@@ -219,7 +219,7 @@ static match_t *match(const char *str, vm_op_t *op)
                 m->end = m->start;
             }
             // TODO: handle captures
-            m->replacement = op->args.replace.replacement;
+            m->capture.replacement = op->args.replace.replacement;
             return m;
         }
         case VM_REF: {
@@ -666,16 +666,19 @@ static vm_op_t *compile_bpeg(const char *str)
     return op;
 }
 
-static void load_def(const char *name, const char *def)
+static vm_op_t *load_def(const char *name, const char *def)
 {
     defs[ndefs].name = name;
-    defs[ndefs].op = compile_bpeg(def);
+    vm_op_t *op = compile_bpeg(def);
+    defs[ndefs].op = op;
     ++ndefs;
+    return op;
 }
 
 static void load_defs(void)
 {
-    load_def("_", "` /\\t/\\n/\\r");
+    load_def("_", "*(` /\\t/\\n/\\r)");
+    load_def("__", "+(` /\\t/\\n/\\r)");
     load_def("nl", "\\n");
     load_def("crlf", "\\r\\n");
     load_def("abc", "`a,z");
@@ -696,15 +699,28 @@ static void load_defs(void)
 
 int main(int argc, char *argv[])
 {
+    check(argc == 3, "Usage: bpeg <pat> <str>");
     load_defs();
 
-    char *lang = argc > 1 ? argv[1] : "'x''y'";
+    const char *lang = argc > 1 ? argv[1] : "'x''y'";
     vm_op_t *op = compile_bpeg(lang);
     check(op, "Failed to compile_bpeg input");
     op = expand_choices(op);
     
-    // TODO: check for semicolon and more rules
-
+    const char *defs = after_spaces(op->end);
+    while (*defs == ';') {
+      defs = after_spaces(++defs);
+      const char *name = defs;
+      check(isalpha(*name), "Definition must begin with a name");
+      while (isalpha(*defs)) ++defs;
+      name = strndup(name, (size_t)(defs-name));
+      defs = after_spaces(defs);
+      check(*defs == '=', "Expected '=' in definition");
+      ++defs;
+      vm_op_t *def = load_def(name, defs);
+      check(def, "Couldn't load definition");
+      defs = def->end;
+    }
 
     char *str = argc > 2 ? argv[2] : "xyz";
 
@@ -725,3 +741,5 @@ int main(int argc, char *argv[])
 
     return 0;
 }
+
+//vim: ts=4

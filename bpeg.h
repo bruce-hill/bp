@@ -8,17 +8,74 @@
 #include <unistd.h>
 
 #include "utils.h"
-#include "vm.h"
 
+/*
+ * Pattern matching result object
+ */
 typedef struct match_s {
+    // Where the match starts and ends (end is after the last character)
     const char *start, *end;
     union {
         unsigned int is_capture:1;
         const char *name;
+        const char *replacement;
     } capture;
-    const char *replacement;
     struct match_s *child, *nextsibling;
 } match_t;
+
+/*
+ * BPEG virtual machine opcodes
+ */
+enum VMOpcode {
+    VM_EMPTY = 0,
+    VM_ANYCHAR = 1,
+    VM_STRING,
+    VM_RANGE,
+    VM_NOT,
+    VM_UPTO,
+    VM_UPTO_AND,
+    VM_REPEAT,
+    VM_BEFORE,
+    VM_AFTER,
+    VM_CAPTURE,
+    VM_OTHERWISE,
+    VM_CHAIN,
+    VM_REPLACE,
+    VM_REF,
+};
+
+/*
+ * A struct reperesenting a BPEG virtual machine operation
+ */
+typedef struct vm_op_s {
+    enum VMOpcode op;
+    const char *start, *end;
+    // Length of the match, if constant, otherwise -1
+    ssize_t len;
+    union {
+        const char *s;
+        struct {
+            char low, high;
+        } range;
+        struct {
+            ssize_t min, max;
+            struct vm_op_s *sep, *repeat_pat;
+        } repetitions;
+        struct {
+            struct vm_op_s *first, *second;
+        } multiple;
+        struct {
+            struct vm_op_s *replace_pat;
+            const char *replacement;
+        } replace;
+        struct {
+            struct vm_op_s *capture_pat;
+            char *name;
+        } capture;
+        struct vm_op_s *pat;
+    } args;
+} vm_op_t;
+
 
 static match_t *free_match(match_t *m);
 static match_t *match(const char *str, vm_op_t *op);

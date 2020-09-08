@@ -7,7 +7,7 @@ all: bpeg
 clean:
 	rm -f bpeg
 
-bpeg: bpeg.c bpeg.h vm.h utils.h
+bpeg: bpeg.c bpeg.h utils.h
 	cc $(CFLAGS) $(OFLAGS) $< -o $@
 
 .PHONY: all clean
