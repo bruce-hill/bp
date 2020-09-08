@@ -182,6 +182,7 @@ static match_t *match(const char *str, vm_op_t *op)
             match_t *m = calloc(sizeof(match_t), 1);
             m->start = str;
             m->end = p->end;
+            m->child = p;
             m->is_capture = 1;
             if (op->args.capture.name)
                 m->name_or_replacement = op->args.capture.name;
@@ -213,6 +214,7 @@ static match_t *match(const char *str, vm_op_t *op)
             if (op->args.replace.replace_pat) {
                 match_t *p = match(str, op->args.replace.replace_pat);
                 if (p == NULL) return NULL;
+                m->child = p;
                 m->end = p->end;
             } else {
                 m->end = m->start;
@@ -610,11 +612,12 @@ static vm_op_t *compile_bpeg(const char *str)
                 check(pat, "Expected pattern after '{'");
                 pat = expand_choices(pat);
                 str = pat->end;
-                str = after_spaces(str+1);
-            } else {
-                ++str;
                 str = after_spaces(str);
+                check(*str == '~', "Expected '~' after pattern in replacement");
             }
+            ++str;
+            str = after_spaces(str);
+
             char quote = *str;
             ++str;
             check(quote == '\'' || quote == '"',
@@ -699,11 +702,66 @@ static void load_defs(void)
     load_def("anglebraces", "`< *(parens / .) `>");
 }
 
+static match_t *get_capture_n(match_t *m, int *n)
+{
+    if (!m) return NULL;
+    if (*n == 0) return m;
+    if (m->is_capture && *n == 1) return m;
+    if (m->is_capture) --(*n);
+    for (match_t *c = m->child; c; c = c->nextsibling) {
+        match_t *cap = get_capture_n(c, n);
+        if (cap) return cap;
+    }
+    return NULL;
+}
+
+static match_t *get_capture_named(match_t *m, const char *name)
+{
+    if (m->is_capture && m->name_or_replacement && strcmp(m->name_or_replacement, name) == 0)
+        return m;
+    for (match_t *c = m->child; c; c = c->nextsibling) {
+        match_t *cap = get_capture_named(c, name);
+        if (cap) return cap;
+    }
+    return NULL;
+}
+
 static void print_match(match_t *m, const char *color)
 {
     if (m->is_replacement) {
-        // TODO: print replacement properly
-        printf("\033[34m%s", m->name_or_replacement);
+        printf("\033[0;7;34m");
+        for (const char *r = m->name_or_replacement; *r; r++) {
+            if (*r == '@') {
+                ++r;
+                match_t *cap = NULL;
+                if (isdigit(*r)) {
+                    int n = (int)strtol(r, (char**)&r, 10);
+                    cap = get_capture_n(m->child, &n);
+                    --r;
+                } else if (*r == '[') {
+                    char *closing = strchr(r+1, ']');
+                    if (!closing) {
+                        fputc('@', stdout);
+                        --r;
+                    } else {
+                        char *name = strndup(r, (size_t)(closing-r));
+                        cap = get_capture_named(m, name);
+                        free(name);
+                        r = closing;
+                    }
+                } else if (*r == '@') {
+                    fputc('@', stdout);
+                } else {
+                    fputc('@', stdout);
+                }
+                if (cap != NULL) {
+                    print_match(cap, "\033[0;7;35m");
+                    printf("\033[0;7;34m");
+                }
+            } else {
+                fputc(*r, stdout);
+            }
+        }
     } else {
         const char *prev = m->start;
         for (match_t *child = m->child; child; child = child->nextsibling) {
