@@ -744,6 +744,7 @@ static void print_match(match_t *m, const char *color)
                         fputc('@', stdout);
                         --r;
                     } else {
+                        ++r;
                         char *name = strndup(r, (size_t)(closing-r));
                         cap = get_capture_named(m, name);
                         free(name);
