@@ -740,7 +740,7 @@ static match_t *get_capture_named(match_t *m, const char *name)
 static void print_match(match_t *m, const char *color)
 {
     if (m->is_replacement) {
-        printf("\033[0;7;34m");
+        printf("\033[0;34m");
         for (const char *r = m->name_or_replacement; *r; r++) {
             if (*r == '@') {
                 ++r;
@@ -767,8 +767,8 @@ static void print_match(match_t *m, const char *color)
                     fputc('@', stdout);
                 }
                 if (cap != NULL) {
-                    print_match(cap, "\033[0;7;35m");
-                    printf("\033[0;7;34m");
+                    print_match(cap, "\033[0;35m");
+                    printf("\033[0;34m");
                 }
             } else if (*r == '\\') {
                 ++r;
@@ -779,6 +779,7 @@ static void print_match(match_t *m, const char *color)
             }
         }
     } else {
+        if (m->is_capture) printf("\033[0;33m{");
         const char *prev = m->start;
         for (match_t *child = m->child; child; child = child->nextsibling) {
             if (child->start > prev)
@@ -788,6 +789,7 @@ static void print_match(match_t *m, const char *color)
         }
         if (m->end > prev)
             printf("%s%.*s", color, (int)(m->end - prev), prev);
+        if (m->is_capture) printf("\033[0;33m}");
     }
 }
 
@@ -851,8 +853,8 @@ int main(int argc, char *argv[])
         printf("No match\n");
         return 1;
     } else {
-        print_match(m, "\033[0;7m");
-        printf("\033[0;7;31m%s\n", m->end);
+        print_match(m, "\033[0;1m");
+        printf("\033[0;2m%s\n", m->end);
     }
 
     return 0;
