@@ -1,110 +1,35 @@
-// # <comment>                 comment
-// ` <c>                       character <c>
-// ! <pat>                     no <pat>
-// ^ <pat>                     upto <pat>
-// & <pat>                     upto and including <pat>
-// <N=1> + <pat> [% <sep="">]  <N> or more <pat>s (separated by <sep>)
-// * <pat> [% <sep="">]        sugar for "0+ <pat> [% <sep>]"
-// <N=1> - <pat> [% <sep="">]  <N> or fewer <pat>s (separated by <sep>)
-// ? <pat>                     sugar for "1- <pat>"
-// <N> - <M> <pat>             <N> to <M> (inclusive) <pat>s
-// < <pat>                     after <pat>, ...
-// > <pat>                     before <pat>, ...
-// .                           any character
-// <pat> / <alt>               <pat> otherwise <alt>
-// ( <pat> )                   <pat>
-// @ <pat>                     capture <pat>
-// @ [ <name> ] <pat>          <pat> named <name>
-// ; <name> = <pat>            <name> is defined to be <pat>
-// { <pat> ~ <str> }           <pat> replaced with <str>
-// "@1" or "@{1}"              first capture
-// "@foo" or "@{foo}"          capture named "foo"
+/*
+ * bpeg.h - Source code for the bpeg parser
+ *
+ * Grammar:
+ *     # <comment>                 comment
+ *     ` <c>                       character <c>
+ *     ! <pat>                     no <pat>
+ *     ^ <pat>                     upto <pat>
+ *     & <pat>                     upto and including <pat>
+ *     <N=1> + <pat> [% <sep="">]  <N> or more <pat>s (separated by <sep>)
+ *     * <pat> [% <sep="">]        sugar for "0+ <pat> [% <sep>]"
+ *     <N=1> - <pat> [% <sep="">]  <N> or fewer <pat>s (separated by <sep>)
+ *     ? <pat>                     sugar for "1- <pat>"
+ *     <N> - <M> <pat>             <N> to <M> (inclusive) <pat>s
+ *     < <pat>                     after <pat>, ...
+ *     > <pat>                     before <pat>, ...
+ *     .                           any character
+ *     <pat> / <alt>               <pat> otherwise <alt>
+ *     ( <pat> )                   <pat>
+ *     @ <pat>                     capture <pat>
+ *     @ [ <name> ] <pat>          <pat> named <name>
+ *     ; <name> = <pat>            <name> is defined to be <pat>
+ *     { <pat> ~ <str> }           <pat> replaced with <str>
+ *     "@1" or "@{1}"              first capture
+ *     "@foo" or "@{foo}"          capture named "foo"
+ */
 
-#include <ctype.h>
-#include <stdio.h>
-#include <string.h>
-#include <stdlib.h>
-#include <unistd.h>
+#include "bpeg.h"
 
-#define check(cond, ...) do { if (!(cond)) { fprintf(stderr, __VA_ARGS__); _exit(1); } } while(0)
-
-typedef struct match_s {
-    const char *start, *end;
-    union {
-        unsigned int is_capture:1;
-        const char *name;
-    } capture;
-    const char *replacement;
-    struct match_s *child, *nextsibling;
-} match_t;
-
-enum VM_OPTYPE {
-    VM_EMPTY = 0,
-    VM_ANYCHAR = 1,
-    VM_STRING,
-    VM_RANGE,
-    VM_NOT,
-    VM_UPTO,
-    VM_UPTO_AND,
-    VM_REPEAT,
-    VM_BEFORE,
-    VM_AFTER,
-    VM_CAPTURE,
-    VM_OTHERWISE,
-    VM_CHAIN,
-    VM_REPLACE,
-    VM_REF,
-};
-
-typedef struct vm_op_s {
-    enum VM_OPTYPE op;
-    const char *start, *end;
-    ssize_t len;
-    union {
-        const char *s;
-        struct {
-            char low, high;
-        } range;
-        struct {
-            ssize_t min, max;
-            struct vm_op_s *sep, *repeat_pat;
-        } repetitions;
-        struct {
-            struct vm_op_s *first, *second;
-        } multiple;
-        struct {
-            struct vm_op_s *replace_pat;
-            const char *replacement;
-        } replace;
-        struct {
-            struct vm_op_s *capture_pat;
-            char *name;
-        } capture;
-        struct vm_op_s *pat;
-    } args;
-} vm_op_t;
-
-static match_t *free_match(match_t *m);
-static match_t *match(const char *str, vm_op_t *op);
-static void set_range(vm_op_t *op, ssize_t min, ssize_t max, vm_op_t *pat, vm_op_t *sep);
-static inline const char *skip_spaces(const char *str);
-static vm_op_t *expand_choices(vm_op_t *op);
-static vm_op_t *expand_chain(vm_op_t *first);
-static vm_op_t *parse(const char *str);
-
-
-typedef struct {
-    const char *name;
-    vm_op_t *op;
-} def_t;
-
-static def_t defs[1024] = {{NULL, NULL}};
-size_t ndefs = 0;
-static int verbose = 1;
-
-#define debug(...) do { if (verbose) fprintf(stderr, __VA_ARGS__); } while(0)
-
-
+/*
+ * Recursively deallocate a match object and return NULL
+ */
 static match_t *free_match(match_t *m)
 {
     if (m->child) m->child = free_match(m->child);
@@ -113,6 +38,11 @@ static match_t *free_match(match_t *m)
     return NULL;
 }
 
+/*
+ * Run virtual machine operation against a string and return
+ * a match struct, or NULL if no match is found.
+ * The returned value should be free()'d to avoid memory leaking.
+ */
 static match_t *match(const char *str, vm_op_t *op)
 {
   tailcall:
@@ -311,6 +241,9 @@ static match_t *match(const char *str, vm_op_t *op)
     }
 }
 
+/*
+ * Helper function to initialize a range object.
+ */
 static void set_range(vm_op_t *op, ssize_t min, ssize_t max, vm_op_t *pat, vm_op_t *sep)
 {
     op->op = VM_REPEAT;
@@ -324,7 +257,11 @@ static void set_range(vm_op_t *op, ssize_t min, ssize_t max, vm_op_t *pat, vm_op
     op->args.repetitions.sep = sep;
 }
 
-static inline const char *skip_spaces(const char *str)
+/* 
+ * Helper function to skip past all spaces (and comments)
+ * Returns a pointer to the first non-space character.
+ */
+static inline const char *after_spaces(const char *str)
 {
     // Skip whitespace and comments:
   skip_whitespace:
@@ -341,9 +278,14 @@ static inline const char *skip_spaces(const char *str)
     return str;
 }
 
+/*
+ * Take an opcode and expand it into a chain of patterns if it's
+ * followed by any patterns (e.g. "`x `y"), otherwise return
+ * the original input.
+ */
 static vm_op_t *expand_chain(vm_op_t *first)
 {
-    vm_op_t *second = parse(first->end);
+    vm_op_t *second = compile_bpeg(first->end);
     if (second == NULL) return first;
     check(second->end > first->end, "No forward progress in chain!");
     second = expand_chain(second);
@@ -359,13 +301,18 @@ static vm_op_t *expand_chain(vm_op_t *first)
     return chain;
 }
 
+/*
+ * Take an opcode and expand it into a chain of choices if it's
+ * followed by any "/"-separated patterns (e.g. "`x/`y"), otherwise
+ * return the original input.
+ */
 static vm_op_t *expand_choices(vm_op_t *first)
 {
     first = expand_chain(first);
-    const char *str = skip_spaces(first->end);
+    const char *str = after_spaces(first->end);
     if (*str != '/') return first;
     ++str;
-    vm_op_t *second = parse(str);
+    vm_op_t *second = compile_bpeg(str);
     check(second, "Expected pattern after '/'");
     second = expand_chain(second);
     vm_op_t *choice = calloc(sizeof(vm_op_t), 1);
@@ -380,11 +327,11 @@ static vm_op_t *expand_choices(vm_op_t *first)
     return expand_choices(choice);
 }
 
-static vm_op_t *parse(const char *str)
+static vm_op_t *compile_bpeg(const char *str)
 {
     if (!*str) return NULL;
     debug("Parsing \"%s\"...\n", str);
-    str = skip_spaces(str);
+    str = after_spaces(str);
     check(*str, "Expected a pattern");
     vm_op_t *op = calloc(sizeof(vm_op_t), 1);
     op->start = str;
@@ -489,7 +436,7 @@ static vm_op_t *parse(const char *str)
         case '!': {
             ++str;
             debug("Not pattern\n");
-            vm_op_t *p = parse(str);
+            vm_op_t *p = compile_bpeg(str);
             check(p, "Expected pattern after '!'\n");
             str = p->end;
             op->op = VM_NOT;
@@ -501,7 +448,7 @@ static vm_op_t *parse(const char *str)
         case '^': {
             ++str;
             debug("Upto pattern\n");
-            vm_op_t *p = parse(str);
+            vm_op_t *p = compile_bpeg(str);
             check(p, "Expected pattern after '^'\n");
             str = p->end;
             op->op = VM_UPTO;
@@ -513,7 +460,7 @@ static vm_op_t *parse(const char *str)
         case '&': {
             ++str;
             debug("Upto-and pattern\n");
-            vm_op_t *p = parse(str);
+            vm_op_t *p = compile_bpeg(str);
             check(p, "Expected pattern after '&'\n");
             str = p->end;
             op->op = VM_UPTO_AND;
@@ -527,11 +474,11 @@ static vm_op_t *parse(const char *str)
             debug("Repetitions\n");
             ssize_t min = -1, max = -1;
             long n1 = strtol(str, (char**)&str, 10);
-            str = skip_spaces(str);
+            str = after_spaces(str);
             switch (*str) {
                 case '-': {
                     ++str;
-                    str = skip_spaces(str);
+                    str = after_spaces(str);
                     const char *start = str;
                     long n2 = strtol(str, (char**)&str, 10);
                     if (str == start) min = 0, max = n1;
@@ -548,13 +495,13 @@ static vm_op_t *parse(const char *str)
                     break;
                 }
             }
-            vm_op_t *pat = parse(str);
+            vm_op_t *pat = compile_bpeg(str);
             check(pat, "Expected pattern after repetition count");
             str = pat->end;
-            str = skip_spaces(str);
+            str = after_spaces(str);
             if (*str == '%') {
                 ++str;
-                vm_op_t *sep = parse(str);
+                vm_op_t *sep = compile_bpeg(str);
                 check(sep, "Expected pattern for separator after '%%'");
                 str = sep->end;
                 set_range(op, min, max, pat, sep);
@@ -574,13 +521,13 @@ static vm_op_t *parse(const char *str)
                 case '?': min = 0, max = 1; break;
             }
             ++str;
-            vm_op_t *pat = parse(str);
+            vm_op_t *pat = compile_bpeg(str);
             check(pat, "Expected pattern after +");
             str = pat->end;
-            str = skip_spaces(str);
+            str = after_spaces(str);
             if (*str == '%') {
                 ++str;
-                vm_op_t *sep = parse(str);
+                vm_op_t *sep = compile_bpeg(str);
                 check(sep, "Expected pattern for separator after '%%'");
                 str = sep->end;
                 set_range(op, min, max, pat, sep);
@@ -594,7 +541,7 @@ static vm_op_t *parse(const char *str)
         case '<': {
             ++str;
             debug("Lookbehind\n");
-            vm_op_t *pat = parse(str);
+            vm_op_t *pat = compile_bpeg(str);
             check(pat, "Expected pattern after <");
             str = pat->end;
             check(pat->len != -1, "Lookbehind patterns must have a fixed length");
@@ -608,7 +555,7 @@ static vm_op_t *parse(const char *str)
         case '>': {
             ++str;
             debug("Lookahead\n");
-            vm_op_t *pat = parse(str);
+            vm_op_t *pat = compile_bpeg(str);
             check(pat, "Expected pattern after >");
             str = pat->end;
             op->op = VM_BEFORE;
@@ -621,11 +568,11 @@ static vm_op_t *parse(const char *str)
             debug("Open paren (\n");
             ++str;
             free(op);
-            op = parse(str);
+            op = compile_bpeg(str);
             check(op, "Expected pattern inside parentheses");
             op = expand_choices(op);
             str = op->end;
-            str = skip_spaces(str);
+            str = after_spaces(str);
             check(*str == ')', "Expected closing parenthesis");
             ++str;
             debug("Close paren (\n");
@@ -636,7 +583,7 @@ static vm_op_t *parse(const char *str)
             debug("Capture\n");
             ++str;
             op->op = VM_CAPTURE;
-            str = skip_spaces(str);
+            str = after_spaces(str);
             if (*str == '[') {
                 ++str;
                 char *closing = strchr(str, ']');
@@ -646,7 +593,7 @@ static vm_op_t *parse(const char *str)
                 str = closing;
                 ++str;
             }
-            vm_op_t *pat = parse(str);
+            vm_op_t *pat = compile_bpeg(str);
             check(pat, "Expected pattern after @");
             str = pat->end;
             op->args.capture.capture_pat = pat;
@@ -657,16 +604,16 @@ static vm_op_t *parse(const char *str)
         case '{': {
             debug("Replacement {\n");
             ++str;
-            str = skip_spaces(str);
+            str = after_spaces(str);
             vm_op_t *pat = NULL;
             if (*str != '~') {
-                pat = parse(str);
+                pat = compile_bpeg(str);
                 check(pat, "Expected pattern after '{'");
                 pat = expand_choices(pat);
                 str = pat->end;
-                str = skip_spaces(str+1);
+                str = after_spaces(str+1);
             }
-            str = skip_spaces(str+1);
+            str = after_spaces(str+1);
             char quote = *(str++);
             check(quote == '\'' || quote == '"',
                   "Expected string literal for replacement");
@@ -679,7 +626,7 @@ static vm_op_t *parse(const char *str)
             }
             replacement = strndup(replacement, (size_t)(str-replacement));
             ++str;
-            str = skip_spaces(str);
+            str = after_spaces(str);
             check(*str == '}', "Expected a closing '}'");
             ++str;
             op->op = VM_REPLACE;
@@ -722,7 +669,7 @@ static vm_op_t *parse(const char *str)
 static void load_def(const char *name, const char *def)
 {
     defs[ndefs].name = name;
-    defs[ndefs].op = parse(def);
+    defs[ndefs].op = compile_bpeg(def);
     ++ndefs;
 }
 
@@ -752,8 +699,8 @@ int main(int argc, char *argv[])
     load_defs();
 
     char *lang = argc > 1 ? argv[1] : "'x''y'";
-    vm_op_t *op = parse(lang);
-    check(op, "Failed to parse input");
+    vm_op_t *op = compile_bpeg(lang);
+    check(op, "Failed to compile_bpeg input");
     op = expand_choices(op);
     
     // TODO: check for semicolon and more rules
