@@ -308,9 +308,10 @@ static vm_op_t *expand_choices(vm_op_t *first)
     const char *str = after_spaces(first->end);
     if (*str != '/') return first;
     ++str;
+    debug("Otherwise:\n");
     vm_op_t *second = compile_bpeg(str);
     check(second, "Expected pattern after '/'");
-    second = expand_chain(second);
+    second = expand_choices(second);
     vm_op_t *choice = calloc(sizeof(vm_op_t), 1);
     choice->op = VM_OTHERWISE;
     choice->start = first->start;
@@ -320,7 +321,7 @@ static vm_op_t *expand_choices(vm_op_t *first)
     choice->end = second->end;
     choice->args.multiple.first = first;
     choice->args.multiple.second = second;
-    return expand_choices(choice);
+    return choice;
 }
 
 static char escapechar(const char *escaped, const char **end)
@@ -392,11 +393,13 @@ static vm_op_t *compile_bpeg(const char *str)
             op->len = 1;
             if (*str == ',') { // Range
                 debug("Char range\n");
-                char c2 = *(++str);
+                ++str;
+                char c2 = *str;
                 check(c2, "Expected character after ','");
                 op->op = VM_RANGE;
                 op->args.range.low = c[0];
                 op->args.range.high = c2;
+                ++str;
             } else {
                 debug("Char literal\n");
                 op->op = VM_STRING;
@@ -578,7 +581,7 @@ static vm_op_t *compile_bpeg(const char *str)
             str = after_spaces(str);
             check(*str == ')', "Expected closing parenthesis");
             ++str;
-            debug("Close paren (\n");
+            debug(")\n");
             break;
         }
         // Capture
@@ -682,6 +685,7 @@ static vm_op_t *load_def(const char *name, const char *def)
 {
     defs[ndefs].name = name;
     vm_op_t *op = compile_bpeg(def);
+    op = expand_choices(op);
     defs[ndefs].op = op;
     ++ndefs;
     return op;
@@ -703,10 +707,10 @@ static void load_defs(void)
     load_def("HEX", "`0,9/`A,F");
     load_def("id", "(`a,z/`A,Z/`_) *(`a,z/`A,Z/`_/`0,9)");
     load_def("line", "^(?\\r\\n / !.)");
-    load_def("parens", "`( *(parens / .) `)");
-    load_def("braces", "`{ *(parens / .) `}");
-    load_def("brackets", "`[ *(parens / .) `]");
-    load_def("anglebraces", "`< *(parens / .) `>");
+    load_def("parens", "`( *(parens / !`) .) `)");
+    load_def("braces", "`{ *(braces / !`} .) `}");
+    load_def("brackets", "`[ *(brackets / !`] .) `]");
+    load_def("anglebraces", "`< *(anglebraces / !`> .) `>");
 }
 
 static match_t *get_capture_n(match_t *m, int *n)
@@ -845,6 +849,7 @@ int main(int argc, char *argv[])
     match_t *m = match(input, op);
     if (m == NULL) {
         printf("No match\n");
+        return 1;
     } else {
         print_match(m, "\033[0;7m");
         printf("\033[0;7;31m%s\n", m->end);
