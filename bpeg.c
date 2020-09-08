@@ -323,6 +323,48 @@ static vm_op_t *expand_choices(vm_op_t *first)
     return expand_choices(choice);
 }
 
+static char escapechar(const char *escaped, const char **end)
+{
+    size_t len = 1;
+    char ret = *escaped;
+    switch (*escaped) {
+        case 'a': ret = '\a'; break; case 'b': ret = '\b'; break;
+        case 'n': ret = '\n'; break; case 'r': ret = '\r'; break;
+        case 't': ret = '\t'; break; case 'v': ret = '\v'; break;
+        case 'x': { // Hex
+            static const char hextable[255] = {
+                ['0']=0x10, ['1']=0x1, ['2']=0x2, ['3']=0x3, ['4']=0x4,
+                ['5']=0x5, ['6']=0x6, ['7']=0x7, ['8']=0x8, ['9']=0x9,
+                ['a']=0xa, ['b']=0xb, ['c']=0xc, ['d']=0xd, ['e']=0xe, ['f']=0xf,
+                ['A']=0xa, ['B']=0xb, ['C']=0xc, ['D']=0xd, ['E']=0xe, ['F']=0xf,
+            };
+            if (hextable[(int)escaped[1]] && hextable[(int)escaped[2]]) {
+                ret = (hextable[(int)escaped[1]] << 4) | (hextable[(int)escaped[2]] & 0xF);
+                len = 3;
+            }
+            break;
+        }
+        case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7': { // Octal
+            ret = escaped[0] - '0';
+            if ('0' <= escaped[1] && escaped[1] <= '7') {
+                ++len;
+                ret = (ret << 3) | (escaped[1] - '0');
+                if ('0' <= escaped[2] && escaped[2] <= '7') {
+                    ++len;
+                    ret = (ret << 3) | (escaped[2] - '0');
+                }
+            }
+            break;
+        }
+        default: break;
+    }
+    *end = &escaped[len];
+    return ret;
+}
+
+/*
+ * Compile a string of BPEG code into virtual machine opcodes
+ */
 static vm_op_t *compile_bpeg(const char *str)
 {
     if (!*str) return NULL;
@@ -369,43 +411,7 @@ static vm_op_t *compile_bpeg(const char *str)
             check(*str, "Expected escape after '\\'");
             op->op = VM_STRING;
             op->len = 1;
-            char c[2] = {*str, '\0'};
-            ++str;
-            switch (c[0]) {
-                case 'a': c[0] = '\a'; break;
-                case 'b': c[0] = '\b'; break;
-                case 'n': c[0] = '\n'; break;
-                case 'r': c[0] = '\r'; break;
-                case 't': c[0] = '\t'; break;
-                case 'v': c[0] = '\v'; break;
-                case 'x': { // Hex
-                    static const char hextable[255] = {
-                        ['0']=0x10, ['1']=0x1, ['2']=0x2, ['3']=0x3, ['4']=0x4,
-                        ['5']=0x5, ['6']=0x6, ['7']=0x7, ['8']=0x8, ['9']=0x9,
-                        ['a']=0xa, ['b']=0xb, ['c']=0xc, ['d']=0xd, ['e']=0xe, ['f']=0xf,
-                        ['A']=0xa, ['B']=0xb, ['C']=0xc, ['D']=0xd, ['E']=0xe, ['F']=0xf,
-                    };
-                    if (hextable[(int)str[1]] && hextable[(int)str[2]])
-                        c[0] = (hextable[(int)str[1]] << 4) | (hextable[(int)str[2]] & 0xF);
-                    break;
-                }
-                case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7': { // Octal
-                    c[0] = c[0] - '0';
-                    ++str;
-                    if ('0' <= *str && *str <= '7') {
-                        c[0] = (c[0] << 3) | (*str - '0');
-                        ++str;
-                    }
-                    if ('0' <= *str && *str <= '7') {
-                        c[0] = (c[0] << 3) | (*str - '0');
-                        ++str;
-                    }
-                    break;
-                }
-                default: {
-                    check(0, "Invalid escape sequence");
-                }
-            }
+            char c[2] = {escapechar(str, &str), '\0'};
             op->args.s = strdup(c);
             break;
         }
@@ -615,19 +621,24 @@ static vm_op_t *compile_bpeg(const char *str)
             str = after_spaces(str);
 
             char quote = *str;
-            ++str;
-            check(quote == '\'' || quote == '"',
-                  "Expected string literal for replacement");
-            const char *replacement = str;
-            for (; *str && *str != quote; str++) {
-                if (*str == '\\') {
-                    check(str[1], "Expected more string contents after backslash");
-                    ++str;
+            const char *replacement;
+            if (quote == '}') {
+                replacement = strdup("");
+            } else {
+                ++str;
+                check(quote == '\'' || quote == '"',
+                      "Expected string literal for replacement");
+                replacement = str;
+                for (; *str && *str != quote; str++) {
+                    if (*str == '\\') {
+                        check(str[1], "Expected more string contents after backslash");
+                        ++str;
+                    }
                 }
+                replacement = strndup(replacement, (size_t)(str-replacement));
+                ++str;
+                str = after_spaces(str);
             }
-            replacement = strndup(replacement, (size_t)(str-replacement));
-            ++str;
-            str = after_spaces(str);
             check(*str == '}', "Expected a closing '}'");
             ++str;
             op->op = VM_REPLACE;
@@ -755,6 +766,10 @@ static void print_match(match_t *m, const char *color)
                     print_match(cap, "\033[0;7;35m");
                     printf("\033[0;7;34m");
                 }
+            } else if (*r == '\\') {
+                ++r;
+                fputc(escapechar(r, &r), stdout);
+                --r;
             } else {
                 fputc(*r, stdout);
             }
