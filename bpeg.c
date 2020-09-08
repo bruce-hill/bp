@@ -115,37 +115,32 @@ static match_t *match(const char *str, vm_op_t *op)
 
             match_t **dest = &m->child;
 
-            size_t reps = 0;
-            *dest = match(str, op->args.repetitions.repeat_pat);
-            if (*dest != NULL) {
-                ++reps;
-                str = (*dest)->end;
-                dest = &(*dest)->nextsibling;
-
-                if (op->args.repetitions.sep != NULL) {
-                    for (; reps < (size_t)op->args.repetitions.max; reps++) {
-                        match_t *sep = match(str, op->args.repetitions.sep);
-                        if (sep == NULL) break;
-                        str = sep->end;
-                        match_t *p = match(str, op->args.repetitions.repeat_pat);
-                        if (p == NULL) {
-                            p = free_match(p);
-                            break;
-                        }
-                        str = p->end;
-                        *dest = sep;
-                        sep->nextsibling = p;
-                        dest = &p->nextsibling;
-                    }
-                } else {
-                    for (; reps < (size_t)op->args.repetitions.max; reps++) {
-                        *dest = match(str, op->args.repetitions.repeat_pat);
-                        if (*dest == NULL) break;
-                        str = (*dest)->end;
-                        dest = &(*dest)->nextsibling;
-                    }
+            const char *prev = str;
+            size_t reps;
+            for (reps = 0; reps < (size_t)op->args.repetitions.max; ++reps) {
+                // Separator
+                match_t *sep = NULL;
+                if (op->args.repetitions.sep != NULL && reps > 0) {
+                    sep = match(str, op->args.repetitions.sep);
+                    if (sep == NULL) break;
+                    str = sep->end;
                 }
+                match_t *p = match(str, op->args.repetitions.repeat_pat);
+                if (p == NULL || p->end == prev) { // Prevent infinite loops
+                    if (sep) sep = free_match(sep);
+                    if (p) p = free_match(p);
+                    break;
+                }
+                if (sep) {
+                    *dest = sep;
+                    dest = &sep->nextsibling;
+                }
+                *dest = p;
+                dest = &p->nextsibling;
+                str = p->end;
+                prev = str;
             }
+
             if ((ssize_t)reps < op->args.repetitions.min) {
                 m = free_match(m);
                 return NULL;
@@ -375,6 +370,7 @@ static vm_op_t *compile_bpeg(const char *str)
             op->op = VM_STRING;
             op->len = 1;
             char c[2] = {*str, '\0'};
+            ++str;
             switch (c[0]) {
                 case 'a': c[0] = '\a'; break;
                 case 'b': c[0] = '\b'; break;
@@ -695,7 +691,7 @@ static void load_defs(void)
     load_def("Hex", "`0,9/`a,f/`A,F");
     load_def("HEX", "`0,9/`A,F");
     load_def("id", "(`a,z/`A,Z/`_) *(`a,z/`A,Z/`_/`0,9)");
-    load_def("line", "&(?\\r\\n / !.)");
+    load_def("line", "^(?\\r\\n / !.)");
     load_def("parens", "`( *(parens / .) `)");
     load_def("braces", "`{ *(parens / .) `}");
     load_def("brackets", "`[ *(parens / .) `]");
@@ -776,12 +772,28 @@ static void print_match(match_t *m, const char *color)
     }
 }
 
+/*
+ * Read an entire file into memory.
+ */
+static char *readfile(int fd)
+{
+    size_t capacity = 1000, len = 0;
+    char *buf = calloc(sizeof(char), capacity+1);
+    ssize_t just_read;
+    while ((just_read=read(fd, &buf[len], capacity-len)) > 0) {
+        len += (size_t)just_read;
+        if (len >= capacity)
+            buf = realloc(buf, (capacity *= 2));
+    }
+    return buf;
+}
+
 int main(int argc, char *argv[])
 {
-    check(argc == 3, "Usage: bpeg <pat> <str>");
+    check(argc >= 2, "Usage: bpeg <pat> [<file>]");
     load_defs();
 
-    const char *lang = argc > 1 ? argv[1] : "'x''y'";
+    const char *lang = argv[1];
     vm_op_t *op = compile_bpeg(lang);
     check(op, "Failed to compile_bpeg input");
     op = expand_choices(op);
@@ -801,14 +813,21 @@ int main(int argc, char *argv[])
         defs = def->end;
     }
 
-    char *str = argc > 2 ? argv[2] : "xyz";
+    char *input;
+    if (argc >= 3) {
+        int fd = open(argv[2], O_RDONLY);
+        check(fd >= 0, "Couldn't open file: %s", argv[2]);
+        input = readfile(fd);
+    } else {
+        input = readfile(STDIN_FILENO);
+    }
 
     // Ensure string has a null byte to the left:
-    char *lpadded = calloc(sizeof(char), strlen(str)+2);
-    stpcpy(&lpadded[1], str);
-    str = &lpadded[1];
+    char *lpadded = calloc(sizeof(char), strlen(input)+2);
+    stpcpy(&lpadded[1], input);
+    input = &lpadded[1];
 
-    match_t *m = match(str, op);
+    match_t *m = match(input, op);
     if (m == NULL) {
         printf("No match\n");
     } else {

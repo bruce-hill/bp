@@ -2,6 +2,7 @@
  * bpeg.h - Header file for the bpeg parser
  */
 #include <ctype.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
