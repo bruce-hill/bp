@@ -90,18 +90,18 @@ static match_t *match(const char *str, vm_op_t *op)
         case VM_UPTO: case VM_UPTO_AND: {
             match_t *m = calloc(sizeof(match_t), 1);
             m->start = str;
-            for (; *str; ++str) {
+            while (*str) {
                 match_t *p = match(str, op->args.pat);
-                if (p != NULL) {
-                    if (op->op == VM_UPTO) {
-                        p = free_match(p);
-                        m->end = str;
-                        return m;
-                    } else {
-                        m->end = p->end;
-                        m->child = p;
-                        return m;
-                    }
+                if (p == NULL) {
+                    ++str;
+                } else if (op->op == VM_UPTO) {
+                    p = free_match(p);
+                    m->end = str;
+                    return m;
+                } else {
+                    m->end = p->end;
+                    m->child = p;
+                    return m;
                 }
             }
             m = free_match(m);
@@ -182,10 +182,9 @@ static match_t *match(const char *str, vm_op_t *op)
             match_t *m = calloc(sizeof(match_t), 1);
             m->start = str;
             m->end = p->end;
+            m->is_capture = 1;
             if (op->args.capture.name)
-                m->capture.name = op->args.capture.name;
-            else
-                m->capture.is_capture = 1;
+                m->name_or_replacement = op->args.capture.name;
             return m;
         }
         case VM_OTHERWISE: {
@@ -218,8 +217,8 @@ static match_t *match(const char *str, vm_op_t *op)
             } else {
                 m->end = m->start;
             }
-            // TODO: handle captures
-            m->capture.replacement = op->args.replace.replacement;
+            m->is_replacement = 1;
+            m->name_or_replacement = op->args.replace.replacement;
             return m;
         }
         case VM_REF: {
@@ -612,9 +611,12 @@ static vm_op_t *compile_bpeg(const char *str)
                 pat = expand_choices(pat);
                 str = pat->end;
                 str = after_spaces(str+1);
+            } else {
+                ++str;
+                str = after_spaces(str);
             }
-            str = after_spaces(str+1);
-            char quote = *(str++);
+            char quote = *str;
+            ++str;
             check(quote == '\'' || quote == '"',
                   "Expected string literal for replacement");
             const char *replacement = str;
@@ -632,8 +634,8 @@ static vm_op_t *compile_bpeg(const char *str)
             op->op = VM_REPLACE;
             op->args.replace.replace_pat = pat;
             op->args.replace.replacement = replacement;
-            debug(" rep = \"%s\"", replacement);
-            debug("}");
+            debug(" rep = \"%s\"\n", replacement);
+            debug("}\n");
             if (pat != NULL) op->len = pat->len;
             break;
         }
@@ -697,6 +699,24 @@ static void load_defs(void)
     load_def("anglebraces", "`< *(parens / .) `>");
 }
 
+static void print_match(match_t *m, const char *color)
+{
+    if (m->is_replacement) {
+        // TODO: print replacement properly
+        printf("\033[34m%s", m->name_or_replacement);
+    } else {
+        const char *prev = m->start;
+        for (match_t *child = m->child; child; child = child->nextsibling) {
+            if (child->start > prev)
+                printf("%s%.*s", color, (int)(child->start - prev), prev);
+            print_match(child, color);
+            prev = child->end;
+        }
+        if (m->end > prev)
+            printf("%s%.*s", color, (int)(m->end - prev), prev);
+    }
+}
+
 int main(int argc, char *argv[])
 {
     check(argc == 3, "Usage: bpeg <pat> <str>");
@@ -709,17 +729,17 @@ int main(int argc, char *argv[])
     
     const char *defs = after_spaces(op->end);
     while (*defs == ';') {
-      defs = after_spaces(++defs);
-      const char *name = defs;
-      check(isalpha(*name), "Definition must begin with a name");
-      while (isalpha(*defs)) ++defs;
-      name = strndup(name, (size_t)(defs-name));
-      defs = after_spaces(defs);
-      check(*defs == '=', "Expected '=' in definition");
-      ++defs;
-      vm_op_t *def = load_def(name, defs);
-      check(def, "Couldn't load definition");
-      defs = def->end;
+        defs = after_spaces(++defs);
+        const char *name = defs;
+        check(isalpha(*name), "Definition must begin with a name");
+        while (isalpha(*defs)) ++defs;
+        name = strndup(name, (size_t)(defs-name));
+        defs = after_spaces(defs);
+        check(*defs == '=', "Expected '=' in definition");
+        ++defs;
+        vm_op_t *def = load_def(name, defs);
+        check(def, "Couldn't load definition");
+        defs = def->end;
     }
 
     char *str = argc > 2 ? argv[2] : "xyz";
@@ -733,10 +753,8 @@ int main(int argc, char *argv[])
     if (m == NULL) {
         printf("No match\n");
     } else {
-        printf("%.*s\033[7m%.*s\033[0m%s\n",
-               (int)(str - m->start), str,
-               (int)(m->end - m->start), m->start, 
-               m->end);
+        print_match(m, "\033[0;7m");
+        printf("\033[0;7;31m%s\n", m->end);
     }
 
     return 0;
