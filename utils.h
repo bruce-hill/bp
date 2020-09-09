@@ -6,6 +6,8 @@
 #define check(cond, ...) do { if (!(cond)) { fprintf(stderr, __VA_ARGS__); fwrite("\n", 1, 1, stderr); _exit(1); } } while(0)
 #define debug(...) do { if (verbose) fprintf(stderr, __VA_ARGS__); } while(0)
 
+static int visualize_delay = -1;
+
 /* 
  * Helper function to skip past all spaces (and comments)
  * Returns a pointer to the first non-space character.
@@ -36,4 +38,17 @@ static inline int matchchar(const char **str, char c)
     } else {
         return 0;
     }
+}
+
+static void visualize(const char *source, const char *ptr, const char *msg)
+{
+    if (visualize_delay < 0) return;
+    fprintf(stderr, "\033[0;1m\r\033[2A\033[K%.*s\033[0;2m%s\033[0m\n",
+            (int)(ptr-source), source, ptr);
+    fprintf(stderr, "\033[0;1m");
+    for (--ptr ; ptr > source; --ptr) putc(' ', stderr);
+    fprintf(stderr, "^\033[K\n");
+    if (msg)
+        fprintf(stderr, "\033[K\033[33;1m%s\033[0m", msg);
+    usleep(visualize_delay);
 }

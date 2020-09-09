@@ -78,19 +78,20 @@ typedef struct vm_op_s {
 static inline const char *after_spaces(const char *str);
 static match_t *free_match(match_t *m);
 static match_t *match(const char *str, vm_op_t *op);
-static vm_op_t *compile_bpeg(const char *str);
-static vm_op_t *expand_chain(vm_op_t *first);
-static vm_op_t *expand_choices(vm_op_t *op);
+static vm_op_t *compile_bpeg(const char *source, const char *str);
+static vm_op_t *expand_chain(const char *source, vm_op_t *first);
+static vm_op_t *expand_choices(const char *source, vm_op_t *op);
 static void print_match(match_t *m, const char *color);
 static void set_range(vm_op_t *op, ssize_t min, ssize_t max, vm_op_t *pat, vm_op_t *sep);
 
 
 typedef struct {
     const char *name;
+    const char *source;
     vm_op_t *op;
 } def_t;
 
-static def_t defs[1024] = {{NULL, NULL}};
+static def_t defs[1024] = {{NULL, NULL, NULL}};
 size_t ndefs = 0;
-static int verbose = 1;
+//static int verbose = 1;
 

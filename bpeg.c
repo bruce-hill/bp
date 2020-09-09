@@ -258,12 +258,13 @@ static void set_range(vm_op_t *op, ssize_t min, ssize_t max, vm_op_t *pat, vm_op
  * followed by any patterns (e.g. "`x `y"), otherwise return
  * the original input.
  */
-static vm_op_t *expand_chain(vm_op_t *first)
+static vm_op_t *expand_chain(const char *source, vm_op_t *first)
 {
-    vm_op_t *second = compile_bpeg(first->end);
+    vm_op_t *second = compile_bpeg(source, first->end);
     if (second == NULL) return first;
     check(second->end > first->end, "No forward progress in chain!");
-    second = expand_chain(second);
+    visualize(source, first->end, "Expanding chain...");
+    second = expand_chain(source, second);
     vm_op_t *chain = calloc(sizeof(vm_op_t), 1);
     chain->op = VM_CHAIN;
     chain->start = first->start;
@@ -273,6 +274,7 @@ static vm_op_t *expand_chain(vm_op_t *first)
     chain->end = second->end;
     chain->args.multiple.first = first;
     chain->args.multiple.second = second;
+    visualize(source, chain->end, "Got chained pair.");
     return chain;
 }
 
@@ -281,15 +283,16 @@ static vm_op_t *expand_chain(vm_op_t *first)
  * followed by any "/"-separated patterns (e.g. "`x/`y"), otherwise
  * return the original input.
  */
-static vm_op_t *expand_choices(vm_op_t *first)
+static vm_op_t *expand_choices(const char *source, vm_op_t *first)
 {
-    first = expand_chain(first);
+    first = expand_chain(source, first);
     const char *str = first->end;
     if (!matchchar(&str, '/')) return first;
-    debug("Otherwise:\n");
-    vm_op_t *second = compile_bpeg(str);
+    visualize(source, str, "Expanding choices...");
+    //debug("Otherwise:\n");
+    vm_op_t *second = compile_bpeg(source, str);
     check(second, "Expected pattern after '/'");
-    second = expand_choices(second);
+    second = expand_choices(source, second);
     vm_op_t *choice = calloc(sizeof(vm_op_t), 1);
     choice->op = VM_OTHERWISE;
     choice->start = first->start;
@@ -299,6 +302,7 @@ static vm_op_t *expand_choices(vm_op_t *first)
     choice->end = second->end;
     choice->args.multiple.first = first;
     choice->args.multiple.second = second;
+    visualize(source, choice->end, "Got two choices");
     return choice;
 }
 
@@ -344,10 +348,11 @@ static char escapechar(const char *escaped, const char **end)
 /*
  * Compile a string of BPEG code into virtual machine opcodes
  */
-static vm_op_t *compile_bpeg(const char *str)
+static vm_op_t *compile_bpeg(const char *source, const char *str)
 {
     if (!*str) return NULL;
-    debug("Parsing \"%s\"...\n", str);
+    visualize(source, str, "Compiling...");
+    //debug("Parsing \"%s\"...\n", str);
     str = after_spaces(str);
     check(*str, "Expected a pattern");
     vm_op_t *op = calloc(sizeof(vm_op_t), 1);
@@ -358,7 +363,8 @@ static vm_op_t *compile_bpeg(const char *str)
     switch (c) {
         // Any char (dot)
         case '.': {
-            debug("Dot\n");
+            visualize(source, str, "Dot");
+            //debug("Dot\n");
             op->op = VM_ANYCHAR;
             op->len = 1;
             break;
@@ -367,10 +373,12 @@ static vm_op_t *compile_bpeg(const char *str)
         case '`': {
             char literal[2] = {*str, '\0'};
             ++str;
+            visualize(source, str, "Char literal");
             check(literal[0], "Expected character after '`'\n");
             op->len = 1;
             if (matchchar(&str, ',')) { // Range
-                debug("Char range\n");
+                visualize(source, str, "Char range");
+                //debug("Char range\n");
                 char c2 = *str;
                 check(c2, "Expected character after ','");
                 op->op = VM_RANGE;
@@ -378,7 +386,7 @@ static vm_op_t *compile_bpeg(const char *str)
                 op->args.range.high = c2;
                 ++str;
             } else {
-                debug("Char literal\n");
+                //debug("Char literal\n");
                 op->op = VM_STRING;
                 op->args.s = strdup(literal);
             }
@@ -386,7 +394,8 @@ static vm_op_t *compile_bpeg(const char *str)
         }
         // Escapes
         case '\\': {
-            debug("Escape sequence\n");
+            //debug("Escape sequence\n");
+            visualize(source, str, "Escape sequence");
             check(*str, "Expected escape after '\\'");
             op->op = VM_STRING;
             op->len = 1;
@@ -396,6 +405,7 @@ static vm_op_t *compile_bpeg(const char *str)
         }
         // String literal
         case '"': case '\'': {
+            visualize(source, str, "String literal");
             char quote = c;
             const char *literal = str;
             for (; *str && *str != quote; str++) {
@@ -403,19 +413,21 @@ static vm_op_t *compile_bpeg(const char *str)
                     check(str[1], "Expected more string contents after backslash");
                     ++str;
                 }
+                visualize(source, str, "String literal");
             }
             op->op = VM_STRING;
             op->len = (ssize_t)(str - literal);
             op->args.s = strndup(literal, (size_t)op->len);
             // TODO: handle escape chars like \n
-            debug("String literal: %c%s%c\n", quote, op->args.s, quote);
+            //debug("String literal: %c%s%c\n", quote, op->args.s, quote);
             check(matchchar(&str, quote), "Missing closing quote");
             break;
         }
         // Not <pat>
         case '!': {
-            debug("Not pattern\n");
-            vm_op_t *p = compile_bpeg(str);
+            // debug("Not pattern\n");
+            visualize(source, str, "Not <pat>");
+            vm_op_t *p = compile_bpeg(source, str);
             check(p, "Expected pattern after '!'\n");
             str = p->end;
             op->op = VM_NOT;
@@ -425,8 +437,9 @@ static vm_op_t *compile_bpeg(const char *str)
         }
         // Upto <pat>
         case '^': {
-            debug("Upto pattern\n");
-            vm_op_t *p = compile_bpeg(str);
+            visualize(source, str, "Upto <pat>");
+            //debug("Upto pattern\n");
+            vm_op_t *p = compile_bpeg(source, str);
             check(p, "Expected pattern after '^'\n");
             str = p->end;
             op->op = VM_UPTO;
@@ -436,8 +449,9 @@ static vm_op_t *compile_bpeg(const char *str)
         }
         // Upto and including <pat>
         case '&': {
-            debug("Upto-and pattern\n");
-            vm_op_t *p = compile_bpeg(str);
+            //debug("Upto-and pattern\n");
+            visualize(source, str, "Upto and including <pat>");
+            vm_op_t *p = compile_bpeg(source, str);
             check(p, "Expected pattern after '&'\n");
             str = p->end;
             op->op = VM_UPTO_AND;
@@ -448,7 +462,7 @@ static vm_op_t *compile_bpeg(const char *str)
         // Number of repetitions: <N>(-<N> / - / + / "")
         case '0': case '1': case '2': case '3': case '4': case '5':
         case '6': case '7': case '8': case '9': {
-            debug("Repetitions\n");
+            visualize(source, str, "Repeat <pat>");
             ssize_t min = -1, max = -1;
             --str;
             long n1 = strtol(str, (char**)&str, 10);
@@ -463,49 +477,56 @@ static vm_op_t *compile_bpeg(const char *str)
             } else {
                 min = n1, max = n1;
             }
-            vm_op_t *pat = compile_bpeg(str);
+            visualize(source, str, NULL);
+            vm_op_t *pat = compile_bpeg(source, str);
             check(pat, "Expected pattern after repetition count");
             str = pat->end;
             str = after_spaces(str);
             if (matchchar(&str, '%')) {
-                vm_op_t *sep = compile_bpeg(str);
+                visualize(source, str, "Repeat <pat> with separator");
+                vm_op_t *sep = compile_bpeg(source, str);
                 check(sep, "Expected pattern for separator after '%%'");
                 str = sep->end;
                 set_range(op, min, max, pat, sep);
             } else {
                 set_range(op, min, max, pat, NULL);
             }
-            debug("min = %lld max = %lld\n", (long long)op->args.repetitions.min, (long long)op->args.repetitions.max);
+            visualize(source, str, NULL);
+            //debug("min = %lld max = %lld\n", (long long)op->args.repetitions.min, (long long)op->args.repetitions.max);
             break;
         }
         // Special repetitions:
         case '+': case '*': case '?': {
-            debug("Special repetitions\n");
+            //debug("Special repetitions\n");
+            visualize(source, str, "Repeat <pat>");
             ssize_t min = -1, max = -1;
             switch (c) {
                 case '+': min = 1, max = -1; break;
                 case '*': min = 0, max = -1; break;
                 case '?': min = 0, max = 1; break;
             }
-            vm_op_t *pat = compile_bpeg(str);
+            vm_op_t *pat = compile_bpeg(source, str);
             check(pat, "Expected pattern after +");
             str = pat->end;
             str = after_spaces(str);
             if (matchchar(&str, '%')) {
-                vm_op_t *sep = compile_bpeg(str);
+                visualize(source, str, "Repeat <pat> with separator");
+                vm_op_t *sep = compile_bpeg(source, str);
                 check(sep, "Expected pattern for separator after '%%'");
                 str = sep->end;
                 set_range(op, min, max, pat, sep);
             } else {
                 set_range(op, min, max, pat, NULL);
             }
-            debug("min = %lld max = %lld\n", (long long)op->args.repetitions.min, (long long)op->args.repetitions.max);
+            visualize(source, str, NULL);
+            //debug("min = %lld max = %lld\n", (long long)op->args.repetitions.min, (long long)op->args.repetitions.max);
             break;
         }
         // Lookbehind
         case '<': {
-            debug("Lookbehind\n");
-            vm_op_t *pat = compile_bpeg(str);
+            visualize(source, str, "After <pat>");
+            //debug("Lookbehind\n");
+            vm_op_t *pat = compile_bpeg(source, str);
             check(pat, "Expected pattern after <");
             str = pat->end;
             check(pat->len != -1, "Lookbehind patterns must have a fixed length");
@@ -517,8 +538,9 @@ static vm_op_t *compile_bpeg(const char *str)
         }
         // Lookahead
         case '>': {
-            debug("Lookahead\n");
-            vm_op_t *pat = compile_bpeg(str);
+            visualize(source, str, "Before <pat>");
+            //debug("Lookahead\n");
+            vm_op_t *pat = compile_bpeg(source, str);
             check(pat, "Expected pattern after >");
             str = pat->end;
             op->op = VM_BEFORE;
@@ -528,50 +550,57 @@ static vm_op_t *compile_bpeg(const char *str)
         }
         // Parentheses
         case '(': {
-            debug("Open paren (\n");
+            visualize(source, str, NULL);
+            // debug("Open paren (\n");
             free(op);
-            op = compile_bpeg(str);
+            op = compile_bpeg(source, str);
             check(op, "Expected pattern inside parentheses");
-            op = expand_choices(op);
+            op = expand_choices(source, op);
             str = op->end;
             str = after_spaces(str);
             check(matchchar(&str, ')'), "Expected closing parenthesis");
-            debug(")\n");
+            visualize(source, str, NULL);
+            // debug(")\n");
             break;
         }
         // Capture
         case '@': {
-            debug("Capture\n");
+            //debug("Capture\n");
+            visualize(source, str, "Capture");
             op->op = VM_CAPTURE;
             str = after_spaces(str);
             if (matchchar(&str, '[')) {
                 char *closing = strchr(str, ']');
                 check(closing, "Expected closing ']'");
                 op->args.capture.name = strndup(str, (size_t)(closing-str));
-                debug("named \"%s\"\n", op->args.capture.name);
+                visualize(source, str, "Named capture");
+                //debug("named \"%s\"\n", op->args.capture.name);
                 str = closing;
                 check(matchchar(&str, ']'), "Expected closing ']'");
             }
-            vm_op_t *pat = compile_bpeg(str);
+            vm_op_t *pat = compile_bpeg(source, str);
             check(pat, "Expected pattern after @");
             str = pat->end;
             op->args.capture.capture_pat = pat;
             op->len = pat->len;
+            visualize(source, str, NULL);
             break;
         }
         // Replacement
         case '{': {
-            debug("Replacement {\n");
+            //debug("Replacement {\n");
+            visualize(source, str, "Replacement");
             str = after_spaces(str);
             vm_op_t *pat = NULL;
             if (!matchchar(&str, '~')) {
-                pat = compile_bpeg(str);
+                pat = compile_bpeg(source, str);
                 check(pat, "Expected pattern after '{'");
-                pat = expand_choices(pat);
+                pat = expand_choices(source, pat);
                 str = pat->end;
                 str = after_spaces(str);
                 check(matchchar(&str, '~'), "Expected '~' after pattern in replacement");
             }
+            visualize(source, str, NULL);
             str = after_spaces(str);
 
             char quote = *str;
@@ -587,22 +616,26 @@ static vm_op_t *compile_bpeg(const char *str)
                         check(str[1], "Expected more string contents after backslash");
                         ++str;
                     }
+                    visualize(source, str, NULL);
                 }
                 replacement = strndup(replacement, (size_t)(str-replacement));
                 check(matchchar(&str, quote), "Expected closing quote");
             }
+            visualize(source, str, NULL);
             check(matchchar(&str, '}'), "Expected a closing '}'");
             op->op = VM_REPLACE;
             op->args.replace.replace_pat = pat;
             op->args.replace.replacement = replacement;
-            debug(" rep = \"%s\"\n", replacement);
-            debug("}\n");
+            //debug(" rep = \"%s\"\n", replacement);
+            //debug("}\n");
             if (pat != NULL) op->len = pat->len;
+            visualize(source, str, NULL);
             break;
         }
         // Whitespace
         case '_': {
-            debug("Whitespace\n");
+            //debug("Whitespace\n");
+            visualize(source, str, NULL);
             op->op = VM_REF;
             op->args.s = strdup("_");
             break;
@@ -610,16 +643,20 @@ static vm_op_t *compile_bpeg(const char *str)
         default: {
             // Reference
             if (isalpha(c)) {
+                visualize(source, str, "Ref");
                 --str;
                 const char *refname = str;
                 size_t len = 1;
-                for (++str; isalnum(*str); ++str)
+                for (++str; isalnum(*str); ++str) {
                     ++len;
+                    visualize(source, str, NULL);
+                }
                 op->op = VM_REF;
-                debug("Ref: %s\n", refname);
+                //debug("Ref: %s\n", refname);
                 op->args.s = strndup(refname, len);
                 break;
             } else {
+                visualize(source, str, "No match");
                 free(op);
                 return NULL;
             }
@@ -629,11 +666,12 @@ static vm_op_t *compile_bpeg(const char *str)
     return op;
 }
 
-static vm_op_t *load_def(const char *name, const char *def)
+static vm_op_t *load_def(const char *name, const char *source)
 {
     defs[ndefs].name = name;
-    vm_op_t *op = compile_bpeg(def);
-    op = expand_choices(op);
+    defs[ndefs].source = source;
+    vm_op_t *op = compile_bpeg(source, source);
+    op = expand_choices(source, op);
     defs[ndefs].op = op;
     ++ndefs;
     return op;
@@ -726,7 +764,7 @@ static void print_match(match_t *m, const char *color)
             }
         }
     } else {
-        if (m->is_capture) printf("\033[0;33m{");
+        if (m->is_capture) printf("\033[0;2;33m{");
         const char *prev = m->start;
         for (match_t *child = m->child; child; child = child->nextsibling) {
             if (child->start > prev)
@@ -736,7 +774,7 @@ static void print_match(match_t *m, const char *color)
         }
         if (m->end > prev)
             printf("%s%.*s", color, (int)(m->end - prev), prev);
-        if (m->is_capture) printf("\033[0;33m}");
+        if (m->is_capture) printf("\033[0;2;33m}");
     }
 }
 
@@ -756,18 +794,123 @@ static char *readfile(int fd)
     return buf;
 }
 
+static void print_grammar(vm_op_t *op)
+{
+    switch (op->op) {
+        case VM_REF: fprintf(stderr, "a $%s", op->args.s); break;
+        case VM_EMPTY: fprintf(stderr, "empty"); break;
+        case VM_ANYCHAR: fprintf(stderr, "any char"); break;
+        case VM_STRING: fprintf(stderr, "string \"%s\"", op->args.s); break;
+        case VM_RANGE: {
+            fprintf(stderr, "char from %c-%c", op->args.range.low, op->args.range.high);
+            break;
+        }
+        case VM_REPEAT: {
+            if (op->args.repetitions.max == -1)
+                fprintf(stderr, "%ld or more ", op->args.repetitions.min);
+            else
+                fprintf(stderr, "%ld-%ld of (",
+                        op->args.repetitions.min,
+                        op->args.repetitions.max);
+            print_grammar(op->args.repetitions.repeat_pat);
+            fprintf(stderr, ")");
+            if (op->args.repetitions.sep) {
+                fprintf(stderr, " separated by (");
+                print_grammar(op->args.repetitions.sep);
+                fprintf(stderr, ")");
+            }
+            break;
+        }
+        case VM_NOT: {
+            fprintf(stderr, "not (");
+            print_grammar(op->args.pat);
+            fprintf(stderr, ")");
+            break;
+        }
+        case VM_UPTO: {
+            fprintf(stderr, "text up to (");
+            print_grammar(op->args.pat);
+            fprintf(stderr, ")");
+            break;
+        }
+        case VM_UPTO_AND: {
+            fprintf(stderr, "text up to and including (");
+            print_grammar(op->args.pat);
+            fprintf(stderr, ")");
+            break;
+        }
+        case VM_AFTER: {
+            fprintf(stderr, "after (");
+            print_grammar(op->args.pat);
+            fprintf(stderr, ")");
+            break;
+        }
+        case VM_BEFORE: {
+            fprintf(stderr, "before (");
+            print_grammar(op->args.pat);
+            fprintf(stderr, ")");
+            break;
+        }
+        case VM_CAPTURE: {
+            fprintf(stderr, "capture (");
+            print_grammar(op->args.pat);
+            fprintf(stderr, ")");
+            if (op->args.capture.name)
+                fprintf(stderr, " and call it %s", op->args.capture.name);
+            break;
+        }
+        case VM_OTHERWISE: {
+            fprintf(stderr, "(");
+            print_grammar(op->args.multiple.first);
+            fprintf(stderr, ") or else ");
+            if (op->args.multiple.second->op != VM_OTHERWISE)
+                fprintf(stderr, "(");
+            print_grammar(op->args.multiple.second);
+            if (op->args.multiple.second->op != VM_OTHERWISE)
+                fprintf(stderr, ")");
+            break;
+        }
+        case VM_CHAIN: {
+            fprintf(stderr, "(");
+            print_grammar(op->args.multiple.first);
+            fprintf(stderr, ") then ");
+            if (op->args.multiple.second->op != VM_CHAIN)
+                fprintf(stderr, "(");
+            print_grammar(op->args.multiple.second);
+            if (op->args.multiple.second->op != VM_CHAIN)
+                fprintf(stderr, ")");
+            break;
+        }
+        case VM_REPLACE: {
+            fprintf(stderr, "replace ");
+            if (op->args.replace.replace_pat) {
+                fprintf(stderr, "(");
+                print_grammar(op->args.replace.replace_pat);
+                fprintf(stderr, ")");
+            } else
+                fprintf(stderr, "\"\"");
+            fprintf(stderr, " with \"%s\"", op->args.replace.replacement);
+            break;
+        }
+        default: break;
+    }
+}
+
 int main(int argc, char *argv[])
 {
     check(argc >= 2, "Usage: bpeg <pat> [<file>]");
+    fprintf(stderr, "========== Compiling ===========\n\n\n\n");
     load_defs();
 
     const char *lang = argv[1];
-    vm_op_t *op = compile_bpeg(lang);
+    visualize_delay = 100000;
+    vm_op_t *op = compile_bpeg(lang, lang);
     check(op, "Failed to compile_bpeg input");
-    op = expand_choices(op);
+    op = expand_choices(lang, op);
     
     const char *defs = op->end;
     while (matchchar(&defs, ';')) {
+        fprintf(stderr, "\n");
         defs = after_spaces(defs);
         const char *name = defs;
         check(isalpha(*name), "Definition must begin with a name");
@@ -779,6 +922,10 @@ int main(int argc, char *argv[])
         check(def, "Couldn't load definition");
         defs = def->end;
     }
+
+    fprintf(stderr, "\n\n");
+    print_grammar(op);
+    fprintf(stderr, "\n\n");
 
     char *input;
     if (argc >= 3) {
