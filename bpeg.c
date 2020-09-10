@@ -1,5 +1,5 @@
 /*
- * bpeg.h - Source code for the bpeg parser
+ * bpeg.c - Source code for the bpeg parser
  *
  * Grammar:
  *     # <comment>                 comment
@@ -9,10 +9,7 @@
  *     _                           0 or more spaces or tabs
  *     `<c>                        character <c>
  *     `<a>-<z>                    character between <a> and <z>
- *     `<a>,<b>,...                character <a> or <b> (WIP)
  *     \<e>                        escape sequence (e.g. \n, \033)
- *     \<e1>-<e2>                  escape sequence range (WIP)
- *     \<e1>,<e2>,...              one of multiple escape sequences (WIP)
  *     ! <pat>                     no <pat>
  *     ~ <pat>                     any character as long as it doesn't match <pat>
  *     & <pat>                     upto and including <pat> (aka *~<pat> <pat>)
@@ -23,14 +20,15 @@
  *     <N> - <M> <pat>             <N> to <M> (inclusive) <pat>s
  *     < <pat>                     after <pat>, ...
  *     > <pat>                     before <pat>, ...
- *     <pat> / <alt>               <pat> otherwise <alt>
  *     ( <pat> )                   <pat>
  *     @ <pat>                     capture <pat>
  *     @ [ <name> ] <pat>          <pat> named <name>
+ *     { <pat> => <str> }           <pat> replaced with <str>
+ *     "@1" or "@[1]"              first capture
+ *     "@foo" or "@[foo]"          capture named "foo"
+ *     <pat1> <pat2>               <pat1> followed by <pat2>
+ *     <pat> / <alt>               <pat> otherwise <alt>
  *     ; <name> = <pat>            <name> is defined to be <pat>
- *     { <pat> -> <str> }           <pat> replaced with <str>
- *     "@1" or "@{1}"              first capture
- *     "@foo" or "@{foo}"          capture named "foo"
  */
 
 #include "bpeg.h"
@@ -103,9 +101,11 @@ static match_t *match(const char *str, vm_op_t *op)
         case VM_UPTO_AND: {
             match_t *m = calloc(sizeof(match_t), 1);
             m->start = str;
-            while (*str && (multiline_dot || (*str != '\n' && *str != '\r'))) {
+            while (*str) {
                 match_t *p = match(str, op->args.pat);
                 if (p == NULL) {
+                    if (!multiline_dot && (*str == '\n' || *str == '\r'))
+                        break;
                     ++str;
                 } else {
                     m->end = p->end;
@@ -135,7 +135,7 @@ static match_t *match(const char *str, vm_op_t *op)
                     str = sep->end;
                 }
                 match_t *p = match(str, op->args.repetitions.repeat_pat);
-                if (p == NULL || p->end == prev) { // Prevent infinite loops
+                if (p == NULL || (p->end == prev && reps > 0)) { // Prevent infinite loops
                     if (sep) sep = free_match(sep);
                     if (p) p = free_match(p);
                     break;
@@ -612,16 +612,17 @@ static vm_op_t *compile_bpeg(const char *source, const char *str)
             visualize(source, str, "Replacement");
             str = after_spaces(str);
             vm_op_t *pat = NULL;
-            if (strncmp(str, "->", 2) == 0) {
-                str += strlen("->");
+            if (strncmp(str, "=>", 2) == 0) {
+                str += strlen("=>");
             } else {
                 pat = compile_bpeg(source, str);
                 check(pat, "Invalid pattern after '{'");
                 pat = expand_choices(source, pat);
                 str = pat->end;
                 str = after_spaces(str);
-                check(matchchar(&str, '-') && matchchar(&str, '>'),
-                      "Expected '->' after pattern in replacement");
+                printf("at: '%s'\n", str);
+                check(matchchar(&str, '=') && matchchar(&str, '>'),
+                      "Expected '=>' after pattern in replacement");
             }
             visualize(source, str, NULL);
             str = after_spaces(str);
@@ -630,6 +631,7 @@ static vm_op_t *compile_bpeg(const char *source, const char *str)
             const char *replacement;
             if (matchchar(&str, '}')) {
                 replacement = strdup("");
+                visualize(source, str, NULL);
             } else {
                 check(matchchar(&str, '"') || matchchar(&str, '\''),
                       "Expected string literal for replacement");
@@ -643,9 +645,8 @@ static vm_op_t *compile_bpeg(const char *source, const char *str)
                 }
                 replacement = strndup(replacement, (size_t)(str-replacement));
                 check(matchchar(&str, quote), "Expected closing quote");
+                check(matchchar(&str, '}'), "Expected a closing '}'");
             }
-            visualize(source, str, NULL);
-            check(matchchar(&str, '}'), "Expected a closing '}'");
             op->op = VM_REPLACE;
             op->args.replace.replace_pat = pat;
             op->args.replace.replacement = replacement;
@@ -657,9 +658,24 @@ static vm_op_t *compile_bpeg(const char *source, const char *str)
         }
         // Special rules:
         case '_': case '^': case '$': {
-            visualize(source, str, NULL);
             op->op = VM_REF;
-            op->args.s = strndup(&c, 1);
+            if (matchchar(&str, c)) { // double __, ^^, $$
+                char tmp[3] = {c, c, '\0'};
+                op->args.s = strdup(tmp);
+            } else 
+                op->args.s = strndup(&c, 1);
+            visualize(source, str, op->args.s);
+            break;
+        }
+        // Empty choice (/) or {/}
+        case '/': {
+            str = after_spaces(str);
+            if (*str == ')' || *str == '}') {
+                op->op = VM_EMPTY;
+            } else {
+                free(op);
+                return NULL;
+            }
             break;
         }
         default: {
@@ -795,10 +811,19 @@ static void load_defs(void)
     load_def("esc", "\\e"); load_def("e", "\\e");
     load_def("tab", "\\t"); load_def("t", "\\t");
     load_def("nl", "\\n"); load_def("lf", "\\n"); load_def("n", "\\n");
-    load_def("ws", "` /\\t/\\n/\\r");
-    load_def("_", "*(` /\\t/\\n/\\r)");
-    load_def("$", ">\\n / !. / >\\r\\n");
+    load_def("cBlockComment", "'/*' &'*/'");
+    load_def("cLineComment", "'//' &$");
+    load_def("cComment", "cLineComment / cBlockComment");
+    load_def("hashComment", "`# &$");
+    load_def("comment", "!(/)"); // undefined by default
+    load_def("WS", "` /\\t/\\n/\\r/comment");
+    load_def("ws", "` /\\t");
+    load_def("$$", "!(. / \\n)");
+    load_def("$", "!. / >\\n");
+    load_def("^^", "!<(. / \\n)");
     load_def("^", "<\\n / !<.");
+    load_def("__", "*(` /\\t/\\n/\\r/comment)");
+    load_def("_", "*(` /\\t)");
 }
 
 static match_t *get_capture_n(match_t *m, int *n)
@@ -905,7 +930,7 @@ static void print_grammar(vm_op_t *op)
 {
     switch (op->op) {
         case VM_REF: fprintf(stderr, "a $%s", op->args.s); break;
-        case VM_EMPTY: fprintf(stderr, "empty"); break;
+        case VM_EMPTY: fprintf(stderr, "the empty string"); break;
         case VM_ANYCHAR: fprintf(stderr, "any char"); break;
         case VM_STRING: fprintf(stderr, "string \"%s\"", op->args.s); break;
         case VM_RANGE: {
@@ -1014,9 +1039,19 @@ static vm_op_t *load_grammar(const char *grammar)
         if (verbose) fprintf(stderr, "\n");
         defs = after_spaces(defs);
         const char *name = defs;
-        check(isalpha(*name), "Definition must begin with a name");
-        while (isalpha(*defs)) ++defs;
-        name = strndup(name, (size_t)(defs-name));
+        if (strncmp(name, "^^", 2) == 0 ||
+            strncmp(name, "__", 2) == 0 ||
+            strncmp(name, "$$", 2) == 0) {
+            name = strndup(name, 2);
+            defs += 2;
+        } else if (*name == '^' || *name == '_' || *name == '$') {
+            name = strndup(name, 1);
+            defs += 1;
+        } else {
+            check(isalpha(*name), "Definition must begin with a name");
+            while (isalnum(*defs)) ++defs;
+            name = strndup(name, (size_t)(defs-name));
+        }
         defs = after_spaces(defs);
         check(matchchar(&defs, '='), "Expected '=' in definition");
         vm_op_t *def = load_def(name, defs);
