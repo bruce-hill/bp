@@ -10,7 +10,7 @@ string-grammar = *(`\ pat ?`; / .);
 pat = empty / dot / string / char-range / char / escape-range / escape / no / anything-but
     / upto-and / repeat / after / before / capture / replace / ref / parens;
 
-empty = `/ >(__ (`}/`}));
+empty = `/ >(__ (`)/`}));
 dot = `.;
 string = (
         `" @[s]*(escape / ~`") `"
