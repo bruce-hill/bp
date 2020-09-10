@@ -3,10 +3,19 @@
  *
  * Grammar:
  *     # <comment>                 comment
- *     ` <c>                       character <c>
+ *     .                           any character
+ *     ^                           beginning of a line
+ *     $                           end of a line
+ *     _                           0 or more spaces or tabs
+ *     `<c>                        character <c>
+ *     `<a>-<z>                    character between <a> and <z>
+ *     `<a>,<b>,...                character <a> or <b> (WIP)
+ *     \<e>                        escape sequence (e.g. \n, \033)
+ *     \<e1>-<e2>                  escape sequence range (WIP)
+ *     \<e1>,<e2>,...              one of multiple escape sequences (WIP)
  *     ! <pat>                     no <pat>
- *     ^ <pat>                     upto <pat>
- *     & <pat>                     upto and including <pat>
+ *     ~ <pat>                     any character as long as it doesn't match <pat>
+ *     & <pat>                     upto and including <pat> (aka *~<pat> <pat>)
  *     <N=1> + <pat> [% <sep="">]  <N> or more <pat>s (separated by <sep>)
  *     * <pat> [% <sep="">]        sugar for "0+ <pat> [% <sep>]"
  *     <N=1> - <pat> [% <sep="">]  <N> or fewer <pat>s (separated by <sep>)
@@ -14,13 +23,12 @@
  *     <N> - <M> <pat>             <N> to <M> (inclusive) <pat>s
  *     < <pat>                     after <pat>, ...
  *     > <pat>                     before <pat>, ...
- *     .                           any character
  *     <pat> / <alt>               <pat> otherwise <alt>
  *     ( <pat> )                   <pat>
  *     @ <pat>                     capture <pat>
  *     @ [ <name> ] <pat>          <pat> named <name>
  *     ; <name> = <pat>            <name> is defined to be <pat>
- *     { <pat> ~ <str> }           <pat> replaced with <str>
+ *     { <pat> -> <str> }           <pat> replaced with <str>
  *     "@1" or "@{1}"              first capture
  *     "@foo" or "@{foo}"          capture named "foo"
  */
@@ -79,7 +87,8 @@ static match_t *match(const char *str, vm_op_t *op)
             m->end = str + 1;
             return m;
         }
-        case VM_NOT: {
+        case VM_NOT: case VM_ANYTHING_BUT: {
+            if (op->op == VM_ANYTHING_BUT && !*str && *str != '\n') return NULL;
             match_t *m = match(str, op->args.pat);
             if (m != NULL) {
                 m = free_match(m);
@@ -87,20 +96,17 @@ static match_t *match(const char *str, vm_op_t *op)
             }
             m = calloc(sizeof(match_t), 1);
             m->start = str;
+            if (op->op == VM_ANYTHING_BUT) ++str;
             m->end = str;
             return m;
         }
-        case VM_UPTO: case VM_UPTO_AND: {
+        case VM_UPTO_AND: {
             match_t *m = calloc(sizeof(match_t), 1);
             m->start = str;
             while (*str && (multiline_dot || (*str != '\n' && *str != '\r'))) {
                 match_t *p = match(str, op->args.pat);
                 if (p == NULL) {
                     ++str;
-                } else if (op->op == VM_UPTO) {
-                    p = free_match(p);
-                    m->end = str;
-                    return m;
                 } else {
                     m->end = p->end;
                     m->child = p;
@@ -222,7 +228,8 @@ static match_t *match(const char *str, vm_op_t *op)
             return m;
         }
         case VM_REF: {
-            for (size_t i = 0; i < ndefs; i++) {
+            // Search backwards so newer defs take precedence
+            for (int i = ndefs-1; i >= 0; i--) {
                 if (streq(defs[i].name, op->args.s)) {
                     // Bingo!
                     op = defs[i].op;
@@ -386,15 +393,17 @@ static vm_op_t *compile_bpeg(const char *source, const char *str)
             visualize(source, str, "Char literal");
             check(literal[0], "Expected character after '`'\n");
             op->len = 1;
-            if (matchchar(&str, ',')) { // Range
+            if (matchchar(&str, '-')) { // Range
                 visualize(source, str, "Char range");
-                //debug("Char range\n");
                 char c2 = *str;
-                check(c2, "Expected character after ','");
+                check(c2, "Expected character after '-'");
                 op->op = VM_RANGE;
                 op->args.range.low = literal[0];
                 op->args.range.high = c2;
                 ++str;
+            } else if (matchchar(&str, ',')) { // Set
+                // TODO: implement
+                check(0, "Sorry, character sets are not yet implemented!");
             } else {
                 //debug("Char literal\n");
                 op->op = VM_STRING;
@@ -448,21 +457,19 @@ static vm_op_t *compile_bpeg(const char *source, const char *str)
             op->args.pat = p;
             break;
         }
-        // Upto <pat>
-        case '^': {
-            visualize(source, str, "Upto <pat>");
-            //debug("Upto pattern\n");
+        // Anything but <pat>
+        case '~': {
+            visualize(source, str, "Anything but <pat>");
             vm_op_t *p = compile_bpeg(source, str);
-            check(p, "Expected pattern after '^'\n");
+            check(p, "Expected pattern after '~'\n");
             str = p->end;
-            op->op = VM_UPTO;
+            op->op = VM_ANYTHING_BUT;
             op->len = -1;
             op->args.pat = p;
             break;
         }
         // Upto and including <pat>
         case '&': {
-            //debug("Upto-and pattern\n");
             visualize(source, str, "Upto and including <pat>");
             vm_op_t *p = compile_bpeg(source, str);
             check(p, "Expected pattern after '&'\n");
@@ -605,13 +612,16 @@ static vm_op_t *compile_bpeg(const char *source, const char *str)
             visualize(source, str, "Replacement");
             str = after_spaces(str);
             vm_op_t *pat = NULL;
-            if (!matchchar(&str, '~')) {
+            if (strncmp(str, "->", 2) == 0) {
+                str += strlen("->");
+            } else {
                 pat = compile_bpeg(source, str);
-                check(pat, "Expected pattern after '{'");
+                check(pat, "Invalid pattern after '{'");
                 pat = expand_choices(source, pat);
                 str = pat->end;
                 str = after_spaces(str);
-                check(matchchar(&str, '~'), "Expected '~' after pattern in replacement");
+                check(matchchar(&str, '-') && matchchar(&str, '>'),
+                      "Expected '->' after pattern in replacement");
             }
             visualize(source, str, NULL);
             str = after_spaces(str);
@@ -645,12 +655,11 @@ static vm_op_t *compile_bpeg(const char *source, const char *str)
             visualize(source, str, NULL);
             break;
         }
-        // Whitespace
-        case '_': {
-            //debug("Whitespace\n");
+        // Special rules:
+        case '_': case '^': case '$': {
             visualize(source, str, NULL);
             op->op = VM_REF;
-            op->args.s = strdup("_");
+            op->args.s = strndup(&c, 1);
             break;
         }
         default: {
@@ -745,41 +754,51 @@ static vm_op_t *compile_bpeg_replacement(vm_op_t *pat, const char *str)
     return op;
 }
 
-static vm_op_t *load_def(const char *name, const char *source)
+static vm_op_t *add_def(const char *name, const char *source, vm_op_t *op)
 {
+    check(ndefs < (sizeof(defs)/sizeof(defs[0])), "Too many definitions!");
     defs[ndefs].name = name;
-    vm_op_t *op = compile_bpeg(source, source);
-    op = expand_choices(source, op);
     defs[ndefs].op = op;
-    defs[ndefs].source = strndup((char*)op->start, (int)(op->end - op->start));
+    defs[ndefs].source = source;
     ++ndefs;
     return op;
 }
 
+static vm_op_t *load_def(const char *name, const char *source)
+{
+    vm_op_t *op = compile_bpeg(source, source);
+    source = strndup((char*)op->start, (int)(op->end - op->start));
+    op = expand_choices(source, op);
+    return add_def(name, source, op);
+}
+
 static void load_defs(void)
 {
-    load_def("_", "*(` /\\t/\\n/\\r)");
-    load_def("__", "+(` /\\t/\\n/\\r)");
-    load_def("nl", "\\n"); load_def("n", "\\n");
-    load_def("cr", "\\r"); load_def("r", "\\r");
-    load_def("tab", "\\t"); load_def("t", "\\t");
-    load_def("tab", "\\t"); load_def("t", "\\t");
-    load_def("esc", "\\e"); load_def("e", "\\e");
+    // Approximately these are in least-to-most used order so they will be
+    // found most efficiently by the lookup, which goes in reverse order.
     load_def("crlf", "\\r\\n");
-    load_def("abc", "`a,z");
-    load_def("ABC", "`A,Z");
-    load_def("Abc", "`a,z/`A,Z");
-    load_def("digit", "`0,9");
-    load_def("number", "+`0,9 ?(`. *`0,9) / `. +`0,9");
-    load_def("hex", "`0,9/`a,f");
-    load_def("Hex", "`0,9/`a,f/`A,F");
-    load_def("HEX", "`0,9/`A,F");
-    load_def("id", "(`a,z/`A,Z/`_) *(`a,z/`A,Z/`_/`0,9)");
-    load_def("line", "^(?\\r\\n / !.)");
-    load_def("parens", "`( *(parens / !`) .) `)");
-    load_def("braces", "`{ *(braces / !`} .) `}");
-    load_def("brackets", "`[ *(brackets / !`] .) `]");
+    load_def("cr", "\\r"); load_def("r", "\\r");
     load_def("anglebraces", "`< *(anglebraces / !`> .) `>");
+    load_def("brackets", "`[ *(brackets / !`] .) `]");
+    load_def("braces", "`{ *(braces / !`} .) `}");
+    load_def("parens", "`( *(parens / !`) .) `)");
+    load_def("line", "^(?\\r\\n / !.)");
+    load_def("id", "(`a-z/`A-Z/`_) *(`a-z/`A-Z/`_/`0-9)");
+    load_def("HEX", "`0-9/`A-F");
+    load_def("Hex", "`0-9/`a-f/`A-F");
+    load_def("hex", "`0-9/`a-f");
+    load_def("number", "+`0-9 ?(`. *`0-9) / `. +`0-9");
+    load_def("digit", "`0-9");
+    load_def("Abc", "`a-z/`A-Z");
+    load_def("ABC", "`A-Z");
+    load_def("abc", "`a-z");
+    load_def("esc", "\\e"); load_def("e", "\\e");
+    load_def("tab", "\\t"); load_def("t", "\\t");
+    load_def("nl", "\\n"); load_def("lf", "\\n"); load_def("n", "\\n");
+    load_def("ws", "` /\\t/\\n/\\r");
+    load_def("_", "*(` /\\t/\\n/\\r)");
+    load_def("$", ">\\n / !. / >\\r\\n");
+    load_def("^", "<\\n / !<.");
 }
 
 static match_t *get_capture_n(match_t *m, int *n)
@@ -915,14 +934,14 @@ static void print_grammar(vm_op_t *op)
             fprintf(stderr, ")");
             break;
         }
-        case VM_UPTO: {
-            fprintf(stderr, "text up to (");
+        case VM_UPTO_AND: {
+            fprintf(stderr, "text up to and including (");
             print_grammar(op->args.pat);
             fprintf(stderr, ")");
             break;
         }
-        case VM_UPTO_AND: {
-            fprintf(stderr, "text up to and including (");
+        case VM_ANYTHING_BUT: {
+            fprintf(stderr, "anything but (");
             print_grammar(op->args.pat);
             fprintf(stderr, ")");
             break;
@@ -1064,10 +1083,7 @@ int main(int argc, char *argv[])
             pat = compile_bpeg_replacement(pat, replacement);
         }
 
-        defs[ndefs].name = "pattern";
-        defs[ndefs].op = pat;
-        defs[ndefs].source = pattern;
-        ++ndefs;
+        add_def("pattern", pattern, pat);
 
         const char *grammar = "*(@pattern / \\n / .)";
         op = compile_bpeg(grammar, grammar);

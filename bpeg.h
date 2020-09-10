@@ -10,7 +10,16 @@
 
 #include "utils.h"
 
-const char *usage = "Usage: bpeg [-m|--multiline] [-v|--verbose] [-h|--help] [-s|--slow] <grammar> [<input file>]";
+const char *usage = (
+    "Usage:\n"
+    "  bpeg [flags] <pattern> [<input files>...]\n\n"
+    "Flags:\n"
+    "  -m --multiline\t dot and similar patterns include newlines\n"
+    "  -v --verbose\t print verbose debugging info\n"
+    "  -h --help\t print the usage and quit\n"
+    "  -s --slow\t run in slow mode for debugging\n"
+    "  -r --replace <replacement>   replace the input pattern with the given replacement\n"
+    "  -g --grammar <grammar file>  use the specified file as a grammar\n");
 /*
  * Pattern matching result object
  */
@@ -28,10 +37,10 @@ typedef struct match_s {
 enum VMOpcode {
     VM_EMPTY = 0,
     VM_ANYCHAR = 1,
+    VM_ANYTHING_BUT,
     VM_STRING,
     VM_RANGE,
     VM_NOT,
-    VM_UPTO,
     VM_UPTO_AND,
     VM_REPEAT,
     VM_BEFORE,
@@ -82,6 +91,8 @@ static match_t *free_match(match_t *m);
 static match_t *match(const char *str, vm_op_t *op);
 static vm_op_t *compile_bpeg(const char *source, const char *str);
 static vm_op_t *load_grammar(const char *grammar);
+static vm_op_t *add_def(const char *name, const char *source, vm_op_t *op);
+static vm_op_t *load_def(const char *name, const char *source);
 static vm_op_t *chain_together(vm_op_t *first, vm_op_t *second);
 static vm_op_t *compile_bpeg_string(const char *source, const char *str);
 static vm_op_t *expand_chain(const char *source, vm_op_t *first);
