@@ -10,6 +10,7 @@
  *     `<c>                        character <c>
  *     `<a>-<z>                    character between <a> and <z>
  *     \<e>                        escape sequence (e.g. \n, \033)
+ *     \<e1>-<e2>                  escape sequence range (e.g. \x00-\xF0)
  *     ! <pat>                     no <pat>
  *     ~ <pat>                     any character as long as it doesn't match <pat>
  *     & <pat>                     upto and including <pat> (aka *~<pat> <pat>)
@@ -397,13 +398,11 @@ static vm_op_t *compile_bpeg(const char *source, const char *str)
                 visualize(source, str, "Char range");
                 char c2 = *str;
                 check(c2, "Expected character after '-'");
+                check(c2 >= literal[0], "Character range must be low-to-high");
                 op->op = VM_RANGE;
                 op->args.range.low = literal[0];
                 op->args.range.high = c2;
                 ++str;
-            } else if (matchchar(&str, ',')) { // Set
-                // TODO: implement
-                check(0, "Sorry, character sets are not yet implemented!");
             } else {
                 //debug("Char literal\n");
                 op->op = VM_STRING;
@@ -416,10 +415,21 @@ static vm_op_t *compile_bpeg(const char *source, const char *str)
             //debug("Escape sequence\n");
             visualize(source, str, "Escape sequence");
             check(*str, "Expected escape after '\\'");
-            op->op = VM_STRING;
             op->len = 1;
-            char literal[2] = {unescapechar(str, &str), '\0'};
-            op->args.s = strdup(literal);
+            char e = unescapechar(str, &str);
+            if (*str == '-') { // Escape range (e.g. \x00-\xFF)
+                ++str;
+                char e2 = unescapechar(str, &str);
+                check(e2, "Expected character after '-'");
+                check(e2 >= e, "Character range must be low-to-high");
+                op->op = VM_RANGE;
+                op->args.range.low = e;
+                op->args.range.high = e2;
+            } else {
+                char literal[2] = {e, '\0'};
+                op->op = VM_STRING;
+                op->args.s = strdup(literal);
+            }
             break;
         }
         // String literal

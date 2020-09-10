@@ -7,7 +7,7 @@ def = @[name]ref __ `= __ @[definition]extendedPat;
 # This is used for command line arguments:
 stringGrammar = *(`\ pat ?`; / .);
 
-pat = empty / dot / string / charRange / char / escape / no / anythingBut
+pat = empty / dot / string / charRange / char / escapeRange / escape / no / anythingBut
     / uptoAnd / repeat / after / before / capture / replace / ref / parens;
 
 empty = `/ >(__ (`}/`}));
@@ -18,7 +18,9 @@ string = (
     );
 charRange = `` @[low]. `- @[high].;
 char = `` @[s].;
-escape = `\ @[s](
+escapeRange = `\ @[low]escapeSequence `- @[high]escapeSequence;
+escape = `\ @[s]escapeSequence;
+escapeSequence = (
         1-3 `0-7
       / `x 2 (`0-9/`a-f/`A-F)
       /`a/`b/`e/`n/`r/`t/`v / . / \n
