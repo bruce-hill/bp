@@ -817,6 +817,7 @@ static void load_defs(void)
     load_def("Hex", "`0-9/`a-f/`A-F");
     load_def("hex", "`0-9/`a-f");
     load_def("number", "+`0-9 ?(`. *`0-9) / `. +`0-9");
+    load_def("int", "+`0-9");
     load_def("digit", "`0-9");
     load_def("Abc", "`a-z/`A-Z");
     load_def("ABC", "`A-Z");
@@ -1059,6 +1060,7 @@ static vm_op_t *load_grammar(const char *grammar)
             defs += 1;
         } else {
             defs = after_name(defs);
+            if (defs == NULL) break;
             name = strndup(name, (size_t)(defs-name));
         }
         defs = after_spaces(defs);
