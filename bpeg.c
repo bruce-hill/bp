@@ -27,6 +27,8 @@
 
 #include "bpeg.h"
 
+static int multiline_dot = 0;
+
 /*
  * Recursively deallocate a match object and return NULL
  */
@@ -54,7 +56,8 @@ static match_t *match(const char *str, vm_op_t *op)
             return m;
         }
         case VM_ANYCHAR: {
-            if (!*str) return NULL;
+            if (!*str || (!multiline_dot && (*str == '\n' || *str == '\r')))
+                return NULL;
             match_t *m = calloc(sizeof(match_t), 1);
             m->start = str;
             m->end = str+1;
@@ -90,7 +93,7 @@ static match_t *match(const char *str, vm_op_t *op)
         case VM_UPTO: case VM_UPTO_AND: {
             match_t *m = calloc(sizeof(match_t), 1);
             m->start = str;
-            while (*str) {
+            while (*str && (multiline_dot || (*str != '\n' && *str != '\r'))) {
                 match_t *p = match(str, op->args.pat);
                 if (p == NULL) {
                     ++str;
@@ -220,7 +223,7 @@ static match_t *match(const char *str, vm_op_t *op)
         }
         case VM_REF: {
             for (size_t i = 0; i < ndefs; i++) {
-                if (strcmp(defs[i].name, op->args.s) == 0) {
+                if (streq(defs[i].name, op->args.s)) {
                     // Bingo!
                     op = defs[i].op;
                     goto tailcall;
@@ -260,22 +263,12 @@ static void set_range(vm_op_t *op, ssize_t min, ssize_t max, vm_op_t *pat, vm_op
  */
 static vm_op_t *expand_chain(const char *source, vm_op_t *first)
 {
+    visualize(source, first->end, "Expanding chain...");
     vm_op_t *second = compile_bpeg(source, first->end);
     if (second == NULL) return first;
     check(second->end > first->end, "No forward progress in chain!");
-    visualize(source, first->end, "Expanding chain...");
-    second = expand_chain(source, second);
-    vm_op_t *chain = calloc(sizeof(vm_op_t), 1);
-    chain->op = VM_CHAIN;
-    chain->start = first->start;
-    if (first->len >= 0 && second->len >= 0)
-        chain->len = first->len + second->len;
-    else chain->len = -1;
-    chain->end = second->end;
-    chain->args.multiple.first = first;
-    chain->args.multiple.second = second;
-    visualize(source, chain->end, "Got chained pair.");
-    return chain;
+    visualize(source, second->end, "Got chained pair.");
+    return chain_together(first, second);
 }
 
 /*
@@ -345,6 +338,22 @@ static char escapechar(const char *escaped, const char **end)
     return ret;
 }
 
+static vm_op_t *chain_together(vm_op_t *first, vm_op_t *second)
+{
+    if (first == NULL) return second;
+    if (second == NULL) return first;
+    vm_op_t *chain = calloc(sizeof(vm_op_t), 1);
+    chain->op = VM_CHAIN;
+    chain->start = first->start;
+    if (first->len >= 0 && second->len >= 0)
+        chain->len = first->len + second->len;
+    else chain->len = -1;
+    chain->end = second->end;
+    chain->args.multiple.first = first;
+    chain->args.multiple.second = second;
+    return chain;
+}
+
 /*
  * Compile a string of BPEG code into virtual machine opcodes
  */
@@ -404,11 +413,11 @@ static vm_op_t *compile_bpeg(const char *source, const char *str)
             break;
         }
         // String literal
-        case '"': case '\'': {
+        case '"': case '\'': case '\002': {
             visualize(source, str, "String literal");
-            char quote = c;
+            char endquote = c == '\002' ? '\003' : c;
             const char *literal = str;
-            for (; *str && *str != quote; str++) {
+            for (; *str && *str != endquote; str++) {
                 if (*str == '\\') {
                     check(str[1], "Expected more string contents after backslash");
                     ++str;
@@ -419,8 +428,7 @@ static vm_op_t *compile_bpeg(const char *source, const char *str)
             op->len = (ssize_t)(str - literal);
             op->args.s = strndup(literal, (size_t)op->len);
             // TODO: handle escape chars like \n
-            //debug("String literal: %c%s%c\n", quote, op->args.s, quote);
-            check(matchchar(&str, quote), "Missing closing quote");
+            check(matchchar(&str, endquote), "Missing closing quote");
             break;
         }
         // Not <pat>
@@ -656,7 +664,7 @@ static vm_op_t *compile_bpeg(const char *source, const char *str)
                 op->args.s = strndup(refname, len);
                 break;
             } else {
-                visualize(source, str, "No match");
+                visualize(source, str, "Finished");
                 free(op);
                 return NULL;
             }
@@ -666,13 +674,75 @@ static vm_op_t *compile_bpeg(const char *source, const char *str)
     return op;
 }
 
+/*
+ * Similar to compile_bpeg, except that the pattern begins with an implicit, unclosable quote.
+ */
+static vm_op_t *compile_bpeg_string(const char *source, const char *str)
+{
+    visualize(source, str, "Compiling string...");
+    vm_op_t *ret = NULL;
+    while (*str) {
+        vm_op_t *strop = calloc(sizeof(vm_op_t), 1);
+        strop->start = str;
+        strop->len = 0;
+        strop->op = VM_STRING;
+        // TODO: properly support backslash escapes
+        const char *literal = str;
+        vm_op_t *interp = NULL;
+        for (; *str; str++) {
+            if (*str == '\\') {
+                check(str[1], "Expected more string contents after backslash");
+                interp = compile_bpeg(source, str + 1);
+                check(interp != NULL, "Invalid escape pattern");
+                break;
+            }
+            visualize(source, str, "String literal");
+        }
+        // End of string
+        strop->len = (ssize_t)(str - literal);
+        strop->args.s = strndup(literal, (size_t)strop->len);
+        strop->end = str;
+
+        if (strop->len == 0) {
+            free(strop);
+            strop = NULL;
+        } else {
+            ret = chain_together(ret, strop);
+        }
+        if (interp) {
+            ret = chain_together(ret, interp);
+            str = interp->end;
+        }
+    }
+    return ret;
+}
+
+static vm_op_t *compile_bpeg_replacement(vm_op_t *pat, const char *str)
+{
+    vm_op_t *op = calloc(sizeof(vm_op_t), 1);
+    op->op = VM_REPLACE;
+    op->start = pat->start;
+    op->len = pat->len;
+    op->args.replace.replace_pat = pat;
+    const char *replacement = str;
+    for (; *str; str++) {
+        if (*str == '\\') {
+            check(str[1], "Expected more string contents after backslash");
+            ++str;
+        }
+    }
+    replacement = strndup(replacement, (size_t)(str-replacement));
+    op->args.replace.replacement = replacement;
+    return op;
+}
+
 static vm_op_t *load_def(const char *name, const char *source)
 {
     defs[ndefs].name = name;
-    defs[ndefs].source = source;
     vm_op_t *op = compile_bpeg(source, source);
     op = expand_choices(source, op);
     defs[ndefs].op = op;
+    defs[ndefs].source = strndup((char*)op->start, (int)(op->end - op->start));
     ++ndefs;
     return op;
 }
@@ -714,7 +784,7 @@ static match_t *get_capture_n(match_t *m, int *n)
 
 static match_t *get_capture_named(match_t *m, const char *name)
 {
-    if (m->is_capture && m->name_or_replacement && strcmp(m->name_or_replacement, name) == 0)
+    if (m->is_capture && m->name_or_replacement && streq(m->name_or_replacement, name))
         return m;
     for (match_t *c = m->child; c; c = c->nextsibling) {
         match_t *cap = get_capture_named(c, name);
@@ -764,7 +834,12 @@ static void print_match(match_t *m, const char *color)
             }
         }
     } else {
-        if (m->is_capture) printf("\033[0;2;33m{");
+        if (m->is_capture) {
+            if (m->name_or_replacement)
+                printf("\033[0;2;33m[%s]{", m->name_or_replacement);
+            else
+                printf("\033[0;2;33m{");
+        }
         const char *prev = m->start;
         for (match_t *child = m->child; child; child = child->nextsibling) {
             if (child->start > prev)
@@ -807,7 +882,7 @@ static void print_grammar(vm_op_t *op)
         }
         case VM_REPEAT: {
             if (op->args.repetitions.max == -1)
-                fprintf(stderr, "%ld or more ", op->args.repetitions.min);
+                fprintf(stderr, "%ld or more (", op->args.repetitions.min);
             else
                 fprintf(stderr, "%ld-%ld of (",
                         op->args.repetitions.min,
@@ -896,21 +971,15 @@ static void print_grammar(vm_op_t *op)
     }
 }
 
-int main(int argc, char *argv[])
+static vm_op_t *load_grammar(const char *grammar)
 {
-    check(argc >= 2, "Usage: bpeg <pat> [<file>]");
-    fprintf(stderr, "========== Compiling ===========\n\n\n\n");
-    load_defs();
-
-    const char *lang = argv[1];
-    visualize_delay = 100000;
-    vm_op_t *op = compile_bpeg(lang, lang);
+    vm_op_t *op = compile_bpeg(grammar, grammar);
     check(op, "Failed to compile_bpeg input");
-    op = expand_choices(lang, op);
+    op = expand_choices(grammar, op);
     
     const char *defs = op->end;
     while (matchchar(&defs, ';')) {
-        fprintf(stderr, "\n");
+        if (verbose) fprintf(stderr, "\n");
         defs = after_spaces(defs);
         const char *name = defs;
         check(isalpha(*name), "Definition must begin with a name");
@@ -922,18 +991,87 @@ int main(int argc, char *argv[])
         check(def, "Couldn't load definition");
         defs = def->end;
     }
+    return op;
+}
 
-    fprintf(stderr, "\n\n");
-    print_grammar(op);
-    fprintf(stderr, "\n\n");
+int main(int argc, char *argv[])
+{
+    const char *pattern = NULL,
+          *replacement = NULL,
+          *grammarfile = NULL,
+          *infile = NULL;
+
+    for (int i = 1; i < argc; i++) {
+        if (streq(argv[i], "--help") || streq(argv[i], "-h")) {
+            printf("%s\n", usage);
+            return 0;
+        } else if (streq(argv[i], "--verbose") || streq(argv[i], "-v")) {
+            verbose = 1;
+        } else if (streq(argv[i], "--replace") || streq(argv[i], "-r")) {
+            replacement = argv[++i];
+        } else if (streq(argv[i], "--slow") || streq(argv[i], "-s")) {
+            visualize_delay = 100000;
+        } else if (streq(argv[i], "--grammar") || streq(argv[i], "-g")) {
+            grammarfile = argv[++i];
+        } else if (streq(argv[i], "--multiline") || streq(argv[i], "-m")) {
+            multiline_dot = 1;
+        } else if (pattern == NULL) {
+            pattern = argv[i];
+        } else if (infile == NULL) {
+            infile = argv[i];
+        }
+    }
+
+    check(pattern != NULL || grammarfile != NULL, usage);
+    if (verbose) fprintf(stderr, "========== Compiling ===========\n\n\n\n");
+    {
+        int tmp1 = visualize_delay, tmp2 = verbose;
+        visualize_delay = -1, verbose = 0;
+        load_defs();
+        visualize_delay = tmp1, verbose = tmp2;
+    }
+
+    vm_op_t *op;
+    if (grammarfile) {
+        // load grammar from a file (semicolon mode)
+        char *grammar;
+        if (streq(grammarfile, "-")) {
+            grammar = readfile(STDIN_FILENO);
+        } else {
+            int fd = open(grammarfile, O_RDONLY);
+            check(fd >= 0, "Couldn't open file: %s", argv[2]);
+            grammar = readfile(fd);
+        }
+        op = load_grammar(grammar);
+    } else {
+        // load grammar in start-with-string mode:
+        vm_op_t *pat = compile_bpeg_string(pattern, pattern);
+        if (replacement) {
+            pat = compile_bpeg_replacement(pat, replacement);
+        }
+
+        defs[ndefs].name = "pattern";
+        defs[ndefs].op = pat;
+        defs[ndefs].source = pattern;
+        ++ndefs;
+
+        const char *grammar = "*(@pattern / \\n / .)";
+        op = compile_bpeg(grammar, grammar);
+    }
+
+    if (verbose) {
+        fprintf(stderr, "\n\n");
+        print_grammar(op);
+        fprintf(stderr, "\n\n");
+    }
 
     char *input;
-    if (argc >= 3) {
-        int fd = open(argv[2], O_RDONLY);
+    if (infile == NULL || streq(infile, "-")) {
+        input = readfile(STDIN_FILENO);
+    } else {
+        int fd = open(infile, O_RDONLY);
         check(fd >= 0, "Couldn't open file: %s", argv[2]);
         input = readfile(fd);
-    } else {
-        input = readfile(STDIN_FILENO);
     }
 
     // Ensure string has a null byte to the left:

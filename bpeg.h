@@ -10,6 +10,7 @@
 
 #include "utils.h"
 
+const char *usage = "Usage: bpeg [-m|--multiline] [-v|--verbose] [-h|--help] [-s|--slow] <grammar> [<input file>]";
 /*
  * Pattern matching result object
  */
@@ -59,6 +60,7 @@ typedef struct vm_op_s {
             ssize_t min, max;
             struct vm_op_s *sep, *repeat_pat;
         } repetitions;
+        // TODO: use a linked list instead of a binary tree
         struct {
             struct vm_op_s *first, *second;
         } multiple;
@@ -79,6 +81,9 @@ static inline const char *after_spaces(const char *str);
 static match_t *free_match(match_t *m);
 static match_t *match(const char *str, vm_op_t *op);
 static vm_op_t *compile_bpeg(const char *source, const char *str);
+static vm_op_t *load_grammar(const char *grammar);
+static vm_op_t *chain_together(vm_op_t *first, vm_op_t *second);
+static vm_op_t *compile_bpeg_string(const char *source, const char *str);
 static vm_op_t *expand_chain(const char *source, vm_op_t *first);
 static vm_op_t *expand_choices(const char *source, vm_op_t *op);
 static void print_match(match_t *m, const char *color);
@@ -93,5 +98,3 @@ typedef struct {
 
 static def_t defs[1024] = {{NULL, NULL, NULL}};
 size_t ndefs = 0;
-//static int verbose = 1;
-
