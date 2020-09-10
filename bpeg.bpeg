@@ -30,12 +30,12 @@ anything-but = `~ ?`~ _ @pat;
 upto-and = `& ?`& _ @pat;
 repeat = (
            @[min]int _ `- _ @[max]int
-      /    @[min]{->"0"}    @[max]int _ `-
+      /    @[min]{=>"0"}    @[max]int _ `-
       /    @[min]int _ `+   @[max](/)
       /    @[min]           @[max]int
-      / `+ @[min]{->"1"}    @[max](/)
-      / `* @[min]{->"0"}    @[max](/)
-      / `? @[min]{->"0"}    @[max]{->"1"}
+      / `+ @[min]{=>"1"}    @[max](/)
+      / `* @[min]{=>"0"}    @[max](/)
+      / `? @[min]{=>"0"}    @[max]{=>"1"}
     ) _ @[repeat-pat]pat ?( __ `% __ @[sep]pat);
 after = `< _ pat;
 before = `> _ pat;
