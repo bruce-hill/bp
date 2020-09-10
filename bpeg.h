@@ -14,9 +14,8 @@ const char *usage = (
     "Usage:\n"
     "  bpeg [flags] <pattern> [<input files>...]\n\n"
     "Flags:\n"
-    "  -m --multiline\t dot and similar patterns include newlines\n"
-    "  -v --verbose\t print verbose debugging info\n"
     "  -h --help\t print the usage and quit\n"
+    "  -v --verbose\t print verbose debugging info\n"
     "  -s --slow\t run in slow mode for debugging\n"
     "  -r --replace <replacement>   replace the input pattern with the given replacement\n"
     "  -g --grammar <grammar file>  use the specified file as a grammar\n");
@@ -57,6 +56,7 @@ enum VMOpcode {
  */
 typedef struct vm_op_s {
     enum VMOpcode op;
+    unsigned int multiline:1;
     const char *start, *end;
     // Length of the match, if constant, otherwise -1
     ssize_t len;

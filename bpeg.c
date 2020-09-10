@@ -3,17 +3,17 @@
  *
  * Grammar:
  *     # <comment>                 comment
- *     .                           any character
- *     ^                           beginning of a line
- *     $                           end of a line
- *     _                           0 or more spaces or tabs
+ *     .                           any character (multiline: $.)
+ *     ^                           beginning of a line (^^: beginning of file)
+ *     $                           end of a line ($$: end of file)
+ *     _                           0 or more spaces or tabs (__: include newlines and comments)
  *     `<c>                        character <c>
  *     `<a>-<z>                    character between <a> and <z>
  *     \<e>                        escape sequence (e.g. \n, \033)
  *     \<e1>-<e2>                  escape sequence range (e.g. \x00-\xF0)
  *     ! <pat>                     no <pat>
- *     ~ <pat>                     any character as long as it doesn't match <pat>
- *     & <pat>                     upto and including <pat> (aka *~<pat> <pat>)
+ *     ~ <pat>                     any character as long as it doesn't match <pat> (multiline: ~~<pat>)
+ *     & <pat>                     upto and including <pat> (aka *~<pat> <pat>) (multiline: &&<pat>)
  *     <N=1> + <pat> [% <sep="">]  <N> or more <pat>s (separated by <sep>)
  *     * <pat> [% <sep="">]        sugar for "0+ <pat> [% <sep>]"
  *     <N=1> - <pat> [% <sep="">]  <N> or fewer <pat>s (separated by <sep>)
@@ -33,8 +33,6 @@
  */
 
 #include "bpeg.h"
-
-static int multiline_dot = 0;
 
 /*
  * Recursively deallocate a match object and return NULL
@@ -63,7 +61,7 @@ static match_t *match(const char *str, vm_op_t *op)
             return m;
         }
         case VM_ANYCHAR: {
-            if (!*str || (!multiline_dot && (*str == '\n' || *str == '\r')))
+            if (!*str || (!op->multiline && *str == '\n'))
                 return NULL;
             match_t *m = calloc(sizeof(match_t), 1);
             m->start = str;
@@ -87,7 +85,9 @@ static match_t *match(const char *str, vm_op_t *op)
             return m;
         }
         case VM_NOT: case VM_ANYTHING_BUT: {
-            if (op->op == VM_ANYTHING_BUT && !*str && *str != '\n') return NULL;
+            if (op->op == VM_ANYTHING_BUT)
+                if (!*str || (!op->multiline && *str == '\n'))
+                    return NULL;
             match_t *m = match(str, op->args.pat);
             if (m != NULL) {
                 m = free_match(m);
@@ -102,17 +102,17 @@ static match_t *match(const char *str, vm_op_t *op)
         case VM_UPTO_AND: {
             match_t *m = calloc(sizeof(match_t), 1);
             m->start = str;
-            while (*str) {
-                match_t *p = match(str, op->args.pat);
-                if (p == NULL) {
-                    if (!multiline_dot && (*str == '\n' || *str == '\r'))
-                        break;
+            match_t *p = NULL;
+            for (const char *prev = NULL; p == NULL && prev < str; ) {
+                prev = str;
+                p = match(str, op->args.pat);
+                if (*str && (op->multiline || *str != '\n'))
                     ++str;
-                } else {
-                    m->end = p->end;
-                    m->child = p;
-                    return m;
-                }
+            }
+            if (p) {
+                m->end = p->end;
+                m->child = p;
+                return m;
             }
             m = free_match(m);
             return NULL;
@@ -159,12 +159,13 @@ static match_t *match(const char *str, vm_op_t *op)
             return m;
         }
         case VM_AFTER: {
-            check(op->len != -1, "'<' is only allowed for fixed-length operations");
+            ssize_t backtrack = op->args.pat->len;
+            check(backtrack != -1, "'<' is only allowed for fixed-length operations");
             // Check for necessary space:
-            for (int i = 0; i < op->len; i++) {
+            for (int i = 0; i < backtrack; i++) {
                 if (str[-i] == '\0') return NULL;
             }
-            match_t *before = match(str-op->len, op->args.pat);
+            match_t *before = match(str - backtrack, op->args.pat);
             if (before == NULL) return NULL;
             before = free_match(before);
             match_t *m = calloc(sizeof(match_t), 1);
@@ -274,6 +275,7 @@ static vm_op_t *expand_chain(const char *source, vm_op_t *first)
     visualize(source, first->end, "Expanding chain...");
     vm_op_t *second = compile_bpeg(source, first->end);
     if (second == NULL) return first;
+    second = expand_chain(source, second);
     check(second->end > first->end, "No forward progress in chain!");
     visualize(source, second->end, "Got chained pair.");
     return chain_together(first, second);
@@ -379,8 +381,9 @@ static vm_op_t *compile_bpeg(const char *source, const char *str)
     char c = *str;
     ++str;
     switch (c) {
-        // Any char (dot)
+        // Any char (dot) ($. is multiline anychar)
         case '.': {
+          anychar:
             visualize(source, str, "Dot");
             //debug("Dot\n");
             op->op = VM_ANYCHAR;
@@ -469,6 +472,7 @@ static vm_op_t *compile_bpeg(const char *source, const char *str)
         }
         // Anything but <pat>
         case '~': {
+            if (matchchar(&str, '~')) op->multiline = 1;
             visualize(source, str, "Anything but <pat>");
             vm_op_t *p = compile_bpeg(source, str);
             check(p, "Expected pattern after '~'\n");
@@ -480,6 +484,7 @@ static vm_op_t *compile_bpeg(const char *source, const char *str)
         }
         // Upto and including <pat>
         case '&': {
+            if (matchchar(&str, '&')) op->multiline = 1;
             visualize(source, str, "Upto and including <pat>");
             vm_op_t *p = compile_bpeg(source, str);
             check(p, "Expected pattern after '&'\n");
@@ -630,7 +635,6 @@ static vm_op_t *compile_bpeg(const char *source, const char *str)
                 pat = expand_choices(source, pat);
                 str = pat->end;
                 str = after_spaces(str);
-                printf("at: '%s'\n", str);
                 check(matchchar(&str, '=') && matchchar(&str, '>'),
                       "Expected '=>' after pattern in replacement");
             }
@@ -668,12 +672,16 @@ static vm_op_t *compile_bpeg(const char *source, const char *str)
         }
         // Special rules:
         case '_': case '^': case '$': {
-            op->op = VM_REF;
             if (matchchar(&str, c)) { // double __, ^^, $$
                 char tmp[3] = {c, c, '\0'};
                 op->args.s = strdup(tmp);
-            } else 
+            } else if (c == '$' && matchchar(&str, '.')) { // $. (multi-line anychar)
+                op->multiline = 1;
+                goto anychar;
+            } else {
                 op->args.s = strndup(&c, 1);
+            }
+            op->op = VM_REF;
             visualize(source, str, op->args.s);
             break;
         }
@@ -804,11 +812,10 @@ static void load_defs(void)
     // found most efficiently by the lookup, which goes in reverse order.
     load_def("crlf", "\\r\\n");
     load_def("cr", "\\r"); load_def("r", "\\r");
-    load_def("anglebraces", "`< *(anglebraces / !`> .) `>");
-    load_def("brackets", "`[ *(brackets / !`] .) `]");
-    load_def("braces", "`{ *(braces / !`} .) `}");
-    load_def("parens", "`( *(parens / !`) .) `)");
-    load_def("line", "^(?\\r\\n / !.)");
+    load_def("anglebraces", "`< *(anglebraces / ~~`>) `>");
+    load_def("brackets", "`[ *(brackets / ~~`]) `]");
+    load_def("braces", "`{ *(braces / ~~`}) `}");
+    load_def("parens", "`( *(parens / ~~`)) `)");
     load_def("id", "(`a-z/`A-Z/`_) *(`a-z/`A-Z/`_/`0-9)");
     load_def("HEX", "`0-9/`A-F");
     load_def("Hex", "`0-9/`a-f/`A-F");
@@ -821,17 +828,17 @@ static void load_defs(void)
     load_def("esc", "\\e"); load_def("e", "\\e");
     load_def("tab", "\\t"); load_def("t", "\\t");
     load_def("nl", "\\n"); load_def("lf", "\\n"); load_def("n", "\\n");
-    load_def("cBlockComment", "'/*' &'*/'");
+    load_def("cBlockComment", "'/*' &&'*/'");
     load_def("cLineComment", "'//' &$");
     load_def("cComment", "cLineComment / cBlockComment");
     load_def("hashComment", "`# &$");
     load_def("comment", "!(/)"); // undefined by default
     load_def("WS", "` /\\t/\\n/\\r/comment");
     load_def("ws", "` /\\t");
-    load_def("$$", "!(. / \\n)");
-    load_def("$", "!. / >\\n");
-    load_def("^^", "!<(. / \\n)");
-    load_def("^", "<\\n / !<.");
+    load_def("$$", "!$.");
+    load_def("$", "!.");
+    load_def("^^", "!<$.");
+    load_def("^", "!<.");
     load_def("__", "*(` /\\t/\\n/\\r/comment)");
     load_def("_", "*(` /\\t)");
 }
@@ -901,22 +908,19 @@ static void print_match(match_t *m, const char *color)
             }
         }
     } else {
-        if (m->is_capture) {
-            if (m->name_or_replacement)
-                printf("\033[0;2;33m[%s]{", m->name_or_replacement);
-            else
-                printf("\033[0;2;33m{");
-        }
+        if (m->is_capture && m->name_or_replacement)
+          printf("\033[0;2;33m[%s:", m->name_or_replacement);
         const char *prev = m->start;
         for (match_t *child = m->child; child; child = child->nextsibling) {
             if (child->start > prev)
                 printf("%s%.*s", color, (int)(child->start - prev), prev);
-            print_match(child, color);
+            print_match(child, m->is_capture ? "\033[0;1m" : color);
             prev = child->end;
         }
         if (m->end > prev)
             printf("%s%.*s", color, (int)(m->end - prev), prev);
-        if (m->is_capture) printf("\033[0;2;33m}");
+        if (m->is_capture && m->name_or_replacement)
+          printf("\033[0;2;33m]");
     }
 }
 
@@ -1090,8 +1094,6 @@ int main(int argc, char *argv[])
             visualize_delay = 100000;
         } else if (streq(argv[i], "--grammar") || streq(argv[i], "-g")) {
             grammarfile = argv[++i];
-        } else if (streq(argv[i], "--multiline") || streq(argv[i], "-m")) {
-            multiline_dot = 1;
         } else if (pattern == NULL) {
             pattern = argv[i];
         } else if (infile == NULL) {
@@ -1159,7 +1161,7 @@ int main(int argc, char *argv[])
         printf("No match\n");
         return 1;
     } else {
-        print_match(m, "\033[0;1m");
+        print_match(m, "\033[0m");
         printf("\033[0;2m%s\n", m->end);
     }
 

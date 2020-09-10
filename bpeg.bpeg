@@ -26,8 +26,8 @@ escapeSequence = (
       /`a/`b/`e/`n/`r/`t/`v / . / \n
     );
 no = `! _ @pat;
-anythingBut = `~ _ @pat;
-uptoAnd = `& _ @pat;
+anythingBut = `~ ?`~ _ @pat;
+uptoAnd = `& ?`& _ @pat;
 repeat = (
            @[min]int _ `- _ @[max]int
       /    @[min]{->"0"}    @[max]int _ `-
