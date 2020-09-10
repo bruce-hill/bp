@@ -299,7 +299,7 @@ static vm_op_t *expand_choices(const char *source, vm_op_t *first)
     return choice;
 }
 
-static char escapechar(const char *escaped, const char **end)
+static char unescapechar(const char *escaped, const char **end)
 {
     size_t len = 1;
     char ret = *escaped;
@@ -307,6 +307,7 @@ static char escapechar(const char *escaped, const char **end)
         case 'a': ret = '\a'; break; case 'b': ret = '\b'; break;
         case 'n': ret = '\n'; break; case 'r': ret = '\r'; break;
         case 't': ret = '\t'; break; case 'v': ret = '\v'; break;
+        case 'e': ret = '\033'; break;
         case 'x': { // Hex
             static const char hextable[255] = {
                 ['0']=0x10, ['1']=0x1, ['2']=0x2, ['3']=0x3, ['4']=0x4,
@@ -408,7 +409,7 @@ static vm_op_t *compile_bpeg(const char *source, const char *str)
             check(*str, "Expected escape after '\\'");
             op->op = VM_STRING;
             op->len = 1;
-            char literal[2] = {escapechar(str, &str), '\0'};
+            char literal[2] = {unescapechar(str, &str), '\0'};
             op->args.s = strdup(literal);
             break;
         }
@@ -416,7 +417,7 @@ static vm_op_t *compile_bpeg(const char *source, const char *str)
         case '"': case '\'': case '\002': {
             visualize(source, str, "String literal");
             char endquote = c == '\002' ? '\003' : c;
-            const char *literal = str;
+            char *literal = (char*)str;
             for (; *str && *str != endquote; str++) {
                 if (*str == '\\') {
                     check(str[1], "Expected more string contents after backslash");
@@ -424,10 +425,14 @@ static vm_op_t *compile_bpeg(const char *source, const char *str)
                 }
                 visualize(source, str, "String literal");
             }
+            size_t len = (size_t)(str - literal);
+            literal = strndup(literal, len);
+            len = unescape_string(literal, literal, len);
+
             op->op = VM_STRING;
-            op->len = (ssize_t)(str - literal);
-            op->args.s = strndup(literal, (size_t)op->len);
-            // TODO: handle escape chars like \n
+            op->len = len;
+            op->args.s = literal;
+
             check(matchchar(&str, endquote), "Missing closing quote");
             break;
         }
@@ -686,21 +691,23 @@ static vm_op_t *compile_bpeg_string(const char *source, const char *str)
         strop->start = str;
         strop->len = 0;
         strop->op = VM_STRING;
-        // TODO: properly support backslash escapes
-        const char *literal = str;
+        char *literal = (char*)str;
         vm_op_t *interp = NULL;
         for (; *str; str++) {
             if (*str == '\\') {
                 check(str[1], "Expected more string contents after backslash");
                 interp = compile_bpeg(source, str + 1);
-                check(interp != NULL, "Invalid escape pattern");
+                check(interp != NULL, "No valid BPEG pattern detected after backslash");
                 break;
             }
             visualize(source, str, "String literal");
         }
         // End of string
-        strop->len = (ssize_t)(str - literal);
-        strop->args.s = strndup(literal, (size_t)strop->len);
+        size_t len = (size_t)(str - literal);
+        literal = strndup(literal, len);
+        len = unescape_string(literal, literal, len);
+        strop->len = len;
+        strop->args.s = literal;
         strop->end = str;
 
         if (strop->len == 0) {
@@ -712,6 +719,8 @@ static vm_op_t *compile_bpeg_string(const char *source, const char *str)
         if (interp) {
             ret = chain_together(ret, interp);
             str = interp->end;
+            // allow terminating seq
+            matchchar(&str, ';');
         }
     }
     return ret;
@@ -751,7 +760,11 @@ static void load_defs(void)
 {
     load_def("_", "*(` /\\t/\\n/\\r)");
     load_def("__", "+(` /\\t/\\n/\\r)");
-    load_def("nl", "\\n");
+    load_def("nl", "\\n"); load_def("n", "\\n");
+    load_def("cr", "\\r"); load_def("r", "\\r");
+    load_def("tab", "\\t"); load_def("t", "\\t");
+    load_def("tab", "\\t"); load_def("t", "\\t");
+    load_def("esc", "\\e"); load_def("e", "\\e");
     load_def("crlf", "\\r\\n");
     load_def("abc", "`a,z");
     load_def("ABC", "`A,Z");
@@ -827,7 +840,7 @@ static void print_match(match_t *m, const char *color)
                     printf("\033[0;34m");
                 }
             } else if (matchchar(&r, '\\')) {
-                fputc(escapechar(r, &r), stdout);
+                fputc(unescapechar(r, &r), stdout);
                 --r;
             } else {
                 fputc(*r, stdout);
@@ -1023,13 +1036,14 @@ int main(int argc, char *argv[])
     }
 
     check(pattern != NULL || grammarfile != NULL, usage);
-    if (verbose) fprintf(stderr, "========== Compiling ===========\n\n\n\n");
+    if (verbose) fprintf(stderr, "====== Loading definitions ======\n\n\n\n");
     {
         int tmp1 = visualize_delay, tmp2 = verbose;
         visualize_delay = -1, verbose = 0;
         load_defs();
         visualize_delay = tmp1, verbose = tmp2;
     }
+    if (verbose) fprintf(stderr, "========== Compiling ===========\n\n\n\n");
 
     vm_op_t *op;
     if (grammarfile) {
