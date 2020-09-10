@@ -31,6 +31,16 @@ static inline const char *after_spaces(const char *str)
     return str;
 }
 
+static inline const char *after_name(const char *str)
+{
+    if (!isalpha(*str)) return NULL;
+    for (++str; *str; ++str) {
+        if (!(isalnum(*str) || *str == '-'))
+            break;
+    }
+    return str;
+}
+
 static inline int matchchar(const char **str, char c)
 {
     *str = after_spaces(*str);

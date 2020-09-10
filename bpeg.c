@@ -702,14 +702,10 @@ static vm_op_t *compile_bpeg(const char *source, const char *str)
                 visualize(source, str, "Ref");
                 --str;
                 const char *refname = str;
-                size_t len = 1;
-                for (++str; isalnum(*str); ++str) {
-                    ++len;
-                    visualize(source, str, NULL);
-                }
+                str = after_name(str);
                 op->op = VM_REF;
-                //debug("Ref: %s\n", refname);
-                op->args.s = strndup(refname, len);
+                op->len = (size_t)(str - refname);
+                op->args.s = strndup(refname, op->len);
                 break;
             } else {
                 visualize(source, str, "Finished");
@@ -828,10 +824,10 @@ static void load_defs(void)
     load_def("esc", "\\e"); load_def("e", "\\e");
     load_def("tab", "\\t"); load_def("t", "\\t");
     load_def("nl", "\\n"); load_def("lf", "\\n"); load_def("n", "\\n");
-    load_def("cBlockComment", "'/*' &&'*/'");
-    load_def("cLineComment", "'//' &$");
-    load_def("cComment", "cLineComment / cBlockComment");
-    load_def("hashComment", "`# &$");
+    load_def("c-block-comment", "'/*' &&'*/'");
+    load_def("c-line-comment", "'//' &$");
+    load_def("c-comment", "c-line-comment / c-block-comment");
+    load_def("hash-comment", "`# &$");
     load_def("comment", "!(/)"); // undefined by default
     load_def("WS", "` /\\t/\\n/\\r/comment");
     load_def("ws", "` /\\t");
@@ -1062,8 +1058,7 @@ static vm_op_t *load_grammar(const char *grammar)
             name = strndup(name, 1);
             defs += 1;
         } else {
-            check(isalpha(*name), "Definition must begin with a name");
-            while (isalnum(*defs)) ++defs;
+            defs = after_name(defs);
             name = strndup(name, (size_t)(defs-name));
         }
         defs = after_spaces(defs);
