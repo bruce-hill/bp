@@ -110,11 +110,16 @@ int main(int argc, char *argv[])
 
         add_def(g, pattern, "pattern", pat);
 
-        const char *grammar = (
-            "find-all = *(matching-line / {&&(\\n/$$)=>});\n"
-            "matching-line = +&@pattern *. $ ?\\n;"
+        if (replacement) {
+            load_grammar(g,
+                "replace-all = *&&@pattern &&$$;\n"
+                );
+        } else {
+            load_grammar(g,
+                "find-all = *(matching-line / {&&(\\n/$$)=>});\n"
+                "matching-line = +&@pattern *. $ ?\\n;"
             );
-        load_grammar(g, grammar);
+        }
     }
 
     if (verbose) {
