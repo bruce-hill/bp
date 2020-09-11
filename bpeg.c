@@ -1120,6 +1120,12 @@ int main(int argc, char *argv[])
             visualize_delay = 100000;
         } else if (streq(argv[i], "--grammar") || streq(argv[i], "-g")) {
             grammarfile = argv[++i];
+        } else if (streq(argv[i], "--define") || streq(argv[i], "-d")) {
+            char *def = argv[++i];
+            char *eq = strchr(def, '=');
+            check(eq, usage);
+            *eq = '\0';
+            load_def(def, ++eq);
         } else if (pattern == NULL) {
             pattern = argv[i];
         } else if (infile == NULL) {
