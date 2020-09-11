@@ -1,0 +1,60 @@
+.\" Manpage for bpeg.
+.\" Contact bruce@bruce-hill.com to correct errors or typos.
+.TH man 1 "Sep 12, 2020" "0.1" "bpeg manual page"
+.SH NAME
+bpeg \- Bruce's Parsing Expression Grammar tool
+.SH SYNOPSIS
+.B bpeg
+[\fI-h\fR|\fI--help\fR]
+[\fI-v\fR|\fI--verbose\fR]
+[\fI-d\fR|\fI--define\fR \fI<name>\fR=\fI<pattern>\fR]
+[\fI-r\fR|\fI--replace\fR \fI<replacement>\fR]
+[\fI-g\fR|\fI--grammar\fR \fI<grammar file>\fR]
+\fI<pattern\fR
+[[--] \fI<input file>\fR]
+.SH DESCRIPTION
+\fBbpeg\fR is a tool that matches parsing expression grammars using a custom syntax.
+.SH OPTIONS
+.B \--verbose
+Print debugging information.
+
+.B \--define <name>=<pattern>
+Define a grammar rule.
+
+.B \--replace <replacement>
+Replace all occurrences of the main pattern with the given string.
+
+.B \--grammar <grammar file>
+Load the grammar from the given file.
+
+.B \--help
+Print the usage and exit.
+
+.B <pattern>
+The main pattern for bpeg to match. By default, this pattern
+is in "string literal" mode (i.e. a backslash is requres for
+non-literal patterns). The default mode is to find \fBall\fR
+occurrences of the pattern and highlight them.
+
+.B <input file>
+The input file to search (default: stdin).
+
+.SH EXAMPLES
+.TP
+.B
+ls | bpeg foo
+Find files containing the string "foo"
+
+.TP
+.B
+ls | bpeg '.c\\$' -r '.h'
+Find files ending with ".c" and replace the extension with ".h"
+
+.TP
+.B
+bpeg -g grammar.bpeg '\\myThing' my_file.txt
+Find ocurrences of the grammar rule "myThing" in the file \fBmy_file.txt\fR
+using the grammar rules defined in \fBgrammar.bpeg\fR
+
+.SH AUTHOR
+Bruce Hill (bruce@bruce-hill.com)

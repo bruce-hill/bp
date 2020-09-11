@@ -48,7 +48,7 @@ static const char *usage = (
     "Flags:\n"
     "  -h --help\t print the usage and quit\n"
     "  -v --verbose\t print verbose debugging info\n"
-    "  -s --slow\t run in slow mode for debugging\n"
+    "  -d --define <name>=<def>     Define a grammar rule\n"
     "  -r --replace <replacement>   replace the input pattern with the given replacement\n"
     "  -g --grammar <grammar file>  use the specified file as a grammar\n");
 
