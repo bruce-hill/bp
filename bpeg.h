@@ -19,16 +19,6 @@ const char *usage = (
     "  -s --slow\t run in slow mode for debugging\n"
     "  -r --replace <replacement>   replace the input pattern with the given replacement\n"
     "  -g --grammar <grammar file>  use the specified file as a grammar\n");
-/*
- * Pattern matching result object
- */
-typedef struct match_s {
-    // Where the match starts and ends (end is after the last character)
-    const char *start, *end;
-    unsigned int is_capture:1, is_replacement:1;
-    const char *name_or_replacement;
-    struct match_s *child, *nextsibling;
-} match_t;
 
 /*
  * BPEG virtual machine opcodes
@@ -85,6 +75,17 @@ typedef struct vm_op_s {
     } args;
 } vm_op_t;
 
+/*
+ * Pattern matching result object
+ */
+typedef struct match_s {
+    // Where the match starts and ends (end is after the last character)
+    const char *start, *end;
+    unsigned int is_capture:1, is_replacement:1, is_ref:1;
+    const char *name_or_replacement;
+    struct match_s *child, *nextsibling;
+    vm_op_t *op;
+} match_t;
 
 static inline const char *after_spaces(const char *str);
 static match_t *free_match(match_t *m);

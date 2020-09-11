@@ -52,10 +52,11 @@ static match_t *free_match(match_t *m)
  */
 static match_t *match(const char *str, vm_op_t *op)
 {
-  tailcall:
+  //tailcall:
     switch (op->op) {
         case VM_EMPTY: {
             match_t *m = calloc(sizeof(match_t), 1);
+            m->op = op;
             m->start = str;
             m->end = str;
             return m;
@@ -64,6 +65,7 @@ static match_t *match(const char *str, vm_op_t *op)
             if (!*str || (!op->multiline && *str == '\n'))
                 return NULL;
             match_t *m = calloc(sizeof(match_t), 1);
+            m->op = op;
             m->start = str;
             m->end = str+1;
             return m;
@@ -72,6 +74,7 @@ static match_t *match(const char *str, vm_op_t *op)
             if (strncmp(str, op->args.s, op->len) != 0)
                 return NULL;
             match_t *m = calloc(sizeof(match_t), 1);
+            m->op = op;
             m->start = str;
             m->end = str + op->len;
             return m;
@@ -80,6 +83,7 @@ static match_t *match(const char *str, vm_op_t *op)
             if (*str < op->args.range.low || *str > op->args.range.high)
                 return NULL;
             match_t *m = calloc(sizeof(match_t), 1);
+            m->op = op;
             m->start = str;
             m->end = str + 1;
             return m;
@@ -94,6 +98,7 @@ static match_t *match(const char *str, vm_op_t *op)
                 return NULL;
             }
             m = calloc(sizeof(match_t), 1);
+            m->op = op;
             m->start = str;
             if (op->op == VM_ANYTHING_BUT) ++str;
             m->end = str;
@@ -102,6 +107,7 @@ static match_t *match(const char *str, vm_op_t *op)
         case VM_UPTO_AND: {
             match_t *m = calloc(sizeof(match_t), 1);
             m->start = str;
+            m->op = op;
             match_t *p = NULL;
             for (const char *prev = NULL; p == NULL && prev < str; ) {
                 prev = str;
@@ -121,6 +127,7 @@ static match_t *match(const char *str, vm_op_t *op)
             match_t *m = calloc(sizeof(match_t), 1);
             m->start = str;
             m->end = str;
+            m->op = op;
             if (op->args.repetitions.max == 0) return m;
 
             match_t **dest = &m->child;
@@ -171,6 +178,7 @@ static match_t *match(const char *str, vm_op_t *op)
             match_t *m = calloc(sizeof(match_t), 1);
             m->start = str;
             m->end = str;
+            m->op = op;
             return m;
         }
         case VM_BEFORE: {
@@ -180,6 +188,7 @@ static match_t *match(const char *str, vm_op_t *op)
             match_t *m = calloc(sizeof(match_t), 1);
             m->start = str;
             m->end = str;
+            m->op = op;
             return m;
         }
         case VM_CAPTURE: {
@@ -188,6 +197,7 @@ static match_t *match(const char *str, vm_op_t *op)
             match_t *m = calloc(sizeof(match_t), 1);
             m->start = str;
             m->end = p->end;
+            m->op = op;
             m->child = p;
             m->is_capture = 1;
             if (op->args.capture.name)
@@ -210,6 +220,7 @@ static match_t *match(const char *str, vm_op_t *op)
             match_t *m = calloc(sizeof(match_t), 1);
             m->start = str;
             m->end = m2->end;
+            m->op = op;
             m->child = m1;
             m1->nextsibling = m2;
             return m;
@@ -217,6 +228,7 @@ static match_t *match(const char *str, vm_op_t *op)
         case VM_REPLACE: {
             match_t *m = calloc(sizeof(match_t), 1);
             m->start = str;
+            m->op = op;
             if (op->args.replace.replace_pat) {
                 match_t *p = match(str, op->args.replace.replace_pat);
                 if (p == NULL) return NULL;
@@ -234,8 +246,20 @@ static match_t *match(const char *str, vm_op_t *op)
             for (int i = ndefs-1; i >= 0; i--) {
                 if (streq(defs[i].name, op->args.s)) {
                     // Bingo!
+                    /*
                     op = defs[i].op;
                     goto tailcall;
+                    */
+                    match_t *p = match(str, defs[i].op);
+                    if (p == NULL) return NULL;
+                    match_t *m = calloc(sizeof(match_t), 1);
+                    m->start = p->start;
+                    m->end = p->end;
+                    m->op = op;
+                    m->child = p;
+                    m->name_or_replacement = defs[i].name;
+                    m->is_ref = 1;
+                    return m;
                 }
             }
             check(0, "Unknown identifier: '%s'", op->args.s);
@@ -905,8 +929,11 @@ static void print_match(match_t *m, const char *color)
             }
         }
     } else {
-        if (m->is_capture && m->name_or_replacement)
-          printf("\033[0;2;33m[%s:", m->name_or_replacement);
+        const char *name = m->name_or_replacement;
+        if (verbose && m->is_ref && name && isupper(name[0]))
+            printf("\033[0;2;35m{%s:", name);
+        //if (m->is_capture && name)
+        //    printf("\033[0;2;33m[%s:", name);
         const char *prev = m->start;
         for (match_t *child = m->child; child; child = child->nextsibling) {
             if (child->start > prev)
@@ -916,8 +943,10 @@ static void print_match(match_t *m, const char *color)
         }
         if (m->end > prev)
             printf("%s%.*s", color, (int)(m->end - prev), prev);
-        if (m->is_capture && m->name_or_replacement)
-          printf("\033[0;2;33m]");
+        if (verbose && m->is_ref && name && isupper(name[0]))
+            printf("\033[0;2;35m}");
+        //if (m->is_capture && name)
+        //    printf("\033[0;2;33m]");
     }
 }
 
