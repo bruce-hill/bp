@@ -2,6 +2,7 @@
  * vm.c - Code for the BPEG virtual machine that performs the matching.
  */
 #include "vm.h"
+#include "grammar.h"
 #include "utils.h"
 
 /*
@@ -212,28 +213,19 @@ match_t *match(grammar_t *g, const char *str, vm_op_t *op)
             return m;
         }
         case VM_REF: {
-            // Search backwards so newer defs take precedence
-            for (int i = g->size-1; i >= 0; i--) {
-                if (streq(g->definitions[i].name, op->args.s)) {
-                    // Bingo!
-                    /*
-                    op = g->definitions[i].op;
-                    goto tailcall;
-                    */
-                    match_t *p = match(g, str, g->definitions[i].op);
-                    if (p == NULL) return NULL;
-                    match_t *m = calloc(sizeof(match_t), 1);
-                    m->start = p->start;
-                    m->end = p->end;
-                    m->op = op;
-                    m->child = p;
-                    m->name_or_replacement = g->definitions[i].name;
-                    m->is_ref = 1;
-                    return m;
-                }
-            }
-            check(0, "Unknown identifier: '%s'", op->args.s);
-            return NULL;
+            vm_op_t *r = lookup(g, op->args.s);
+            check(r != NULL, "Unknown identifier: '%s'", op->args.s);
+            // Could use tailcall here, but current have disabled
+            match_t *p = match(g, str, r);
+            if (p == NULL) return NULL;
+            match_t *m = calloc(sizeof(match_t), 1);
+            m->start = p->start;
+            m->end = p->end;
+            m->op = op;
+            m->child = p;
+            m->name_or_replacement = op->args.s;
+            m->is_ref = 1;
+            return m;
         }
         default: {
             fprintf(stderr, "Unknown opcode: %d", op->op);

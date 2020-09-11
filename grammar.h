@@ -11,9 +11,8 @@
 
 grammar_t *new_grammar(void);
 void add_def(grammar_t *g, const char *src, const char *name, vm_op_t *op);
-void load_grammar(grammar_t *g, const char *source);
-void print_grammar(grammar_t *g);
-
+vm_op_t *load_grammar(grammar_t *g, const char *source);
+vm_op_t *lookup(grammar_t *g, const char *name);
 
 #endif
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1

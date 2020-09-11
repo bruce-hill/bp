@@ -7,6 +7,14 @@
 #include "utils.h"
 
 const char *BPEG_BUILTIN_GRAMMAR = (
+    // Meta-rules for acting on everything
+    "pattern = !(/);\n" // Not defined by default
+    "replacement = {!(/)=>};\n" // Not defined by default
+    "replace-all = *&&@replacement &&$$;\n"
+    "find-all = *(matching-line / {&&(\\n/$$)=>});\n"
+    "matching-line = +&@pattern *. $ ?\\n;\n"
+
+    // Helper definitions (commonly used)
     "crlf=\\r\\n;\n"
     "cr=\\r;\n" "r=\\r;\n"
     "anglebraces=`< *(anglebraces / ~~`>) `>;\n"
@@ -61,9 +69,13 @@ void add_def(grammar_t *g, const char *src, const char *name, vm_op_t *op)
     ++g->size;
 }
 
-void load_grammar(grammar_t *g, const char *src)
+/*
+ * Load the given grammar (semicolon-separated definitions)
+ * and return the first rule defined.
+ */
+vm_op_t *load_grammar(grammar_t *g, const char *src)
 {
-    vm_op_t *mainpat = NULL;
+    vm_op_t *ret = NULL;
     do {
         src = after_spaces(src);
         if (!*src) break;
@@ -76,20 +88,21 @@ void load_grammar(grammar_t *g, const char *src)
         vm_op_t *op = bpeg_pattern(src);
         check(op, "Couldn't load definition");
         add_def(g, src, name, op);
-        if (mainpat == NULL) {
-            mainpat = op;
-            g->pattern = op;
+        if (ret == NULL) {
+            ret = op;
         }
         src = op->end;
     } while (*src && matchchar(&src, ';')); 
+    return ret;
 }
 
-/*
- * Print a BPEG grammar in human-readable form.
- */
-void print_grammar(grammar_t *g)
+vm_op_t *lookup(grammar_t *g, const char *name)
 {
-    if (g->pattern) print_pattern(g->pattern);
+    // Search backwards so newer defs take precedence
+    for (int i = g->size-1; i >= 0; i--) {
+        if (streq(g->definitions[i].name, name)) {
+            return g->definitions[i].op;
+        }
+    }
+    return NULL;
 }
-
-// vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1

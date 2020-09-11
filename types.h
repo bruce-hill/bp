@@ -81,7 +81,6 @@ typedef struct {
 } def_t;
 
 typedef struct {
-    vm_op_t *pattern;
     def_t *definitions;
     size_t size, capacity;
 } grammar_t;

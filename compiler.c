@@ -436,6 +436,7 @@ vm_op_t *bpeg_stringpattern(const char *str)
  */
 vm_op_t *bpeg_replacement(vm_op_t *pat, const char *replacement)
 {
+    check(pat, "Null pattern used in replacement");
     vm_op_t *op = calloc(sizeof(vm_op_t), 1);
     op->op = VM_REPLACE;
     op->start = pat->start;

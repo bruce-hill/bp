@@ -52,29 +52,63 @@ static const char *usage = (
     "  -r --replace <replacement>   replace the input pattern with the given replacement\n"
     "  -g --grammar <grammar file>  use the specified file as a grammar\n");
 
+static char *getflag(const char *flag, char *argv[], int *i)
+{
+    size_t n = strlen(flag);
+    if (strncmp(argv[*i], flag, n) == 0) {
+        if (argv[*i][n] == '=') {
+            return &argv[*i][n+1];
+        } else if (argv[*i][n] == '\0') {
+            ++(*i);
+            return argv[*i];
+        }
+    }
+    return NULL;
+}
+#define FLAG(f) (flag=getflag((f), argv, &i))
 
 int main(int argc, char *argv[])
 {
     int verbose = 0;
-    const char *pattern = NULL,
-          *replacement = NULL,
-          *grammarfile = NULL,
-          *infile = NULL;
+    char *flag = NULL;
+    const char *rule = "find-all";
 
     grammar_t *g = new_grammar();
 
-    for (int i = 1; i < argc; i++) {
-        if (streq(argv[i], "--help") || streq(argv[i], "-h")) {
+    int i, npatterns = 0;
+    for (i = 1; i < argc; i++) {
+        if (streq(argv[i], "--")) {
+            ++i;
+            break;
+        } else if (FLAG("--help") || FLAG("-h")) {
             printf("%s\n", usage);
             return 0;
-        } else if (streq(argv[i], "--verbose") || streq(argv[i], "-v")) {
+        } else if (FLAG("--verbose") || FLAG("-v")) {
             verbose = 1;
-        } else if (streq(argv[i], "--replace") || streq(argv[i], "-r")) {
-            replacement = argv[++i];
-        } else if (streq(argv[i], "--grammar") || streq(argv[i], "-g")) {
-            grammarfile = argv[++i];
-        } else if (streq(argv[i], "--define") || streq(argv[i], "-d")) {
-            char *def = argv[++i];
+        } else if (FLAG("--pattern") || FLAG("-p")) {
+            vm_op_t *p = bpeg_pattern(flag);
+            check(p, "Pattern failed to compile");
+            add_def(g, flag, "pattern", p);
+            ++npatterns;
+        } else if (FLAG("--replace") || FLAG("-r")) {
+            vm_op_t *p = bpeg_replacement(bpeg_pattern("pattern"), flag);
+            check(p, "Replacement failed to compile");
+            add_def(g, flag, "replacement", p);
+            rule = "replace-all";
+        } else if (FLAG("--grammar") || FLAG("-g")) {
+            const char *grammarfile = flag;
+            // load grammar from a file (semicolon mode)
+            char *grammar;
+            if (streq(grammarfile, "-")) {
+                grammar = readfile(STDIN_FILENO);
+            } else {
+                int fd = open(grammarfile, O_RDONLY);
+                check(fd >= 0, "Couldn't open file: %s", argv[2]);
+                grammar = readfile(fd);
+            }
+            load_grammar(g, grammar);
+        } else if (FLAG("--define") || FLAG("-d")) {
+            char *def = flag;
             char *eq = strchr(def, '=');
             check(eq, usage);
             *eq = '\0';
@@ -82,71 +116,51 @@ int main(int argc, char *argv[])
             vm_op_t *pat = bpeg_pattern(src);
             check(pat, "Failed to compile pattern");
             add_def(g, src, def, pat);
-        } else if (pattern == NULL) {
-            pattern = argv[i];
-        } else if (infile == NULL) {
-            infile = argv[i];
+        } else if (argv[i][0] != '-') {
+            if (npatterns > 0) break;
+            vm_op_t *p = bpeg_stringpattern(argv[i]);
+            check(p, "Pattern failed to compile");
+            add_def(g, argv[i], "pattern", p);
+            ++npatterns;
         }
     }
 
-    check(pattern != NULL || grammarfile != NULL, usage);
-
-    if (grammarfile) {
-        // load grammar from a file (semicolon mode)
-        char *grammar;
-        if (streq(grammarfile, "-")) {
-            grammar = readfile(STDIN_FILENO);
-        } else {
-            int fd = open(grammarfile, O_RDONLY);
-            check(fd >= 0, "Couldn't open file: %s", argv[2]);
-            grammar = readfile(fd);
-        }
-        load_grammar(g, grammar);
-    } else {
-        // load grammar in start-with-string mode:
-        vm_op_t *pat = bpeg_stringpattern(pattern);
-        if (replacement)
-            pat = bpeg_replacement(pat, replacement);
-
-        add_def(g, pattern, "pattern", pat);
-
-        if (replacement) {
-            load_grammar(g,
-                "replace-all = *&&@pattern &&$$;\n"
-                );
-        } else {
-            load_grammar(g,
-                "find-all = *(matching-line / {&&(\\n/$$)=>});\n"
-                "matching-line = +&@pattern *. $ ?\\n;"
-            );
-        }
-    }
+    vm_op_t *pattern = lookup(g, rule);
+    check(pattern != NULL, usage);
 
     if (verbose) {
-        print_pattern(g->pattern);
+        print_pattern(pattern);
     }
 
     char *input;
-    if (infile == NULL || streq(infile, "-")) {
+    if (i == argc) {
+        // Force stdin if no files given
         input = readfile(STDIN_FILENO);
-    } else {
-        int fd = open(infile, O_RDONLY);
-        check(fd >= 0, "Couldn't open file: %s", argv[2]);
-        input = readfile(fd);
+        goto run_match;
     }
+    for ( ; i < argc; i++) {
+        if (argv[i] == NULL || streq(argv[i], "-")) {
+            input = readfile(STDIN_FILENO);
+        } else {
+            int fd = open(argv[i], O_RDONLY);
+            check(fd >= 0, "Couldn't open file: %s", argv[2]);
+            input = readfile(fd);
+        }
 
-    // Ensure string has a null byte to the left:
-    char *lpadded = calloc(sizeof(char), strlen(input)+2);
-    stpcpy(&lpadded[1], input);
-    input = &lpadded[1];
+      run_match:;
+        // Ensure string has a null byte to the left:
+        char *lpadded = calloc(sizeof(char), strlen(input)+2);
+        stpcpy(&lpadded[1], input);
+        input = &lpadded[1];
 
-    match_t *m = match(g, input, g->pattern);
-    if (m == NULL) {
-        printf("No match\n");
-        return 1;
-    } else {
-        print_match(m, "\033[0m", verbose);
-        //printf("\033[0;2m%s\n", m->end);
+        match_t *m = match(g, input, pattern);
+        if (m == NULL) {
+            printf("No match\n");
+            return 1;
+        } else {
+            print_match(m, "\033[0m", verbose);
+            //printf("\033[0;2m%s\n", m->end);
+        }
     }
 
     return 0;
