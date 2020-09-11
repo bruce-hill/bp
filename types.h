@@ -1,24 +1,10 @@
 /*
- * bpeg.h - Header file for the bpeg parser
+ * types.h - Datatypes used by BPEG
  */
-#include <ctype.h>
-#include <fcntl.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <unistd.h>
+#ifndef TYPES__H
+#define TYPES__H
 
-#include "utils.h"
-
-const char *usage = (
-    "Usage:\n"
-    "  bpeg [flags] <pattern> [<input files>...]\n\n"
-    "Flags:\n"
-    "  -h --help\t print the usage and quit\n"
-    "  -v --verbose\t print verbose debugging info\n"
-    "  -s --slow\t run in slow mode for debugging\n"
-    "  -r --replace <replacement>   replace the input pattern with the given replacement\n"
-    "  -g --grammar <grammar file>  use the specified file as a grammar\n");
+#include <sys/types.h>
 
 /*
  * BPEG virtual machine opcodes
@@ -87,20 +73,6 @@ typedef struct match_s {
     vm_op_t *op;
 } match_t;
 
-static inline const char *after_spaces(const char *str);
-static match_t *free_match(match_t *m);
-static match_t *match(const char *str, vm_op_t *op);
-static vm_op_t *compile_bpeg(const char *source, const char *str);
-static vm_op_t *load_grammar(const char *grammar);
-static vm_op_t *add_def(const char *name, const char *source, vm_op_t *op);
-static vm_op_t *load_def(const char *name, const char *source);
-static vm_op_t *chain_together(vm_op_t *first, vm_op_t *second);
-static vm_op_t *compile_bpeg_string(const char *source, const char *str);
-static vm_op_t *expand_chain(const char *source, vm_op_t *first);
-static vm_op_t *expand_choices(const char *source, vm_op_t *op);
-static void print_match(match_t *m, const char *color);
-static void set_range(vm_op_t *op, ssize_t min, ssize_t max, vm_op_t *pat, vm_op_t *sep);
-
 
 typedef struct {
     const char *name;
@@ -108,5 +80,10 @@ typedef struct {
     vm_op_t *op;
 } def_t;
 
-static def_t defs[1024] = {{NULL, NULL, NULL}};
-size_t ndefs = 0;
+typedef struct {
+    vm_op_t *pattern;
+    def_t *definitions;
+    size_t size, capacity;
+} grammar_t;
+
+#endif

@@ -1,7 +1,6 @@
 # This is a file defining the BPEG grammar using BPEG syntax
 
-Grammar;
-Grammar = __ @[main-pattern]extended-pat __ *((__`;__) Def) ?(`;__);
+Grammar = __ *Def%(__`;__) ?(`;__);
 Def = @[name]Ref __ `= __ @[definition]extended-pat;
 
 # This is used for command line arguments:
