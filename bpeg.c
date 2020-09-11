@@ -138,13 +138,15 @@ int main(int argc, char *argv[])
         input = readfile(STDIN_FILENO);
         goto run_match;
     }
-    for ( ; i < argc; i++) {
+    for (int nfiles = 0; i < argc; nfiles++, i++) {
         if (argv[i] == NULL || streq(argv[i], "-")) {
             input = readfile(STDIN_FILENO);
         } else {
             int fd = open(argv[i], O_RDONLY);
-            check(fd >= 0, "Couldn't open file: %s", argv[2]);
+            check(fd >= 0, "Couldn't open file: %s", argv[i]);
             input = readfile(fd);
+            if (nfiles > 0) printf("\n");
+            printf("\033[1;4;33m%s\033[0m\n", argv[i]);
         }
 
       run_match:;
