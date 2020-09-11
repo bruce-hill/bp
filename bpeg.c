@@ -892,40 +892,46 @@ static void print_match(match_t *m, const char *color)
 {
     if (m->is_replacement) {
         printf("\033[0;34m");
-        for (const char *r = m->name_or_replacement; *r; r++) {
-            if (*r == '@') {
+        for (const char *r = m->name_or_replacement; *r; ) {
+            if (*r == '\\') {
+                fputc(unescapechar(r, &r), stdout);
+                continue;
+            } else if (*r != '@') {
+                fputc(*r, stdout);
                 ++r;
-                match_t *cap = NULL;
-                if (isdigit(*r)) {
+                continue;
+            }
+
+            ++r;
+            match_t *cap = NULL;
+            switch (*r) {
+                case '0': case '1': case '2': case '3': case '4':
+                case '5': case '6': case '7': case '8': case '9': {
                     int n = (int)strtol(r, (char**)&r, 10);
                     cap = get_capture_n(m->child, &n);
-                    --r;
-                } else if (*r == '[') {
+                    break;
+                }
+                case '[': {
                     char *closing = strchr(r+1, ']');
                     if (!closing) {
                         fputc('@', stdout);
-                        --r;
-                    } else {
-                        ++r;
-                        char *name = strndup(r, (size_t)(closing-r));
-                        cap = get_capture_named(m, name);
-                        free(name);
-                        r = closing;
+                        break;
                     }
-                } else if (*r == '@') {
-                    fputc('@', stdout);
-                } else {
-                    fputc('@', stdout);
+                    ++r;
+                    char *name = strndup(r, (size_t)(closing-r));
+                    cap = get_capture_named(m, name);
+                    free(name);
+                    r = closing + 1;
+                    break;
                 }
-                if (cap != NULL) {
-                    print_match(cap, "\033[0;35m");
-                    printf("\033[0;34m");
+                default: {
+                    fputc('@', stdout);
+                    break;
                 }
-            } else if (matchchar(&r, '\\')) {
-                fputc(unescapechar(r, &r), stdout);
-                --r;
-            } else {
-                fputc(*r, stdout);
+            }
+            if (cap != NULL) {
+                print_match(cap, "\033[0;35m");
+                printf("\033[0;34m");
             }
         }
     } else {
