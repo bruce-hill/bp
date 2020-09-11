@@ -91,3 +91,5 @@ void print_grammar(grammar_t *g)
 {
     if (g->pattern) print_pattern(g->pattern);
 }
+
+// vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1

@@ -16,3 +16,4 @@ void print_pattern(vm_op_t *op);
 void print_match(match_t *m, const char *color, int verbose);
 
 #endif
+// vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1

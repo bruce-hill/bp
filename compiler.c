@@ -157,7 +157,7 @@ vm_op_t *bpeg_simplepattern(const char *str)
             len = unescape_string(literal, literal, len);
 
             op->op = VM_STRING;
-            op->len = len;
+            op->len = (ssize_t)len;
             op->args.s = literal;
 
             check(matchchar(&str, endquote), "Missing closing quote");
@@ -372,8 +372,8 @@ vm_op_t *bpeg_simplepattern(const char *str)
                 const char *refname = str;
                 str = after_name(str);
                 op->op = VM_REF;
-                op->len = (size_t)(str - refname);
-                op->args.s = strndup(refname, op->len);
+                op->len = (ssize_t)(str - refname);
+                op->args.s = strndup(refname, (size_t)op->len);
                 break;
             } else {
                 free(op);
@@ -410,7 +410,7 @@ vm_op_t *bpeg_stringpattern(const char *str)
         size_t len = (size_t)(str - literal);
         literal = strndup(literal, len);
         len = unescape_string(literal, literal, len);
-        strop->len = len;
+        strop->len = (ssize_t)len;
         strop->args.s = literal;
         strop->end = str;
 
@@ -459,3 +459,5 @@ vm_op_t *bpeg_pattern(const char *str)
     if (op != NULL) op = expand_choices(op);
     return op;
 }
+
+// vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1

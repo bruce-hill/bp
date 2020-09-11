@@ -41,7 +41,7 @@ match_t *match(grammar_t *g, const char *str, vm_op_t *op)
             return m;
         }
         case VM_STRING: {
-            if (strncmp(str, op->args.s, op->len) != 0)
+            if (strncmp(str, op->args.s, (size_t)op->len) != 0)
                 return NULL;
             match_t *m = calloc(sizeof(match_t), 1);
             m->op = op;
@@ -447,3 +447,4 @@ void print_match(match_t *m, const char *color, int verbose)
     }
 }
 
+// vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1
