@@ -110,7 +110,10 @@ int main(int argc, char *argv[])
 
         add_def(g, pattern, "pattern", pat);
 
-        const char *grammar = "find = *(@pattern / \\n / .);";
+        const char *grammar = (
+            "find-all = *(matching-line / {&&(\\n/$$)=>});\n"
+            "matching-line = +&@pattern *. $ ?\\n;"
+            );
         load_grammar(g, grammar);
     }
 
@@ -138,7 +141,7 @@ int main(int argc, char *argv[])
         return 1;
     } else {
         print_match(m, "\033[0m", verbose);
-        printf("\033[0;2m%s\n", m->end);
+        //printf("\033[0;2m%s\n", m->end);
     }
 
     return 0;
