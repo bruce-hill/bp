@@ -32,6 +32,7 @@
  *     ; <name> = <pat>            <name> is defined to be <pat>
  */
 #include <fcntl.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -78,7 +79,9 @@ int main(int argc, char *argv[])
     int fd;
     if ((fd=open("/etc/xdg/bpeg/builtins.bpeg", O_RDONLY)) >= 0)
         load_grammar(g, readfile(fd));
-    if ((fd=open("/etc/xdg/bpeg/builtins.bpeg", O_RDONLY)) >= 0)
+    char path[PATH_MAX] = {0};
+    sprintf(path, "%s/.config/bpeg/builtins.bpeg", getenv("HOME"));
+    if ((fd=open(path, O_RDONLY)) >= 0)
         load_grammar(g, readfile(fd));
 
     int i, npatterns = 0;
@@ -100,12 +103,19 @@ int main(int argc, char *argv[])
             rule = "replace-all";
         } else if (FLAG("--grammar") || FLAG("-g")) {
             int fd;
-            const char *grammarfile = flag;
-            if (streq(grammarfile, "-")) {
+            if (streq(flag, "-")) {
                 fd = STDIN_FILENO;
             } else {
-                fd = open(grammarfile, O_RDONLY);
-                check(fd >= 0, "Couldn't open file: %s", argv[2]);
+                fd = open(flag, O_RDONLY);
+                if (fd < 0) {
+                    sprintf(path, "%s/.config/bpeg/%s.bpeg", getenv("HOME"), flag);
+                    fd = open(path, O_RDONLY);
+                }
+                if (fd < 0) {
+                    sprintf(path, "/etc/xdg/bpeg/%s.bpeg", flag);
+                    fd = open(path, O_RDONLY);
+                }
+                check(fd >= 0, "Couldn't find grammar: %s", flag);
             }
             load_grammar(g, readfile(fd));
         } else if (FLAG("--define") || FLAG("-d")) {
