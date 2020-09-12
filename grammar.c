@@ -13,6 +13,7 @@ const char *BPEG_BUILTIN_GRAMMAR = (
     "replace-all = *&&@replacement &&$$;\n"
     "find-all = *(matching-line / {&&(\\n/$$)=>});\n"
     "matching-line = +&@pattern *. $ ?\\n;\n"
+    "only-matches = *{&&@pattern=>'@1\\n'};\n"
 
     // Helper definitions (commonly used)
     "crlf=\\r\\n;\n"

@@ -86,10 +86,7 @@ int main(int argc, char *argv[])
         } else if (FLAG("--verbose") || FLAG("-v")) {
             verbose = 1;
         } else if (FLAG("--pattern") || FLAG("-p")) {
-            vm_op_t *p = bpeg_pattern(flag);
-            check(p, "Pattern failed to compile");
-            add_def(g, flag, "pattern", p);
-            ++npatterns;
+            rule = flag;
         } else if (FLAG("--replace") || FLAG("-r")) {
             vm_op_t *p = bpeg_replacement(bpeg_pattern("pattern"), flag);
             check(p, "Replacement failed to compile");
@@ -126,7 +123,7 @@ int main(int argc, char *argv[])
     }
 
     vm_op_t *pattern = lookup(g, rule);
-    check(pattern != NULL, usage);
+    check(pattern != NULL, "No such rule: '%s'", rule);
 
     if (verbose) {
         print_pattern(pattern);

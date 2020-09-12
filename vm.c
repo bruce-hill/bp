@@ -377,6 +377,7 @@ void print_match(match_t *m, const char *color, int verbose)
         printf("\033[0;34m");
         for (const char *r = m->name_or_replacement; *r; ) {
             if (*r == '\\') {
+                ++r;
                 fputc(unescapechar(r, &r), stdout);
                 continue;
             } else if (*r != '@') {
