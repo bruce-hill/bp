@@ -27,7 +27,9 @@ install: $(NAME)
 		read prefix; \
 	fi; \
 	[ ! "$$prefix" ] && prefix="/usr/local"; \
+	[ ! "$$sysconfdir" ] && sysconfdir=/etc; \
 	mkdir -pv -m 755 "$$prefix/share/man/man1" "$$prefix/bin" \
+	&& cp -rv grammars/* "$$sysconfdir/xdg/bpeg/" \
 	&& cp -v $(NAME).1 "$$prefix/share/man/man1/" \
 	&& rm -f "$$prefix/bin/$(NAME)" \
 	&& cp -v $(NAME) "$$prefix/bin/"
@@ -39,8 +41,9 @@ uninstall:
 		read prefix; \
 	fi; \
 	[ ! "$$prefix" ] && prefix="/usr/local"; \
+	[ ! "$$sysconfdir" ] && sysconfdir=/etc; \
 	echo "Deleting..."; \
-	rm -rvf "$$prefix/bin/$(NAME)" "$$prefix/share/man/man1/$(NAME).1" ; \
+	rm -rvf "$$prefix/bin/$(NAME)" "$$prefix/share/man/man1/$(NAME).1" "$$sysconfdir/xdg/bpeg"; \
 	printf "\033[1mIf you created any config files in ~/.config/$(NAME), you may want to delete them manually.\033[0m\n"
 
 .PHONY: all, clean, install, uninstall

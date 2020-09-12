@@ -75,6 +75,12 @@ int main(int argc, char *argv[])
 
     grammar_t *g = new_grammar();
 
+    int fd;
+    if ((fd=open("/etc/xdg/bpeg/builtins.bpeg", O_RDONLY)) >= 0)
+        load_grammar(g, readfile(fd));
+    if ((fd=open("/etc/xdg/bpeg/builtins.bpeg", O_RDONLY)) >= 0)
+        load_grammar(g, readfile(fd));
+
     int i, npatterns = 0;
     for (i = 1; i < argc; i++) {
         if (streq(argv[i], "--")) {
@@ -93,17 +99,15 @@ int main(int argc, char *argv[])
             add_def(g, flag, "replacement", p);
             rule = "replace-all";
         } else if (FLAG("--grammar") || FLAG("-g")) {
+            int fd;
             const char *grammarfile = flag;
-            // load grammar from a file (semicolon mode)
-            char *grammar;
             if (streq(grammarfile, "-")) {
-                grammar = readfile(STDIN_FILENO);
+                fd = STDIN_FILENO;
             } else {
-                int fd = open(grammarfile, O_RDONLY);
+                fd = open(grammarfile, O_RDONLY);
                 check(fd >= 0, "Couldn't open file: %s", argv[2]);
-                grammar = readfile(fd);
             }
-            load_grammar(g, grammar);
+            load_grammar(g, readfile(fd));
         } else if (FLAG("--define") || FLAG("-d")) {
             char *def = flag;
             char *eq = strchr(def, '=');

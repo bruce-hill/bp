@@ -6,55 +6,10 @@
 #include "compiler.h"
 #include "utils.h"
 
-const char *BPEG_BUILTIN_GRAMMAR = (
-    // Meta-rules for acting on everything
-    "pattern = !(/);\n" // Not defined by default
-    "replacement = {!(/)=>};\n" // Not defined by default
-    "replace-all = *&&@replacement &&$$;\n"
-    "find-all = *(matching-line / {&&(\\n/$$)=>});\n"
-    "matching-line = +&@pattern *. $ ?\\n;\n"
-    "only-matches = *{&&@pattern=>'@1\\n'};\n"
-
-    // Helper definitions (commonly used)
-    "crlf=\\r\\n;\n"
-    "cr=\\r;\n" "r=\\r;\n"
-    "anglebraces=`< *(anglebraces / ~~`>) `>;\n"
-    "brackets=`[ *(brackets / ~~`]) `];\n"
-    "braces=`{ *(braces / ~~`}) `};\n"
-    "parens=`( *(parens / ~~`)) `);\n"
-    "id=(`a-z/`A-Z/`_) *(`a-z/`A-Z/`_/`0-9);\n"
-    "HEX=`0-9/`A-F;\n"
-    "Hex=`0-9/`a-f/`A-F;\n"
-    "hex=`0-9/`a-f;\n"
-    "number=+`0-9 ?(`. *`0-9) / `. +`0-9;\n"
-    "int=+`0-9;\n"
-    "digit=`0-9;\n"
-    "Abc=`a-z/`A-Z;\n"
-    "ABC=`A-Z;\n"
-    "abc=`a-z;\n"
-    "esc=\\e;\n" "e=\\e;\n"
-    "tab=\\t;\n" "t=\\t;\n"
-    "nl=\\n;\n" "lf=\\n;\n" "n=\\n;\n"
-    "c-block-comment='/*' &&'*/';\n"
-    "c-line-comment='//' &$;\n"
-    "c-comment=c-line-comment / c-block-comment;\n"
-    "hash-comment=`# &$;\n"
-    "comment=!(/);\n" // No default definition, can be overridden
-    "WS=` /\\t/\\n/\\r/comment;\n"
-    "ws=` /\\t;\n"
-    "$$=!$.;\n"
-    "$=!.;\n"
-    "^^=!<$.;\n"
-    "^=!<.;\n"
-    "__=*(` /\\t/\\n/\\r/comment);\n"
-    "_=*(` /\\t);\n"
-    );
-
 grammar_t *new_grammar(void)
 {
     grammar_t *g = calloc(sizeof(grammar_t), 1);
     g->definitions = calloc(sizeof(def_t), (g->capacity = 128));
-    load_grammar(g, BPEG_BUILTIN_GRAMMAR);
     return g;
 }
 
