@@ -235,7 +235,7 @@ vm_op_t *bpeg_simplepattern(const char *str)
                 case '?': min = 0, max = 1; break;
             }
             vm_op_t *pat = bpeg_simplepattern(str);
-            check(pat, "Expected pattern after +");
+            check(pat, "Expected pattern after '%c'", c);
             str = pat->end;
             str = after_spaces(str);
             if (matchchar(&str, '%')) {
