@@ -199,21 +199,21 @@ static match_t *_match(grammar_t *g, const char *str, vm_op_t *op, recursive_ref
             }
             match_t *before = _match(g, str - backtrack, op->args.pat, rec);
             if (before == NULL) return NULL;
-            destroy_match(&before);
             match_t *m = calloc(sizeof(match_t), 1);
             m->start = str;
             m->end = str;
             m->op = op;
+            m->child = before;
             return m;
         }
         case VM_BEFORE: {
             match_t *after = _match(g, str, op->args.pat, rec);
             if (after == NULL) return NULL;
-            destroy_match(&after);
             match_t *m = calloc(sizeof(match_t), 1);
             m->start = str;
             m->end = str;
             m->op = op;
+            m->child = after;
             return m;
         }
         case VM_CAPTURE: {
@@ -511,6 +511,10 @@ void print_match(match_t *m, const char *color, int verbose)
         //    printf("\033[0;2;33m[%s:", name);
         const char *prev = m->start;
         for (match_t *child = m->child; child; child = child->nextsibling) {
+            // Skip children from e.g. zero-width matches like >@foo
+            if (!(m->start <= child->start && child->start <= m->end &&
+                  m->start <= child->end && child->end <= m->end))
+                continue;
             if (child->start > prev)
                 printf("%s%.*s", color ? color : "", (int)(child->start - prev), prev);
             print_match(child, color ? (m->is_capture ? "\033[0;31;1m" : color) : NULL, verbose);
