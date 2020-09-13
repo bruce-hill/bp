@@ -136,6 +136,8 @@ int main(int argc, char *argv[])
             check(p, "Pattern failed to compile");
             add_def(g, flag, "pattern", p);
             ++npatterns;
+        } else if (FLAG("--mode") || FLAG("-m")) {
+            rule = flag;
         } else if (argv[i][0] != '-') {
             if (npatterns > 0) break;
             vm_op_t *p = bpeg_stringpattern(argv[i]);
@@ -183,7 +185,7 @@ int main(int argc, char *argv[])
             printf("No match\n");
             return 1;
         } else {
-            print_match(m, "\033[0m", verbose);
+            print_match(m, isatty(STDOUT_FILENO) ? "\033[0m" : NULL, verbose);
             //printf("\033[0;2m%s\n", m->end);
         }
         freefile(input);

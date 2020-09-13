@@ -426,7 +426,7 @@ static match_t *get_capture_named(match_t *m, const char *name)
 void print_match(match_t *m, const char *color, int verbose)
 {
     if (m->is_replacement) {
-        printf("\033[0;34m");
+        if (color) printf("\033[0;34m");
         for (const char *r = m->name_or_replacement; *r; ) {
             if (*r == '\\') {
                 ++r;
@@ -466,27 +466,27 @@ void print_match(match_t *m, const char *color, int verbose)
                 }
             }
             if (cap != NULL) {
-                print_match(cap, "\033[0;35m", verbose);
-                printf("\033[0;34m");
+                print_match(cap, color ? "\033[0;35m" : NULL, verbose);
+                if (color) printf("\033[0;34m");
             }
         }
     } else {
         const char *name = m->name_or_replacement;
         if (verbose && m->is_ref && name && isupper(name[0]))
-            printf("\033[0;2;35m{%s:", name);
+            printf(color ? "\033[0;2;35m{%s:" : "{%s", name);
         //if (m->is_capture && name)
         //    printf("\033[0;2;33m[%s:", name);
         const char *prev = m->start;
         for (match_t *child = m->child; child; child = child->nextsibling) {
             if (child->start > prev)
-                printf("%s%.*s", color, (int)(child->start - prev), prev);
-            print_match(child, m->is_capture ? "\033[0;1m" : color, verbose);
+                printf("%s%.*s", color ? color : "", (int)(child->start - prev), prev);
+            print_match(child, color ? (m->is_capture ? "\033[0;31;1m" : color) : NULL, verbose);
             prev = child->end;
         }
         if (m->end > prev)
-            printf("%s%.*s", color, (int)(m->end - prev), prev);
+            printf("%s%.*s", color ? color : "", (int)(m->end - prev), prev);
         if (verbose && m->is_ref && name && isupper(name[0]))
-            printf("\033[0;2;35m}");
+            printf(color ? "\033[0;2;35m}" : "}");
         //if (m->is_capture && name)
         //    printf("\033[0;2;33m]");
     }
