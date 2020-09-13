@@ -62,14 +62,22 @@ static size_t push_backrefs(grammar_t *g, match_t *m)
     return count;
 }
 
+typedef struct recursive_ref_s {
+    const vm_op_t *op;
+    const char *pos;
+    struct recursive_ref_s *prev;
+    int hit;
+    match_t *result;
+} recursive_ref_t;
+
+
 /*
  * Run virtual machine operation against a string and return
  * a match struct, or NULL if no match is found.
  * The returned value should be free()'d to avoid memory leaking.
  */
-match_t *match(grammar_t *g, const char *str, vm_op_t *op)
+static match_t *_match(grammar_t *g, const char *str, vm_op_t *op, recursive_ref_t *rec)
 {
-  //tailcall:
     switch (op->op) {
         case VM_EMPTY: {
             match_t *m = calloc(sizeof(match_t), 1);
@@ -109,7 +117,7 @@ match_t *match(grammar_t *g, const char *str, vm_op_t *op)
             if (op->op == VM_ANYTHING_BUT)
                 if (!*str || (!op->multiline && *str == '\n'))
                     return NULL;
-            match_t *m = match(g, str, op->args.pat);
+            match_t *m = _match(g, str, op->args.pat, rec);
             if (m != NULL) {
                 destroy_match(&m);
                 return NULL;
@@ -128,7 +136,7 @@ match_t *match(grammar_t *g, const char *str, vm_op_t *op)
             match_t *p = NULL;
             for (const char *prev = NULL; p == NULL && prev < str; ) {
                 prev = str;
-                p = match(g, str, op->args.pat);
+                p = _match(g, str, op->args.pat, rec);
                 if (*str && (op->multiline || *str != '\n'))
                     ++str;
             }
@@ -155,11 +163,11 @@ match_t *match(grammar_t *g, const char *str, vm_op_t *op)
                 // Separator
                 match_t *sep = NULL;
                 if (op->args.repetitions.sep != NULL && reps > 0) {
-                    sep = match(g, str, op->args.repetitions.sep);
+                    sep = _match(g, str, op->args.repetitions.sep, rec);
                     if (sep == NULL) break;
                     str = sep->end;
                 }
-                match_t *p = match(g, str, op->args.repetitions.repeat_pat);
+                match_t *p = _match(g, str, op->args.repetitions.repeat_pat, rec);
                 if (p == NULL || (p->end == prev && reps > 0)) { // Prevent infinite loops
                     destroy_match(&sep);
                     destroy_match(&p);
@@ -189,7 +197,7 @@ match_t *match(grammar_t *g, const char *str, vm_op_t *op)
             for (int i = 0; i < backtrack; i++) {
                 if (str[-i] == '\0') return NULL;
             }
-            match_t *before = match(g, str - backtrack, op->args.pat);
+            match_t *before = _match(g, str - backtrack, op->args.pat, rec);
             if (before == NULL) return NULL;
             destroy_match(&before);
             match_t *m = calloc(sizeof(match_t), 1);
@@ -199,7 +207,7 @@ match_t *match(grammar_t *g, const char *str, vm_op_t *op)
             return m;
         }
         case VM_BEFORE: {
-            match_t *after = match(g, str, op->args.pat);
+            match_t *after = _match(g, str, op->args.pat, rec);
             if (after == NULL) return NULL;
             destroy_match(&after);
             match_t *m = calloc(sizeof(match_t), 1);
@@ -209,7 +217,7 @@ match_t *match(grammar_t *g, const char *str, vm_op_t *op)
             return m;
         }
         case VM_CAPTURE: {
-            match_t *p = match(g, str, op->args.pat);
+            match_t *p = _match(g, str, op->args.pat, rec);
             if (p == NULL) return NULL;
             match_t *m = calloc(sizeof(match_t), 1);
             m->start = str;
@@ -222,16 +230,16 @@ match_t *match(grammar_t *g, const char *str, vm_op_t *op)
             return m;
         }
         case VM_OTHERWISE: {
-            match_t *m = match(g, str, op->args.multiple.first);
-            if (m == NULL) m = match(g, str, op->args.multiple.second);
+            match_t *m = _match(g, str, op->args.multiple.first, rec);
+            if (m == NULL) m = _match(g, str, op->args.multiple.second, rec);
             return m;
         }
         case VM_CHAIN: {
-            match_t *m1 = match(g, str, op->args.multiple.first);
+            match_t *m1 = _match(g, str, op->args.multiple.first, rec);
             if (m1 == NULL) return NULL;
 
             size_t nbackrefs = push_backrefs(g, m1);
-            match_t *m2 = match(g, m1->end, op->args.multiple.second);
+            match_t *m2 = _match(g, m1->end, op->args.multiple.second, rec);
             pop_backrefs(g, nbackrefs);
             if (m2 == NULL) {
                 destroy_match(&m1);
@@ -250,7 +258,7 @@ match_t *match(grammar_t *g, const char *str, vm_op_t *op)
             m->start = str;
             m->op = op;
             if (op->args.replace.replace_pat) {
-                match_t *p = match(g, str, op->args.replace.replace_pat);
+                match_t *p = _match(g, str, op->args.replace.replace_pat, rec);
                 if (p == NULL) return NULL;
                 m->child = p;
                 m->end = p->end;
@@ -264,14 +272,39 @@ match_t *match(grammar_t *g, const char *str, vm_op_t *op)
         case VM_REF: {
             vm_op_t *r = lookup(g, op->args.s);
             check(r != NULL, "Unknown identifier: '%s'", op->args.s);
-            // Could use tailcall here, but current have disabled
-            match_t *p = match(g, str, r);
-            if (p == NULL) return NULL;
+
+            // Prevent infinite left recursion:
+            for (recursive_ref_t *p = rec; p; p = p->prev) {
+                if (p->pos == str && p->op == r) {
+                    ++p->hit;
+                    return p->result;
+                }
+            }
+
+            recursive_ref_t wrap = {
+                .op = r,
+                .pos = str,
+                .prev = rec,
+                .hit = 0,
+                .result = NULL,
+            };
+            match_t *best = NULL;
+          left_recursive:;
+            match_t *p = _match(g, str, r, &wrap);
+            if (p == NULL) return best;
+            if (wrap.hit && (best == NULL || p->end > best->end)) {
+                best = p;
+                wrap.hit = 0;
+                wrap.result = p;
+                goto left_recursive;
+            } else if (best == NULL) {
+                best = p;
+            }
             match_t *m = calloc(sizeof(match_t), 1);
-            m->start = p->start;
-            m->end = p->end;
+            m->start = best->start;
+            m->end = best->end;
             m->op = op;
-            m->child = p;
+            m->child = best;
             m->name_or_replacement = op->args.s;
             m->is_ref = 1;
             return m;
@@ -591,6 +624,11 @@ static match_t *match_backref(const char *str, vm_op_t *op, match_t *cap)
     }
     ret->end = str;
     return ret;
+}
+
+match_t *match(grammar_t *g, const char *str, vm_op_t *op)
+{
+    return _match(g, str, op, NULL);
 }
 
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1
