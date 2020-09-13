@@ -50,8 +50,11 @@ static const char *usage = (
     "Flags:\n"
     "  -h --help\t print the usage and quit\n"
     "  -v --verbose\t print verbose debugging info\n"
-    "  -d --define <name>=<def>     Define a grammar rule\n"
+    "  -d --define <name>=<def>     define a grammar rule\n"
+    "  -e --escaped <pat>\t provide an escaped pattern (equivalent to bpeg '\\(<pat>)')\n"
+    "  -s --string <pat>\t provide a string pattern (equivalent to bpeg '<pat>', but may be useful if '<pat>' begins with a '-')\n"
     "  -r --replace <replacement>   replace the input pattern with the given replacement\n"
+    "  -m --mode <mode>\t set the behavior mode (defult: find-all)\n"
     "  -g --grammar <grammar file>  use the specified file as a grammar\n");
 
 static char *getflag(const char *flag, char *argv[], int *i)
