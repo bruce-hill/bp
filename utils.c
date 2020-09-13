@@ -167,6 +167,8 @@ char *readfile(int fd)
         if (len >= capacity)
             buf = realloc(buf, sizeof(char)*(capacity *= 2));
     }
+    buf[len] = '\0';
+    close(fd);
     return &buf[1];
 }
 
