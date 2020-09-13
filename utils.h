@@ -18,6 +18,7 @@
 #define debug(...) do { if (verbose) fprintf(stderr, __VA_ARGS__); } while(0)
 
 char *readfile(int fd);
+void freefile(char *f);
 char unescapechar(const char *escaped, const char **end);
 const char *after_name(const char *str);
 const char *after_spaces(const char *str);

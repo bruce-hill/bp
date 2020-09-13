@@ -78,11 +78,11 @@ int main(int argc, char *argv[])
 
     int fd;
     if ((fd=open("/etc/xdg/bpeg/builtins.bpeg", O_RDONLY)) >= 0)
-        load_grammar(g, readfile(fd));
+        load_grammar(g, readfile(fd)); // Keep in memory for debugging output
     char path[PATH_MAX] = {0};
     sprintf(path, "%s/.config/bpeg/builtins.bpeg", getenv("HOME"));
     if ((fd=open(path, O_RDONLY)) >= 0)
-        load_grammar(g, readfile(fd));
+        load_grammar(g, readfile(fd)); // Keep in memory for debugging output
 
     int i, npatterns = 0;
     for (i = 1; i < argc; i++) {
@@ -94,8 +94,6 @@ int main(int argc, char *argv[])
             return 0;
         } else if (FLAG("--verbose") || FLAG("-v")) {
             verbose = 1;
-        } else if (FLAG("--pattern") || FLAG("-p")) {
-            rule = flag;
         } else if (FLAG("--replace") || FLAG("-r")) {
             vm_op_t *p = bpeg_replacement(bpeg_pattern("pattern"), flag);
             check(p, "Replacement failed to compile");
@@ -117,7 +115,7 @@ int main(int argc, char *argv[])
                 }
                 check(fd >= 0, "Couldn't find grammar: %s", flag);
             }
-            load_grammar(g, readfile(fd));
+            load_grammar(g, readfile(fd)); // Keep in memory for debug output
         } else if (FLAG("--define") || FLAG("-d")) {
             char *def = flag;
             char *eq = strchr(def, '=');
@@ -129,9 +127,14 @@ int main(int argc, char *argv[])
             add_def(g, src, def, pat);
         } else if (FLAG("--escaped") || FLAG("-e")) {
             check(npatterns == 0, "Cannot define multiple patterns");
-            vm_op_t *p = bpeg_pattern(argv[i]);
+            vm_op_t *p = bpeg_pattern(flag);
+            check(p, "Pattern failed to compile: '%s'", flag);
+            add_def(g, flag, "pattern", p);
+            ++npatterns;
+        } else if (FLAG("--string") || FLAG("-s")) {
+            vm_op_t *p = bpeg_stringpattern(flag);
             check(p, "Pattern failed to compile");
-            add_def(g, argv[i], "pattern", p);
+            add_def(g, flag, "pattern", p);
             ++npatterns;
         } else if (argv[i][0] != '-') {
             if (npatterns > 0) break;
@@ -139,6 +142,9 @@ int main(int argc, char *argv[])
             check(p, "Pattern failed to compile");
             add_def(g, argv[i], "pattern", p);
             ++npatterns;
+        } else {
+            printf("Unrecognized flag: %s\n%s\n", argv[i], usage);
+            return 1;
         }
     }
 
@@ -180,6 +186,7 @@ int main(int argc, char *argv[])
             print_match(m, "\033[0m", verbose);
             //printf("\033[0;2m%s\n", m->end);
         }
+        freefile(input);
     }
 
     return 0;
