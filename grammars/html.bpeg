@@ -1,0 +1,18 @@
+# HTML grammar
+HTML = __ ?(doctype __) *html-element%__ __;
+
+doctype = "<!DOCTYPE" &`>;
+
+html-element = void-element / template-element / raw-text-element / normal-element;
+
+void-element = `< ("area"/"base"/"br"/"col"/"embed"/"hr"/"img"/"input"/"link"/"meta"/"param"/"source"/"track"/"wbr") *(__attribute) __ ?`/ __ `>;
+
+template-element = "<template" __`> __ *(~~`< / comment / html-element / ~~("</template"__`>)) ("</template"__`>);
+
+raw-text-element = `<@[tag]("script"/"style"/"textarea"/"title") *(__attribute) __ `> &("</"tag__`>);
+
+normal-element = !raw-text-element `<@[tag]id *(__attribute) __ `> *(~~`< / comment / html-element / ~~("</"tag__`>)) "</"tag__`>;
+
+comment = "<!--" &&"-->";
+
+attribute = +id%`:__`=__(id / `" &`" / `' &`');

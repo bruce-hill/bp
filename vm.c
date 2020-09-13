@@ -5,6 +5,38 @@
 #include "grammar.h"
 #include "utils.h"
 
+static match_t *match_backref(const char *str, vm_op_t *op, match_t *m);
+static size_t push_backrefs(grammar_t *g, match_t *m);
+static match_t *get_capture_n(match_t *m, int *n);
+static match_t *get_capture_named(match_t *m, const char *name);
+
+/*
+ * The names of the opcodes (keep in sync with the enum definition above)
+ */
+static const char *opcode_names[] = {
+    [VM_EMPTY] = "EMPTY",
+    [VM_ANYCHAR] = "ANYCHAR",
+    [VM_ANYTHING_BUT] = "ANYTHING_BUT",
+    [VM_STRING] = "STRING",
+    [VM_RANGE] = "RANGE",
+    [VM_NOT] = "NOT",
+    [VM_UPTO_AND] = "UPTO_AND",
+    [VM_REPEAT] = "REPEAT",
+    [VM_BEFORE] = "BEFORE",
+    [VM_AFTER] = "AFTER",
+    [VM_CAPTURE] = "CAPTURE",
+    [VM_OTHERWISE] = "OTHERWISE",
+    [VM_CHAIN] = "CHAIN",
+    [VM_REPLACE] = "REPLACE",
+    [VM_REF] = "REF",
+    [VM_BACKREF] = "BACKREF",
+};
+
+const char *opcode_name(enum VMOpcode o)
+{
+    return opcode_names[o];
+}
+
 /*
  * Recursively deallocate a match object and set to NULL
  */
@@ -14,6 +46,20 @@ void destroy_match(match_t **m)
     destroy_match(&((*m)->child));
     destroy_match(&((*m)->nextsibling));
     *m = NULL;
+}
+
+static size_t push_backrefs(grammar_t *g, match_t *m)
+{
+    if (m == NULL) return 0;
+    if (m->op->op == VM_REF) return 0;
+    size_t count = 0;
+    if (m->is_capture && m->name_or_replacement) {
+        ++count;
+        push_backref(g, m->name_or_replacement, m->child);
+    }
+    if (m->child) count += push_backrefs(g, m->child);
+    if (m->nextsibling) count += push_backrefs(g, m->nextsibling);
+    return count;
 }
 
 /*
@@ -183,7 +229,10 @@ match_t *match(grammar_t *g, const char *str, vm_op_t *op)
         case VM_CHAIN: {
             match_t *m1 = match(g, str, op->args.multiple.first);
             if (m1 == NULL) return NULL;
+
+            size_t nbackrefs = push_backrefs(g, m1);
             match_t *m2 = match(g, m1->end, op->args.multiple.second);
+            pop_backrefs(g, nbackrefs);
             if (m2 == NULL) {
                 destroy_match(&m1);
                 return NULL;
@@ -226,6 +275,9 @@ match_t *match(grammar_t *g, const char *str, vm_op_t *op)
             m->name_or_replacement = op->args.s;
             m->is_ref = 1;
             return m;
+        }
+        case VM_BACKREF: {
+            return match_backref(str, op, (match_t*)op->args.backref);
         }
         default: {
             fprintf(stderr, "Unknown opcode: %d", op->op);
@@ -438,6 +490,107 @@ void print_match(match_t *m, const char *color, int verbose)
         //if (m->is_capture && name)
         //    printf("\033[0;2;33m]");
     }
+}
+
+static match_t *match_backref(const char *str, vm_op_t *op, match_t *cap)
+{
+    check(op->op == VM_BACKREF, "Attempt to match backref against something that's not a backref");
+    match_t *ret = calloc(sizeof(match_t), 1);
+    ret->start = str;
+    ret->op = op;
+    match_t **dest = &ret->child;
+
+    if (cap->is_replacement) {
+        for (const char *r = cap->name_or_replacement; *r; ) {
+            if (*r == '\\') {
+                ++r;
+                if (*(str++) != unescapechar(r, &r)) {
+                    destroy_match(&ret);
+                    return NULL;
+                }
+            } else if (*r != '@') {
+                if (*(str++) != *r) {
+                    destroy_match(&ret);
+                    return NULL;
+                }
+                ++r;
+                continue;
+            }
+
+            ++r;
+            match_t *cap = NULL;
+            switch (*r) {
+                case '0': case '1': case '2': case '3': case '4':
+                case '5': case '6': case '7': case '8': case '9': {
+                    int n = (int)strtol(r, (char**)&r, 10);
+                    cap = get_capture_n(cap->child, &n);
+                    break;
+                }
+                case '[': {
+                    char *closing = strchr(r+1, ']');
+                    if (!closing) {
+                        if (*(str++) != '@') {
+                            destroy_match(&ret);
+                            return NULL;
+                        }
+                    }
+                    ++r;
+                    char *name = strndup(r, (size_t)(closing-r));
+                    cap = get_capture_named(cap, name);
+                    free(name);
+                    r = closing + 1;
+                    break;
+                }
+                default: {
+                    if (*(str++) != '@') {
+                        destroy_match(&ret);
+                        return NULL;
+                    }
+                    break;
+                }
+            }
+            if (cap != NULL) {
+                *dest = match_backref(str, op, cap);
+                if (*dest == NULL) {
+                    destroy_match(&ret);
+                    return NULL;
+                }
+                str = (*dest)->end;
+                dest = &(*dest)->nextsibling;
+            }
+        }
+    } else {
+        const char *prev = cap->start;
+        for (match_t *child = cap->child; child; child = child->nextsibling) {
+            if (child->start > prev) {
+                size_t len = (size_t)(child->start - prev);
+                if (strncmp(str, prev, len) != 0) {
+                    destroy_match(&ret);
+                    return NULL;
+                }
+                str += len;
+                prev = child->start;
+            }
+            *dest = match_backref(str, op, child);
+            if (*dest == NULL) {
+                destroy_match(&ret);
+                return NULL;
+            }
+            str = (*dest)->end;
+            dest = &(*dest)->nextsibling;
+            prev = child->end;
+        }
+        if (cap->end > prev) {
+            size_t len = (size_t)(cap->end - prev);
+            if (strncmp(str, prev, len) != 0) {
+                destroy_match(&ret);
+                return NULL;
+            }
+            str += len;
+        }
+    }
+    ret->end = str;
+    return ret;
 }
 
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1

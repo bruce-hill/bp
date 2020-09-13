@@ -9,20 +9,20 @@
 grammar_t *new_grammar(void)
 {
     grammar_t *g = calloc(sizeof(grammar_t), 1);
-    g->definitions = calloc(sizeof(def_t), (g->capacity = 128));
+    g->definitions = calloc(sizeof(def_t), (g->defcapacity = 128));
     return g;
 }
 
 void add_def(grammar_t *g, const char *src, const char *name, vm_op_t *op)
 {
-    if (g->size >= g->capacity) {
-        g->definitions = realloc(g->definitions, (g->capacity += 32));
+    if (g->defcount >= g->defcapacity) {
+        g->definitions = realloc(g->definitions, sizeof(&g->definitions[0])*(g->defcapacity += 32));
     }
-    int i = g->size;
+    int i = g->defcount;
     g->definitions[i].source = src;
     g->definitions[i].name = name;
     g->definitions[i].op = op;
-    ++g->size;
+    ++g->defcount;
 }
 
 /*
@@ -54,11 +54,45 @@ vm_op_t *load_grammar(grammar_t *g, const char *src)
 
 vm_op_t *lookup(grammar_t *g, const char *name)
 {
-    // Search backwards so newer defs take precedence
-    for (int i = g->size-1; i >= 0; i--) {
+    // Search backwards so newer backrefs/defs take precedence
+    for (int i = (int)g->backrefcount-1; i >= 0; i--) {
+        if (streq(g->backrefs[i].name, name)) {
+            return g->backrefs[i].op;
+        }
+    }
+    for (int i = g->defcount-1; i >= 0; i--) {
         if (streq(g->definitions[i].name, name)) {
             return g->definitions[i].op;
         }
     }
     return NULL;
+}
+
+void push_backref(grammar_t *g, const char *name, match_t *capture)
+{
+    check(capture, "No capture provided");
+    if (g->backrefcount >= g->backrefcapacity) {
+        g->backrefs = realloc(g->backrefs, sizeof(g->backrefs[0])*(g->backrefcapacity += 32));
+    }
+    size_t i = g->backrefcount++;
+    g->backrefs[i].name = name;
+    g->backrefs[i].capture = capture;
+    vm_op_t *op = calloc(sizeof(vm_op_t), 1);
+    op->op = VM_BACKREF;
+    op->start = capture->start;
+    op->end = capture->end;
+    op->len = -1; // TODO: maybe calculate this?
+    op->args.backref = (void*)capture;
+    g->backrefs[i].op = op;
+}
+
+void pop_backrefs(grammar_t *g, size_t count)
+{
+    check(count <= g->backrefcount, "Attempt to pop %ld backrefs when there are only %ld", count, g->backrefcount);
+    for ( ; count > 0; count--) {
+        //free(g->backrefs[i].op); // TODO: memory leak problem??
+        int i = (int)g->backrefcount - 1;
+        memset(&g->backrefs[i], 0, sizeof(g->backrefs[i]));
+        --g->backrefcount;
+    }
 }

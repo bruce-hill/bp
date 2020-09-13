@@ -7,7 +7,7 @@
 #include <sys/types.h>
 
 /*
- * BPEG virtual machine opcodes
+ * BPEG virtual machine opcodes (these must be kept in sync with the names in vm.c)
  */
 enum VMOpcode {
     VM_EMPTY = 0,
@@ -25,6 +25,7 @@ enum VMOpcode {
     VM_CHAIN,
     VM_REPLACE,
     VM_REF,
+    VM_BACKREF,
 };
 
 /*
@@ -57,6 +58,7 @@ typedef struct vm_op_s {
             struct vm_op_s *capture_pat;
             char *name;
         } capture;
+        void *backref;
         struct vm_op_s *pat;
     } args;
 } vm_op_t;
@@ -81,8 +83,15 @@ typedef struct {
 } def_t;
 
 typedef struct {
+    size_t defcount, defcapacity;
     def_t *definitions;
-    size_t size, capacity;
+
+    size_t backrefcount, backrefcapacity;
+    struct {
+        const char *name;
+        match_t *capture;
+        vm_op_t *op;
+    } *backrefs;
 } grammar_t;
 
 #endif

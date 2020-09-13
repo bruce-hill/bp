@@ -164,7 +164,7 @@ char *readfile(int fd)
     while ((just_read=read(fd, &buf[len], capacity-len)) > 0) {
         len += (size_t)just_read;
         if (len >= capacity)
-            buf = realloc(buf, (capacity *= 2));
+            buf = realloc(buf, sizeof(char)*(capacity *= 2));
     }
     return buf;
 }

@@ -1,0 +1,41 @@
+# Meta-rules for acting on everything
+pattern = !(/); # Not defined by default
+replacement = {!(/)=>}; # Not defined by default
+replace-all = *&&@replacement &&$$;
+find-all = *(matching-line / {&&(\n/$$)=>});
+only-matches = *{&&@pattern=>'@1\n'};
+matching-line = +&@pattern *. $ ?\n;
+
+# Helper definitions (commonly used)
+crlf = \r\n;
+cr = \r; r = \r;
+anglebraces = `< *(anglebraces / ~~`>) `>;
+brackets = `[ *(brackets / ~~`]) `];
+braces = `{ *(braces / ~~`}) `};
+parens = `( *(parens / ~~`)) `);
+id = (`a-z/`A-Z/`_) *(`a-z/`A-Z/`_/`0-9);
+HEX = `0-9/`A-F;
+Hex = `0-9/`a-f/`A-F;
+hex = `0-9/`a-f;
+number = +`0-9 ?(`. *`0-9) / `. +`0-9;
+int = +`0-9;
+digit = `0-9;
+Abc = `a-z/`A-Z;
+ABC = `A-Z;
+abc = `a-z;
+esc = \e; e = \e;
+tab = \t; t = \t;
+nl = \n; lf = \n; n = \n;
+c-block-comment = '/*' &&'*/';
+c-line-comment = '//' &$;
+c-comment = c-line-comment / c-block-comment;
+hash-comment = `# &$;
+comment = !(/); # No default definition, can be overridden
+WS = ` /\t/\n/\r/comment;
+ws = ` /\t;
+$$ = !$.;
+$ = !.;
+^^ = !<$.;
+^ = !<.;
+__ = *(` /\t/\n/\r/comment);
+_ = *(` /\t);

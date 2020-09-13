@@ -127,6 +127,12 @@ int main(int argc, char *argv[])
             vm_op_t *pat = bpeg_pattern(src);
             check(pat, "Failed to compile pattern");
             add_def(g, src, def, pat);
+        } else if (FLAG("--escaped") || FLAG("-e")) {
+            check(npatterns == 0, "Cannot define multiple patterns");
+            vm_op_t *p = bpeg_pattern(argv[i]);
+            check(p, "Pattern failed to compile");
+            add_def(g, argv[i], "pattern", p);
+            ++npatterns;
         } else if (argv[i][0] != '-') {
             if (npatterns > 0) break;
             vm_op_t *p = bpeg_stringpattern(argv[i]);
