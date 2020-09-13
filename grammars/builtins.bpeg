@@ -1,10 +1,11 @@
 # Meta-rules for acting on everything
 pattern = !(/); # Not defined by default
 replacement = {!(/)=>}; # Not defined by default
-replace-all = *&&@replacement &&$$;
-find-all = *(matching-line / {&&(\n/$$)=>});
-only-matches = *{&&@pattern=>'@1\n'};
+replace-all = +&&@replacement &&$$;
+find-all = {&&>matching-line=>} +(matching-line/non-matching-line);
+only-matches = +{&&@pattern=>'@1\n'};
 matching-line = +&@pattern *. $ ?\n;
+non-matching-line = {&&(\n/$$)=>};
 
 # Helper definitions (commonly used)
 crlf = \r\n;

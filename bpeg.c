@@ -32,6 +32,7 @@
  *     ; <name> = <pat>            <name> is defined to be <pat>
  */
 #include <fcntl.h>
+#include <glob.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -66,6 +67,30 @@ static char *getflag(const char *flag, char *argv[], int *i)
     }
     return NULL;
 }
+
+static int run_match(grammar_t *g, const char *filename, vm_op_t *pattern, int verbose)
+{
+    char *input;
+    if (filename == NULL || streq(filename, "-")) {
+        input = readfile(STDIN_FILENO);
+    } else {
+        int fd = open(filename, O_RDONLY);
+        check(fd >= 0, "Couldn't open file: %s", filename);
+        input = readfile(fd);
+    }
+    match_t *m = match(g, input, pattern);
+    if (m != NULL && m->end > m->start + 1) {
+        if (isatty(STDOUT_FILENO)) printf("\033[1;4;33m%s\033[0m\n", filename);
+        else printf("%s\n", filename);
+        print_match(m, isatty(STDOUT_FILENO) ? "\033[0m" : NULL, verbose);
+        freefile(input);
+        return 0;
+    } else {
+        freefile(input);
+        return 1;
+    }
+}
+
 #define FLAG(f) (flag=getflag((f), argv, &i))
 
 int main(int argc, char *argv[])
@@ -157,41 +182,28 @@ int main(int argc, char *argv[])
         print_pattern(pattern);
     }
 
-    char *input;
-    if (i == argc) {
-        // Force stdin if no files given
-        input = readfile(STDIN_FILENO);
-        goto run_match;
-    }
-    for (int nfiles = 0; i < argc; nfiles++, i++) {
-        if (argv[i] == NULL || streq(argv[i], "-")) {
-            input = readfile(STDIN_FILENO);
-        } else {
-            int fd = open(argv[i], O_RDONLY);
-            check(fd >= 0, "Couldn't open file: %s", argv[i]);
-            input = readfile(fd);
-            if (nfiles > 0) printf("\n");
-            printf("\033[1;4;33m%s\033[0m\n", argv[i]);
+    int ret = 0;
+    if (i < argc) {
+        // Files pass in as command line args:
+        for (int nfiles = 0; i < argc; nfiles++, i++) {
+            ret |= run_match(g, argv[i], pattern, verbose);
         }
-
-      run_match:;
-        // Ensure string has a null byte to the left:
-        char *lpadded = calloc(sizeof(char), strlen(input)+2);
-        stpcpy(&lpadded[1], input);
-        input = &lpadded[1];
-
-        match_t *m = match(g, input, pattern);
-        if (m == NULL) {
-            printf("No match\n");
-            return 1;
-        } else {
-            print_match(m, isatty(STDOUT_FILENO) ? "\033[0m" : NULL, verbose);
-            //printf("\033[0;2m%s\n", m->end);
+    } else if (isatty(STDIN_FILENO)) {
+        // No files, no piped in input, so use * **/*:
+        glob_t globbuf;
+        glob("*", 0, NULL, &globbuf);
+        glob("**/*", GLOB_APPEND, NULL, &globbuf);
+        for (size_t i = 0; i < globbuf.gl_pathc; i++) {
+            ret |= run_match(g, globbuf.gl_pathv[i], pattern, verbose);
         }
-        freefile(input);
+        globfree(&globbuf);
+    } else {
+        // Piped in input:
+        ret |= run_match(g, NULL, pattern, verbose);
     }
 
-    return 0;
+
+    return ret;
 }
 
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1
