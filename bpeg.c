@@ -17,27 +17,30 @@
 #include "vm.h"
 
 static const char *usage = (
+    "BPEG - a Parsing Expression Grammar command line tool\n\n"
     "Usage:\n"
     "  bpeg [flags] <pattern> [<input files>...]\n\n"
     "Flags:\n"
-    "  -h --help\t print the usage and quit\n"
-    "  -v --verbose\t print verbose debugging info\n"
-    "  -i --ignore-case\t preform matching case-insensitively\n"
-    "  -d --define <name>=<def>\t define a grammar rule\n"
-    "  -D --define-string <name>=<def>\t define a grammar rule (string-pattern)\n"
-    "  -p --pattern <pat>\t provide a pattern (equivalent to bpeg '\\(<pat>)')\n"
-    "  -P --pattern-string <pat>\t provide a string pattern (equivalent to bpeg '<pat>', but may be useful if '<pat>' begins with a '-')\n"
-    "  -r --replace <replacement>   replace the input pattern with the given replacement\n"
-    "  -m --mode <mode>\t set the behavior mode (defult: find-all)\n"
-    "  -g --grammar <grammar file>  use the specified file as a grammar\n");
+    " -h --help                        print the usage and quit\n"
+    " -v --verbose                     print verbose debugging info\n"
+    " -i --ignore-case                 preform matching case-insensitively\n"
+    " -d --define <name>=<def>         define a grammar rule\n"
+    " -D --define-string <name>=<def>  define a grammar rule (string-pattern)\n"
+    " -p --pattern <pat>               provide a pattern (equivalent to bpeg '\\(<pat>)')\n"
+    " -P --pattern-string <pat>        provide a string pattern (may be useful if '<pat>' begins with a '-')\n"
+    " -r --replace <replacement>       replace the input pattern with the given replacement\n"
+    " -m --mode <mode>                 set the behavior mode (defult: find-all)\n"
+    " -g --grammar <grammar file>      use the specified file as a grammar\n");
 
 static char *getflag(const char *flag, char *argv[], int *i)
 {
     size_t n = strlen(flag);
+    check(argv[*i], "Attempt to get flag from NULL argument");
     if (strncmp(argv[*i], flag, n) == 0) {
         if (argv[*i][n] == '=') {
             return &argv[*i][n+1];
         } else if (argv[*i][n] == '\0') {
+            check(argv[*i+1], "Expected argument after '%s'\n\n%s", flag, usage);
             ++(*i);
             return argv[*i];
         }
@@ -90,6 +93,7 @@ int main(int argc, char *argv[])
         load_grammar(g, readfile(fd)); // Keep in memory for debugging output
 
     int i, npatterns = 0;
+    check(argc > 1, "%s", usage);
     for (i = 1; i < argc; i++) {
         if (streq(argv[i], "--")) {
             ++i;
@@ -126,7 +130,7 @@ int main(int argc, char *argv[])
         } else if (FLAG("--define") || FLAG("-d")) {
             char *def = flag;
             char *eq = strchr(def, '=');
-            check(eq, usage);
+            check(eq, "Rule definitions must include an '='\n\n%s", usage);
             *eq = '\0';
             char *src = ++eq;
             vm_op_t *pat = bpeg_pattern(src);
@@ -135,7 +139,7 @@ int main(int argc, char *argv[])
         } else if (FLAG("--define-string") || FLAG("-D")) {
             char *def = flag;
             char *eq = strchr(def, '=');
-            check(eq, usage);
+            check(eq, "Rule definitions must include an '='\n\n%s", usage);
             *eq = '\0';
             char *src = ++eq;
             vm_op_t *pat = bpeg_stringpattern(src);
@@ -161,7 +165,7 @@ int main(int argc, char *argv[])
             add_def(g, argv[i], "pattern", p);
             ++npatterns;
         } else {
-            printf("Unrecognized flag: %s\n%s\n", argv[i], usage);
+            printf("Unrecognized flag: %s\n\n%s\n", argv[i], usage);
             return 1;
         }
     }
