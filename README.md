@@ -9,6 +9,7 @@ It's written in pure C with no dependencies.
 ### Flags
 * `-h` `--help` print the usage and quit
 * `-v` `--verbose` print verbose debugging info
+* `-i` `--ignore-case` perform a case-insensitive match
 * `-d` `--define <name>=<def>` define a grammar rule
 * `-D` `--define-string <name>=<def>` define a grammar rule (string-pattern)
 * `-p` `--pattern <pat>` provide a pattern (equivalent to bpeg '

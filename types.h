@@ -6,6 +6,11 @@
 
 #include <sys/types.h>
 
+enum BPEGFlag {
+    BPEG_VERBOSE    = 1 << 0,
+    BPEG_IGNORECASE = 1 << 1,
+};
+
 /*
  * BPEG virtual machine opcodes (these must be kept in sync with the names in vm.c)
  */

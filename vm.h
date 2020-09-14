@@ -11,7 +11,7 @@
 #include "types.h"
 
 const char *opcode_name(enum VMOpcode o);
-match_t *match(grammar_t *g, const char *str, vm_op_t *op);
+match_t *match(grammar_t *g, const char *str, vm_op_t *op, unsigned int flags);
 void destroy_match(match_t **m);
 void print_pattern(vm_op_t *op);
 void print_match(match_t *m, const char *color, int verbose);

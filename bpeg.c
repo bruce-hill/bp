@@ -22,6 +22,7 @@ static const char *usage = (
     "Flags:\n"
     "  -h --help\t print the usage and quit\n"
     "  -v --verbose\t print verbose debugging info\n"
+    "  -i --ignore-case\t preform matching case-insensitively\n"
     "  -d --define <name>=<def>\t define a grammar rule\n"
     "  -D --define-string <name>=<def>\t define a grammar rule (string-pattern)\n"
     "  -p --pattern <pat>\t provide a pattern (equivalent to bpeg '\\(<pat>)')\n"
@@ -44,7 +45,7 @@ static char *getflag(const char *flag, char *argv[], int *i)
     return NULL;
 }
 
-static int run_match(grammar_t *g, const char *filename, vm_op_t *pattern, int verbose)
+static int run_match(grammar_t *g, const char *filename, vm_op_t *pattern, unsigned int flags)
 {
     char *input;
     if (filename == NULL || streq(filename, "-")) {
@@ -54,13 +55,13 @@ static int run_match(grammar_t *g, const char *filename, vm_op_t *pattern, int v
         check(fd >= 0, "Couldn't open file: %s", filename);
         input = readfile(fd);
     }
-    match_t *m = match(g, input, pattern);
+    match_t *m = match(g, input, pattern, flags);
     if (m != NULL && m->end > m->start + 1) {
         if (filename != NULL) {
             if (isatty(STDOUT_FILENO)) printf("\033[1;4;33m%s\033[0m\n", filename);
             else printf("%s\n", filename);
         }
-        print_match(m, isatty(STDOUT_FILENO) ? "\033[0m" : NULL, verbose);
+        print_match(m, isatty(STDOUT_FILENO) ? "\033[0m" : NULL, (flags & BPEG_VERBOSE) != 0);
         freefile(input);
         return 0;
     } else {
@@ -73,7 +74,7 @@ static int run_match(grammar_t *g, const char *filename, vm_op_t *pattern, int v
 
 int main(int argc, char *argv[])
 {
-    int verbose = 0;
+    unsigned int flags = 0;
     char *flag = NULL;
     char path[PATH_MAX] = {0};
     const char *rule = "find-all";
@@ -97,7 +98,9 @@ int main(int argc, char *argv[])
             printf("%s\n", usage);
             return 0;
         } else if (streq(argv[i], "--verbose") || streq(argv[i], "-v")) {
-            verbose = 1;
+            flags |= BPEG_VERBOSE;
+        } else if (streq(argv[i], "--ignore-case") || streq(argv[i], "-i")) {
+            flags |= BPEG_IGNORECASE;
         } else if (FLAG("--replace") || FLAG("-r")) {
             vm_op_t *p = bpeg_replacement(bpeg_pattern("pattern"), flag);
             check(p, "Replacement failed to compile");
@@ -170,7 +173,7 @@ int main(int argc, char *argv[])
     if (i < argc) {
         // Files pass in as command line args:
         for (int nfiles = 0; i < argc; nfiles++, i++) {
-            ret |= run_match(g, argv[i], pattern, verbose);
+            ret |= run_match(g, argv[i], pattern, flags);
         }
     } else if (isatty(STDIN_FILENO)) {
         // No files, no piped in input, so use * **/*:
@@ -178,12 +181,12 @@ int main(int argc, char *argv[])
         glob("*", 0, NULL, &globbuf);
         glob("**/*", GLOB_APPEND, NULL, &globbuf);
         for (size_t i = 0; i < globbuf.gl_pathc; i++) {
-            ret |= run_match(g, globbuf.gl_pathv[i], pattern, verbose);
+            ret |= run_match(g, globbuf.gl_pathv[i], pattern, flags);
         }
         globfree(&globbuf);
     } else {
         // Piped in input:
-        ret |= run_match(g, NULL, pattern, verbose);
+        ret |= run_match(g, NULL, pattern, flags);
     }
 
 

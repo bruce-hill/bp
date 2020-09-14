@@ -7,6 +7,7 @@ bpeg \- Bruce's Parsing Expression Grammar tool
 .B bpeg
 [\fI-h\fR|\fI--help\fR]
 [\fI-v\fR|\fI--verbose\fR]
+[\fI-i\fR|\fI--ignore-case\fR \fI<pattern>\fR]
 [\fI-p\fR|\fI--pattern\fR \fI<pattern>\fR]
 [\fI-P\fR|\fI--pattern-string\fR \fI<string-pattern>\fR]
 [\fI-d\fR|\fI--define\fR \fI<name>\fR=\fI<pattern>\fR]
@@ -21,6 +22,9 @@ bpeg \- Bruce's Parsing Expression Grammar tool
 .SH OPTIONS
 .B \-v\fR, \fB--verbose
 Print debugging information.
+
+.B \-i\fR, \fB--ignore-case
+Perform pattern matching case-insensitively.
 
 .B \-d\fR, \fB--define \fI<name>\fR=\fI<pattern>\fR
 Define a grammar rule using a bpeg pattern.
