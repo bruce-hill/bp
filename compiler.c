@@ -97,10 +97,21 @@ vm_op_t *bpeg_simplepattern(const char *str)
     switch (c) {
         // Any char (dot) ($. is multiline anychar)
         case '.': {
-          anychar:
-            op->op = VM_ANYCHAR;
-            op->len = 1;
-            break;
+            if (matchchar(&str, '.')) { // ".."
+                if (matchchar(&str, '.')) // "..."
+                    op->multiline = 1;
+                vm_op_t *till = bpeg_simplepattern(str);
+                str = str; // Don't advance str, the following pattern will be re-matched.
+                op->op = VM_UPTO;
+                op->len = -1;
+                op->args.pat = till;
+                break;
+            } else {
+              anychar:
+                op->op = VM_ANYCHAR;
+                op->len = 1;
+                break;
+            }
         }
         // Char literals
         case '`': {
@@ -180,17 +191,6 @@ vm_op_t *bpeg_simplepattern(const char *str)
             check(p, "Expected pattern after '~'\n");
             str = p->end;
             op->op = VM_ANYTHING_BUT;
-            op->len = -1;
-            op->args.pat = p;
-            break;
-        }
-        // Upto and including <pat>
-        case '&': {
-            if (matchchar(&str, '&')) op->multiline = 1;
-            vm_op_t *p = bpeg_simplepattern(str);
-            check(p, "Expected pattern after '&'\n");
-            str = p->end;
-            op->op = VM_UPTO_AND;
             op->len = -1;
             op->args.pat = p;
             break;

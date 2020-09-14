@@ -20,7 +20,7 @@ static const char *opcode_names[] = {
     [VM_STRING] = "STRING",
     [VM_RANGE] = "RANGE",
     [VM_NOT] = "NOT",
-    [VM_UPTO_AND] = "UPTO_AND",
+    [VM_UPTO] = "UPTO",
     [VM_REPEAT] = "REPEAT",
     [VM_BEFORE] = "BEFORE",
     [VM_AFTER] = "AFTER",
@@ -130,24 +130,30 @@ static match_t *_match(grammar_t *g, const char *str, vm_op_t *op, recursive_ref
             m->end = str;
             return m;
         }
-        case VM_UPTO_AND: {
+        case VM_UPTO: {
             match_t *m = calloc(sizeof(match_t), 1);
             m->start = str;
             m->op = op;
-            match_t *p = NULL;
-            for (const char *prev = NULL; p == NULL && prev < str; ) {
-                prev = str;
-                p = _match(g, str, op->args.pat, rec);
-                if (*str && (op->multiline || *str != '\n'))
-                    ++str;
+            if (op->args.pat) {
+                for (const char *prev = NULL; prev < str; ) {
+                    prev = str;
+                    match_t *p = _match(g, str, op->args.pat, rec);
+                    if (p) {
+                        destroy_match(&p);
+                        break;
+                    }
+                    // This isn't in the for() structure because there needs to
+                    // be at least once chance to match the pattern, even if
+                    // we're at the end of the string already (e.g. "..$").
+                    if (*str && (op->multiline || *str != '\n')) ++str;
+                }
+            } else if (op->multiline) {
+                while (*str) ++str;
+            } else {
+                while (*str && *str != '\n') ++str;
             }
-            if (p) {
-                m->end = p->end;
-                m->child = p;
-                return m;
-            }
-            destroy_match(&m);
-            return NULL;
+            m->end = str;
+            return m;
         }
         case VM_REPEAT: {
             match_t *m = calloc(sizeof(match_t), 1);
@@ -374,8 +380,8 @@ void print_pattern(vm_op_t *op)
             fprintf(stderr, ")");
             break;
         }
-        case VM_UPTO_AND: {
-            fprintf(stderr, "text up to and including (");
+        case VM_UPTO: {
+            fprintf(stderr, "text up to (");
             print_pattern(op->args.pat);
             fprintf(stderr, ")");
             break;

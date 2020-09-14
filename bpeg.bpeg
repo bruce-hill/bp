@@ -7,14 +7,14 @@ Def = @[name]Ref __ `= __ @[definition]extended-pat;
 String-pattern = *(`\ pat ?`; / .);
 
 pat = suffixed-pat / simple-pat;
-simple-pat = Empty / Dot / String / Char-range / Char / Escape-range / Escape / No / Anything-but
-    / Upto-and / Repeat / After / Before / Capture / Replace / Ref / parens;
+simple-pat = Empty / Upto / Dot / String / Char-range / Char / Escape-range / Escape / No / Anything-but
+    / Repeat / After / Before / Capture / Replace / Ref / parens;
 suffixed-pat = Eq-pat;
 
 Eq-pat = @[first]simple-pat "==" @[second]pat;
 
 Empty = `/ >(__ (`)/`}));
-Dot = `.;
+Dot = `. !`.;
 String = (
         `" @[s]*(Escape / ~`") `"
       / `' @[s]*(Escape / ~`') `'
@@ -30,7 +30,7 @@ escape-sequence = (
     );
 No = `! _ @pat;
 Anything-but = `~ ?`~ _ @pat;
-Upto-and = `& ?`& _ @pat;
+Upto = 2-3`. ?>(_@pat);
 Repeat = (
         @[min]int _ `- _ @[max]int
       /{@[min]{=>"0"}=>} @[max]int _ `-
@@ -64,7 +64,7 @@ $  = !.;
 ^^ = !<$.;
 ^  = !<.;
 
-hash-comment = `# *.;
+hash-comment = `# .. $;
 
 # Note: comments are undefined by default in regular BPEG
 comment = hash-comment;

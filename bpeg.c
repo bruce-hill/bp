@@ -3,6 +3,7 @@
  *
  * Grammar:
  *     # <comment>                 comment
+ *     ..                          any text up to the following pattern (if any); (multiline: ...)
  *     .                           any character (multiline: $.)
  *     ^                           beginning of a line (^^: beginning of file)
  *     $                           end of a line ($$: end of file)
@@ -13,7 +14,6 @@
  *     \<e1>-<e2>                  escape sequence range (e.g. \x00-\xF0)
  *     ! <pat>                     no <pat>
  *     ~ <pat>                     any character as long as it doesn't match <pat> (multiline: ~~<pat>)
- *     & <pat>                     upto and including <pat> (aka *~<pat> <pat>) (multiline: &&<pat>)
  *     <N=1> + <pat> [% <sep="">]  <N> or more <pat>s (separated by <sep>)
  *     * <pat> [% <sep="">]        sugar for "0+ <pat> [% <sep>]"
  *     <N=1> - <pat> [% <sep="">]  <N> or fewer <pat>s (separated by <sep>)
