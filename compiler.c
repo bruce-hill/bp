@@ -101,7 +101,7 @@ vm_op_t *bpeg_simplepattern(const char *str)
                 if (matchchar(&str, '.')) // "..."
                     op->multiline = 1;
                 vm_op_t *till = bpeg_simplepattern(str);
-                str = str; // Don't advance str, the following pattern will be re-matched.
+                // Don't advance str, the following pattern will be re-matched.
                 op->op = VM_UPTO;
                 op->len = -1;
                 op->args.pat = till;
