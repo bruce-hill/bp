@@ -7,7 +7,7 @@ Def = @[name]Ref __ `= __ @[definition]extended-pat;
 String-pattern = *(`\ pat ?`; / .);
 
 pat = suffixed-pat / simple-pat;
-simple-pat = Empty / Upto / Dot / String / Char-range / Char / Escape-range / Escape / No / Anything-but
+simple-pat = Empty / Upto / Dot / String / Char-range / Char / Escape-range / Escape / No
     / Repeat / After / Before / Capture / Replace / Ref / parens;
 suffixed-pat = Eq-pat;
 

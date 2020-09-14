@@ -166,10 +166,6 @@ int main(int argc, char *argv[])
     vm_op_t *pattern = lookup(g, rule);
     check(pattern != NULL, "No such rule: '%s'", rule);
 
-    if (verbose) {
-        print_pattern(pattern);
-    }
-
     int ret = 0;
     if (i < argc) {
         // Files pass in as command line args:
