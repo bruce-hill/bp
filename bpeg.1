@@ -145,6 +145,10 @@ be a string, and it may contain references to captured values: \fB@0\fR
 Will match only if \fI<pat1>\fR and \fI<pat2>\fR both match and have the exact
 same length. Pronounced \fI<pat1>\fB-assuming-it-equals-\fI<pat2>\fR
 
+.B |
+This pattern matches the indentation at the beginning of a line that has the
+same indentation as the line before (or zero indentation on the first line).
+
 .B (/)
 The empty string (a pattern that always matches).
 

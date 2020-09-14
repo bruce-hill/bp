@@ -8,8 +8,8 @@ only-matches = +{...@pattern=>'@1\n'};
 matching-line = +(..@pattern) ..$;
 
 # Helper definitions (commonly used)
-indent = \n |+(\t/' ');
-dedent = >(\n !|);
+indent = \n|+(\t/' ');
+dedent = $ !(\n|);
 indented-block = |` ..$ *(\n|..$);
 crlf = \r\n;
 cr = \r; r = \r;
