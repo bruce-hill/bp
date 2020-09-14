@@ -3,16 +3,25 @@ HTML = __ ?(doctype __) *html-element%__ __;
 
 doctype = "<!DOCTYPE" &`>;
 
-html-element = void-element / template-element / raw-text-element / normal-element;
+html-element = (
+    >(`<("area"/"base"/"br"/"col"/"embed"/"hr"/"img"/"input"/"link"/"meta"/"param"/"source"/"track"/"wbr")) void-element
+  / >(`<("script"/"style"/"textarea"/"title")) raw-element
+  / >(`<("template")) template-element
+  / normal-element);
 
-void-element = `< ("area"/"base"/"br"/"col"/"embed"/"hr"/"img"/"input"/"link"/"meta"/"param"/"source"/"track"/"wbr") *(__attribute) __ ?`/ __ `>;
+void-element = `< @[tag](id==match-tag) __attributes__ `/? __ `>;
 
-template-element = "<template" __`> __ *(~~`< / comment / html-element / ~~("</template"__`>)) ("</template"__`>);
+template-element = `< @[tag](id==match-tag) __`> __ >match-body @[body]0+(~~`< / comment / html-element / ~~("</"tag__`>)) ("</"tag__`>);
 
-raw-text-element = `<@[tag]("script"/"style"/"textarea"/"title") *(__attribute) __ `> &("</"tag__`>);
+raw-element = `< @[tag](id==match-tag) __attributes__ `> >match-body @[body]*~~("</"tag__`>) ("</"tag__`>);
 
-normal-element = !raw-text-element `<@[tag]id *(__attribute) __ `> *(~~`< / comment / html-element / ~~("</"tag__`>)) "</"tag__`>;
+normal-element = `< @[tag](id==match-tag) __attributes__ `> >match-body @[body]*(~~`< / comment / html-element / ~~("</"tag__`>)) "</"tag__`>;
 
 comment = "<!--" &&"-->";
 
-attribute = +id%`:__`=__(id / `" &`" / `' &`');
+attributes = *(!(attribute==match-attribute))%__ __(attribute==match-attribute)__ *attribute%__;
+attribute = (+id%`:)__`=__ (id / `" &`" / `' &`');
+attribute = (+id%`:)__`=__ (id / `" *~`" `" / `' *~`' `');
+match-attribute = attribute;
+match-tag = id;
+match-body = (/);

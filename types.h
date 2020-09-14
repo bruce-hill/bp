@@ -23,6 +23,7 @@ enum VMOpcode {
     VM_CAPTURE,
     VM_OTHERWISE,
     VM_CHAIN,
+    VM_EQUAL,
     VM_REPLACE,
     VM_REF,
     VM_BACKREF,

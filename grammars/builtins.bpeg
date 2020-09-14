@@ -2,7 +2,7 @@
 pattern = !(/); # Not defined by default
 replacement = {!(/)=>}; # Not defined by default
 replace-all = +&&@replacement &&$$;
-find-all = {&&>matching-line=>} +(matching-line/non-matching-line);
+find-all = {&&>matching-line=>} +(matching-line/non-matching-line) ?{!<\n => "\n"};
 only-matches = +{&&@pattern=>'@1\n'};
 matching-line = +&@pattern *. $ ?\n;
 non-matching-line = {&&(\n/$$)=>};
@@ -14,7 +14,8 @@ anglebraces = `< *(anglebraces / ~~`>) `>;
 brackets = `[ *(brackets / ~~`]) `];
 braces = `{ *(braces / ~~`}) `};
 parens = `( *(parens / ~~`)) `);
-id = (`a-z/`A-Z/`_) *(`a-z/`A-Z/`_/`0-9);
+id = !<(`a-z/`A-Z/`_/`0-9) (`a-z/`A-Z/`_) *(`a-z/`A-Z/`_/`0-9);
+word = !<(`a-z/`A-Z/`_/`0-9) +(`a-z/`A-Z) !>(`0-9/`_);
 HEX = `0-9/`A-F;
 Hex = `0-9/`a-f/`A-F;
 hex = `0-9/`a-f;

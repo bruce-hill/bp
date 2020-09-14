@@ -28,6 +28,7 @@ static const char *opcode_names[] = {
     [VM_OTHERWISE] = "OTHERWISE",
     [VM_CHAIN] = "CHAIN",
     [VM_REPLACE] = "REPLACE",
+    [VM_EQUAL] = "EQUAL",
     [VM_REF] = "REF",
     [VM_BACKREF] = "BACKREF",
 };
@@ -243,6 +244,25 @@ static match_t *_match(grammar_t *g, const char *str, vm_op_t *op, recursive_ref
             pop_backrefs(g, nbackrefs);
             if (m2 == NULL) {
                 destroy_match(&m1);
+                return NULL;
+            }
+            match_t *m = calloc(sizeof(match_t), 1);
+            m->start = str;
+            m->end = m2->end;
+            m->op = op;
+            m->child = m1;
+            m1->nextsibling = m2;
+            return m;
+        }
+        case VM_EQUAL: {
+            match_t *m1 = _match(g, str, op->args.multiple.first, rec);
+            if (m1 == NULL) return NULL;
+
+            // <p1>==<p2> matches iff both have the same start and end point:
+            match_t *m2 = _match(g, str, op->args.multiple.second, rec);
+            if (m2 == NULL || m2->end != m1->end) {
+                destroy_match(&m1);
+                destroy_match(&m2);
                 return NULL;
             }
             match_t *m = calloc(sizeof(match_t), 1);
@@ -512,8 +532,8 @@ void print_match(match_t *m, const char *color, int verbose)
         const char *prev = m->start;
         for (match_t *child = m->child; child; child = child->nextsibling) {
             // Skip children from e.g. zero-width matches like >@foo
-            if (!(m->start <= child->start && child->start <= m->end &&
-                  m->start <= child->end && child->end <= m->end))
+            if (!(prev <= child->start && child->start <= m->end &&
+                  prev <= child->end && child->end <= m->end))
                 continue;
             if (child->start > prev)
                 printf("%s%.*s", color ? color : "", (int)(child->start - prev), prev);
@@ -608,6 +628,7 @@ static match_t *match_backref(const char *str, vm_op_t *op, match_t *cap)
                 str += len;
                 prev = child->start;
             }
+            if (child->start < prev) continue;
             *dest = match_backref(str, op, child);
             if (*dest == NULL) {
                 destroy_match(&ret);

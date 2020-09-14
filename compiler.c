@@ -372,8 +372,7 @@ vm_op_t *bpeg_simplepattern(const char *str)
                 const char *refname = str;
                 str = after_name(str);
                 op->op = VM_REF;
-                op->len = (ssize_t)(str - refname);
-                op->args.s = strndup(refname, (size_t)op->len);
+                op->args.s = strndup(refname, (size_t)(str - refname));
                 break;
             } else {
                 free(op);
@@ -382,6 +381,29 @@ vm_op_t *bpeg_simplepattern(const char *str)
         }
     }
     op->end = str;
+
+    // Postfix operators:
+  postfix:
+    str = after_spaces(str);
+    if (strncmp(str, "==", 2) == 0) {
+        str += 2;
+        vm_op_t *first = op;
+        vm_op_t *second = bpeg_simplepattern(str);
+        check(second, "Expected pattern after '=='");
+        check(first->len == -1 || second->len == -1 || first->len == second->len,
+              "Two patterns cannot possibly match the same (different lengths: %ld != %ld)",
+              first->len, second->len);
+        op = calloc(sizeof(vm_op_t), 1);
+        op->op = VM_EQUAL;
+        op->start = str;
+        op->end = second->end;
+        op->len = (first->len == -1 || second->len == -1) ? -1 : first->len;
+        op->args.multiple.first = first;
+        op->args.multiple.second = second;
+        str = op->end;
+        goto postfix;
+    }
+
     return op;
 }
 

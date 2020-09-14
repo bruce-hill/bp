@@ -24,7 +24,8 @@
  *     ( <pat> )                   <pat>
  *     @ <pat>                     capture <pat>
  *     @ [ <name> ] <pat>          <pat> named <name>
- *     { <pat> => <str> }           <pat> replaced with <str>
+ *     { <pat> => <str> }          <pat> replaced with <str>
+ *     <pat1> == <pat2>            <pat1> iff <pat2> matches at the same spot for the same length
  *     "@1" or "@[1]"              first capture
  *     "@foo" or "@[foo]"          capture named "foo"
  *     <pat1> <pat2>               <pat1> followed by <pat2>
@@ -50,7 +51,8 @@ static const char *usage = (
     "Flags:\n"
     "  -h --help\t print the usage and quit\n"
     "  -v --verbose\t print verbose debugging info\n"
-    "  -d --define <name>=<def>     define a grammar rule\n"
+    "  -d --define <name>=<def>\t define a grammar rule\n"
+    "  -D --define-string <name>=<def>\t define a grammar rule (string-pattern)\n"
     "  -e --escaped <pat>\t provide an escaped pattern (equivalent to bpeg '\\(<pat>)')\n"
     "  -s --string <pat>\t provide a string pattern (equivalent to bpeg '<pat>', but may be useful if '<pat>' begins with a '-')\n"
     "  -r --replace <replacement>   replace the input pattern with the given replacement\n"
@@ -83,8 +85,10 @@ static int run_match(grammar_t *g, const char *filename, vm_op_t *pattern, int v
     }
     match_t *m = match(g, input, pattern);
     if (m != NULL && m->end > m->start + 1) {
-        if (isatty(STDOUT_FILENO)) printf("\033[1;4;33m%s\033[0m\n", filename);
-        else printf("%s\n", filename);
+        if (filename != NULL) {
+            if (isatty(STDOUT_FILENO)) printf("\033[1;4;33m%s\033[0m\n", filename);
+            else printf("%s\n", filename);
+        }
         print_match(m, isatty(STDOUT_FILENO) ? "\033[0m" : NULL, verbose);
         freefile(input);
         return 0;
@@ -151,6 +155,15 @@ int main(int argc, char *argv[])
             *eq = '\0';
             char *src = ++eq;
             vm_op_t *pat = bpeg_pattern(src);
+            check(pat, "Failed to compile pattern");
+            add_def(g, src, def, pat);
+        } else if (FLAG("--define-string") || FLAG("-D")) {
+            char *def = flag;
+            char *eq = strchr(def, '=');
+            check(eq, usage);
+            *eq = '\0';
+            char *src = ++eq;
+            vm_op_t *pat = bpeg_stringpattern(src);
             check(pat, "Failed to compile pattern");
             add_def(g, src, def, pat);
         } else if (FLAG("--escaped") || FLAG("-e")) {

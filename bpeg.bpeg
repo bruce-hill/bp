@@ -4,10 +4,14 @@ Grammar = __ *Def%(__`;__) ?(`;__);
 Def = @[name]Ref __ `= __ @[definition]extended-pat;
 
 # This is used for command line arguments:
-String-grammar = *(`\ pat ?`; / .);
+String-pattern = *(`\ pat ?`; / .);
 
-pat = Empty / Dot / String / Char-range / Char / Escape-range / Escape / No / Anything-but
+pat = suffixed-pat / simple-pat;
+simple-pat = Empty / Dot / String / Char-range / Char / Escape-range / Escape / No / Anything-but
     / Upto-and / Repeat / After / Before / Capture / Replace / Ref / parens;
+suffixed-pat = Eq-pat;
+
+Eq-pat = @[first]simple-pat "==" @[second]pat;
 
 Empty = `/ >(__ (`)/`}));
 Dot = `.;
