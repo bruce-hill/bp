@@ -2,12 +2,15 @@
 pattern = !(/); # Not defined by default
 replacement = !(/); # Not defined by default
 replace-all = +(...@replacement) ...;
-find-all = {... >matching-line =>} +(matching-line/non-matching-line) ?{!<\n => "\n"};
+find-all = +find-next%\n ?{!<\n => "\n"};
+find-next = matching-line / {..\n =>} find-next;
 only-matches = +{...@pattern=>'@1\n'};
-matching-line = +(..@pattern)..$ ?\n;
-non-matching-line = {..$=>};
+matching-line = +(..@pattern) ..$;
 
 # Helper definitions (commonly used)
+indent = \n |+(\t/' ');
+dedent = >(\n !|);
+indented-block = |` ..$ *(\n|..$);
 crlf = \r\n;
 cr = \r; r = \r;
 anglebraces = `< *(anglebraces / !`>.) `>;

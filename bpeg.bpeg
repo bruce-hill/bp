@@ -8,7 +8,7 @@ String-pattern = *(`\ pat ?`; / .);
 
 pat = suffixed-pat / simple-pat;
 simple-pat = Empty / Upto / Dot / String / Char-range / Char / Escape-range / Escape / No
-    / Repeat / After / Before / Capture / Replace / Ref / parens;
+    / Nodent / Repeat / After / Before / Capture / Replace / Ref / parens;
 suffixed-pat = Eq-pat;
 
 Eq-pat = @[first]simple-pat "==" @[second]pat;
@@ -29,6 +29,7 @@ escape-sequence = (
       /`a/`b/`e/`n/`r/`t/`v / . / \n
     );
 No = `! _ @pat;
+Nodent = `|;
 Upto = 2-3`. ?>(_@pat);
 Repeat = (
         @[min]int _ `- _ @[max]int

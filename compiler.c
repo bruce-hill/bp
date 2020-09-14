@@ -211,6 +211,7 @@ vm_op_t *bpeg_simplepattern(const char *str)
                 str = sep->end;
                 set_range(op, min, max, pat, sep);
             } else {
+                str = pat->end;
                 set_range(op, min, max, pat, NULL);
             }
             break;
@@ -233,6 +234,7 @@ vm_op_t *bpeg_simplepattern(const char *str)
                 str = sep->end;
                 set_range(op, min, max, pat, sep);
             } else {
+                str = pat->end;
                 set_range(op, min, max, pat, NULL);
             }
             break;
@@ -345,13 +347,17 @@ vm_op_t *bpeg_simplepattern(const char *str)
         }
         // Empty choice (/) or {/}
         case '/': {
-            str = after_spaces(str);
-            if (*str == ')' || *str == '}') {
+            const char *next = after_spaces(str);
+            if (*next == ')' || *next == '}') {
                 op->op = VM_EMPTY;
             } else {
                 free(op);
                 return NULL;
             }
+            break;
+        }
+        case '|': {
+            op->op = VM_NODENT;
             break;
         }
         default: {
@@ -373,9 +379,8 @@ vm_op_t *bpeg_simplepattern(const char *str)
 
     // Postfix operators:
   postfix:
-    str = after_spaces(str);
-    if (strncmp(str, "==", 2) == 0) {
-        str += 2;
+    if (strncmp(after_spaces(str), "==", 2) == 0) {
+        str = after_spaces(str)+2;
         vm_op_t *first = op;
         vm_op_t *second = bpeg_simplepattern(str);
         check(second, "Expected pattern after '=='");

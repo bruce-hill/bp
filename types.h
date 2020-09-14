@@ -26,6 +26,7 @@ enum VMOpcode {
     VM_REPLACE,
     VM_REF,
     VM_BACKREF,
+    VM_NODENT,
 };
 
 /*

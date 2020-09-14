@@ -30,6 +30,7 @@ static const char *opcode_names[] = {
     [VM_EQUAL] = "EQUAL",
     [VM_REF] = "REF",
     [VM_BACKREF] = "BACKREF",
+    [VM_NODENT] = "NODENT",
 };
 
 const char *opcode_name(enum VMOpcode o)
@@ -336,6 +337,35 @@ static match_t *_match(grammar_t *g, const char *str, vm_op_t *op, recursive_ref
         }
         case VM_BACKREF: {
             return match_backref(str, op, (match_t*)op->args.backref);
+        }
+        case VM_NODENT: {
+            if (str[-1] == '\0') { // First line
+                match_t *m = calloc(sizeof(match_t), 1);
+                m->start = str;
+                m->end = str;
+                m->op = op;
+                return m;
+            } else if (str[-1] != '\n') {
+                return NULL; // Not at beginning of line
+            }
+            const char *p = &str[-1];
+            while (*p == '\n') --p; // Skip blank lines
+            while (p[-1] && p[-1] != '\n') --p; // Backtrack to start of last (nonblank) line
+            // Count indentation:
+            char denter = *p;
+            int dents = 0;
+            if (denter == ' ' || denter == '\t') {
+                for (; *p == denter; ++p) ++dents;
+            }
+            for (int i = 0; i < dents; i++) {
+                if (str[i] != denter) return NULL;
+            }
+
+            match_t *m = calloc(sizeof(match_t), 1);
+            m->start = str;
+            m->end = &str[dents];
+            m->op = op;
+            return m;
         }
         default: {
             fprintf(stderr, "Unknown opcode: %d", op->op);

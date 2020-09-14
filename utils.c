@@ -46,9 +46,9 @@ const char *after_name(const char *str)
  */
 int matchchar(const char **str, char c)
 {
-    *str = after_spaces(*str);
-    if (**str == c) {
-        ++(*str);
+    const char *next = after_spaces(*str);
+    if (*next == c) {
+        *str = &next[1];
         return 1;
     } else {
         return 0;
