@@ -16,8 +16,8 @@ Eq-pat = @[first]simple-pat "==" @[second]pat;
 Empty = `/ >(__ (`)/`}));
 Dot = `. !`.;
 String = (
-        `" @[s]*(Escape / ~`") `"
-      / `' @[s]*(Escape / ~`') `'
+        `" @[s]*(Escape / !`"$.) `"
+      / `' @[s]*(Escape / !`'$.) `'
     );
 Char-range = `` @[low]. `- @[high].;
 Char = `` @[s].;
@@ -29,7 +29,6 @@ escape-sequence = (
       /`a/`b/`e/`n/`r/`t/`v / . / \n
     );
 No = `! _ @pat;
-Anything-but = `~ ?`~ _ @pat;
 Upto = 2-3`. ?>(_@pat);
 Repeat = (
         @[min]int _ `- _ @[max]int

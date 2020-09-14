@@ -16,7 +16,6 @@ static match_t *get_capture_named(match_t *m, const char *name);
 static const char *opcode_names[] = {
     [VM_EMPTY] = "EMPTY",
     [VM_ANYCHAR] = "ANYCHAR",
-    [VM_ANYTHING_BUT] = "ANYTHING_BUT",
     [VM_STRING] = "STRING",
     [VM_RANGE] = "RANGE",
     [VM_NOT] = "NOT",
@@ -114,10 +113,7 @@ static match_t *_match(grammar_t *g, const char *str, vm_op_t *op, recursive_ref
             m->end = str + 1;
             return m;
         }
-        case VM_NOT: case VM_ANYTHING_BUT: {
-            if (op->op == VM_ANYTHING_BUT)
-                if (!*str || (!op->multiline && *str == '\n'))
-                    return NULL;
+        case VM_NOT: {
             match_t *m = _match(g, str, op->args.pat, rec);
             if (m != NULL) {
                 destroy_match(&m);
@@ -126,7 +122,6 @@ static match_t *_match(grammar_t *g, const char *str, vm_op_t *op, recursive_ref
             m = calloc(sizeof(match_t), 1);
             m->op = op;
             m->start = str;
-            if (op->op == VM_ANYTHING_BUT) ++str;
             m->end = str;
             return m;
         }
@@ -160,13 +155,11 @@ static match_t *_match(grammar_t *g, const char *str, vm_op_t *op, recursive_ref
             m->start = str;
             m->end = str;
             m->op = op;
-            if (op->args.repetitions.max == 0) return m;
 
             match_t **dest = &m->child;
-
             const char *prev = str;
-            size_t reps;
-            for (reps = 0; reps < (size_t)op->args.repetitions.max; ++reps) {
+            size_t reps = 0;
+            for (;;) {
                 // Separator
                 match_t *sep = NULL;
                 if (op->args.repetitions.sep != NULL && reps > 0) {
@@ -188,6 +181,12 @@ static match_t *_match(grammar_t *g, const char *str, vm_op_t *op, recursive_ref
                 dest = &p->nextsibling;
                 str = p->end;
                 prev = str;
+
+                ++reps;
+                if (op->args.repetitions.max != -1 && reps > (size_t)op->args.repetitions.max) {
+                    destroy_match(&m);
+                    return NULL;
+                }
             }
 
             if ((ssize_t)reps < op->args.repetitions.min) {
@@ -382,12 +381,6 @@ void print_pattern(vm_op_t *op)
         }
         case VM_UPTO: {
             fprintf(stderr, "text up to (");
-            print_pattern(op->args.pat);
-            fprintf(stderr, ")");
-            break;
-        }
-        case VM_ANYTHING_BUT: {
-            fprintf(stderr, "anything but (");
             print_pattern(op->args.pat);
             fprintf(stderr, ")");
             break;

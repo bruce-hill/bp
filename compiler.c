@@ -184,17 +184,6 @@ vm_op_t *bpeg_simplepattern(const char *str)
             op->args.pat = p;
             break;
         }
-        // Anything but <pat>
-        case '~': {
-            if (matchchar(&str, '~')) op->multiline = 1;
-            vm_op_t *p = bpeg_simplepattern(str);
-            check(p, "Expected pattern after '~'\n");
-            str = p->end;
-            op->op = VM_ANYTHING_BUT;
-            op->len = -1;
-            op->args.pat = p;
-            break;
-        }
         // Number of repetitions: <N>(-<N> / - / + / "")
         case '0': case '1': case '2': case '3': case '4': case '5':
         case '6': case '7': case '8': case '9': {

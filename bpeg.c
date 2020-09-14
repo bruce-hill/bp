@@ -1,36 +1,7 @@
 /*
  * bpeg.c - Source code for the bpeg parser
  *
- * Grammar:
- *     # <comment>                 comment
- *     ..                          any text up to the following pattern (if any); (multiline: ...)
- *     .                           any character (multiline: $.)
- *     ^                           beginning of a line (^^: beginning of file)
- *     $                           end of a line ($$: end of file)
- *     _                           0 or more spaces or tabs (__: include newlines and comments)
- *     `<c>                        character <c>
- *     `<a>-<z>                    character between <a> and <z>
- *     \<e>                        escape sequence (e.g. \n, \033)
- *     \<e1>-<e2>                  escape sequence range (e.g. \x00-\xF0)
- *     ! <pat>                     no <pat>
- *     ~ <pat>                     any character as long as it doesn't match <pat> (multiline: ~~<pat>)
- *     <N=1> + <pat> [% <sep="">]  <N> or more <pat>s (separated by <sep>)
- *     * <pat> [% <sep="">]        sugar for "0+ <pat> [% <sep>]"
- *     <N=1> - <pat> [% <sep="">]  <N> or fewer <pat>s (separated by <sep>)
- *     ? <pat>                     sugar for "1- <pat>"
- *     <N> - <M> <pat>             <N> to <M> (inclusive) <pat>s
- *     < <pat>                     after <pat>, ...
- *     > <pat>                     before <pat>, ...
- *     ( <pat> )                   <pat>
- *     @ <pat>                     capture <pat>
- *     @ [ <name> ] <pat>          <pat> named <name>
- *     { <pat> => <str> }          <pat> replaced with <str>
- *     <pat1> == <pat2>            <pat1> iff <pat2> matches at the same spot for the same length
- *     "@1" or "@[1]"              first capture
- *     "@foo" or "@[foo]"          capture named "foo"
- *     <pat1> <pat2>               <pat1> followed by <pat2>
- *     <pat> / <alt>               <pat> otherwise <alt>
- *     ; <name> = <pat>            <name> is defined to be <pat>
+ * See `man ./bpeg.1` for more details
  */
 #include <fcntl.h>
 #include <glob.h>
@@ -53,8 +24,8 @@ static const char *usage = (
     "  -v --verbose\t print verbose debugging info\n"
     "  -d --define <name>=<def>\t define a grammar rule\n"
     "  -D --define-string <name>=<def>\t define a grammar rule (string-pattern)\n"
-    "  -e --escaped <pat>\t provide an escaped pattern (equivalent to bpeg '\\(<pat>)')\n"
-    "  -s --string <pat>\t provide a string pattern (equivalent to bpeg '<pat>', but may be useful if '<pat>' begins with a '-')\n"
+    "  -p --pattern <pat>\t provide a pattern (equivalent to bpeg '\\(<pat>)')\n"
+    "  -P --pattern-string <pat>\t provide a string pattern (equivalent to bpeg '<pat>', but may be useful if '<pat>' begins with a '-')\n"
     "  -r --replace <replacement>   replace the input pattern with the given replacement\n"
     "  -m --mode <mode>\t set the behavior mode (defult: find-all)\n"
     "  -g --grammar <grammar file>  use the specified file as a grammar\n");
@@ -104,14 +75,15 @@ int main(int argc, char *argv[])
 {
     int verbose = 0;
     char *flag = NULL;
+    char path[PATH_MAX] = {0};
     const char *rule = "find-all";
 
     grammar_t *g = new_grammar();
 
+    // Load builtins:
     int fd;
     if ((fd=open("/etc/xdg/bpeg/builtins.bpeg", O_RDONLY)) >= 0)
         load_grammar(g, readfile(fd)); // Keep in memory for debugging output
-    char path[PATH_MAX] = {0};
     sprintf(path, "%s/.config/bpeg/builtins.bpeg", getenv("HOME"));
     if ((fd=open(path, O_RDONLY)) >= 0)
         load_grammar(g, readfile(fd)); // Keep in memory for debugging output
@@ -121,10 +93,10 @@ int main(int argc, char *argv[])
         if (streq(argv[i], "--")) {
             ++i;
             break;
-        } else if (FLAG("--help") || FLAG("-h")) {
+        } else if (streq(argv[i], "--help") || streq(argv[i], "-h")) {
             printf("%s\n", usage);
             return 0;
-        } else if (FLAG("--verbose") || FLAG("-v")) {
+        } else if (streq(argv[i], "--verbose") || streq(argv[i], "-v")) {
             verbose = 1;
         } else if (FLAG("--replace") || FLAG("-r")) {
             vm_op_t *p = bpeg_replacement(bpeg_pattern("pattern"), flag);
@@ -166,13 +138,13 @@ int main(int argc, char *argv[])
             vm_op_t *pat = bpeg_stringpattern(src);
             check(pat, "Failed to compile pattern");
             add_def(g, src, def, pat);
-        } else if (FLAG("--escaped") || FLAG("-e")) {
+        } else if (FLAG("--pattern") || FLAG("-p")) {
             check(npatterns == 0, "Cannot define multiple patterns");
             vm_op_t *p = bpeg_pattern(flag);
             check(p, "Pattern failed to compile: '%s'", flag);
             add_def(g, flag, "pattern", p);
             ++npatterns;
-        } else if (FLAG("--string") || FLAG("-s")) {
+        } else if (FLAG("--pattern-string") || FLAG("-P")) {
             vm_op_t *p = bpeg_stringpattern(flag);
             check(p, "Pattern failed to compile");
             add_def(g, flag, "pattern", p);

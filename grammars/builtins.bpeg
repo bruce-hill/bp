@@ -1,6 +1,6 @@
 # Meta-rules for acting on everything
 pattern = !(/); # Not defined by default
-replacement = {!(/)=>}; # Not defined by default
+replacement = !(/); # Not defined by default
 replace-all = +(...@replacement) ...;
 find-all = {... >matching-line =>} +(matching-line/non-matching-line) ?{!<\n => "\n"};
 only-matches = +{...@pattern=>'@1\n'};
@@ -10,10 +10,10 @@ non-matching-line = {..$=>};
 # Helper definitions (commonly used)
 crlf = \r\n;
 cr = \r; r = \r;
-anglebraces = `< *(anglebraces / ~~`>) `>;
-brackets = `[ *(brackets / ~~`]) `];
-braces = `{ *(braces / ~~`}) `};
-parens = `( *(parens / ~~`)) `);
+anglebraces = `< *(anglebraces / !`>.) `>;
+brackets = `[ *(brackets / !`].) `];
+braces = `{ *(braces / !`}.) `};
+parens = `( *(parens / !`).) `);
 id = !<(`a-z/`A-Z/`_/`0-9) (`a-z/`A-Z/`_) *(`a-z/`A-Z/`_/`0-9);
 word = !<(`a-z/`A-Z/`_/`0-9) +(`a-z/`A-Z) !>(`0-9/`_);
 HEX = `0-9/`A-F;

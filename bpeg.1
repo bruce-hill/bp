@@ -7,43 +7,164 @@ bpeg \- Bruce's Parsing Expression Grammar tool
 .B bpeg
 [\fI-h\fR|\fI--help\fR]
 [\fI-v\fR|\fI--verbose\fR]
+[\fI-p\fR|\fI--pattern\fR \fI<pattern>\fR]
+[\fI-P\fR|\fI--pattern-string\fR \fI<string-pattern>\fR]
 [\fI-d\fR|\fI--define\fR \fI<name>\fR=\fI<pattern>\fR]
+[\fI-D\fR|\fI--define-string\fR \fI<name>\fR=\fI<string-pattern>\fR]
 [\fI-r\fR|\fI--replace\fR \fI<replacement>\fR]
 [\fI-g\fR|\fI--grammar\fR \fI<grammar file>\fR]
+[\fI-m\fR|\fI--mode\fR \fI<mode>\fR]
 \fI<pattern\fR
-[[--] \fI<input file>\fR]
+[[--] \fI<input files...>\fR]
 .SH DESCRIPTION
 \fBbpeg\fR is a tool that matches parsing expression grammars using a custom syntax.
 .SH OPTIONS
-.B \--verbose
+.B \-v\fR, \fB--verbose
 Print debugging information.
 
-.B \--define <name>=<pattern>
-Define a grammar rule.
+.B \-d\fR, \fB--define \fI<name>\fR=\fI<pattern>\fR
+Define a grammar rule using a bpeg pattern.
 
-.B \--replace <replacement>
+.B \-D\fR, \fB--define-string \fI<name>\fR=\fI<string-pattern>\fR
+Define a grammar rule using a bpeg string pattern.
+
+.B \-r\fR, \fB--replace \fI<replacement>\fR
 Replace all occurrences of the main pattern with the given string.
 
-.B \--grammar <grammar file>
+.B \-g\fR, \fB--grammar \fI<grammar file>\fR
 Load the grammar from the given file.
+
+.B \-m\fR, \fB--mode \fI<mode>\fR
+The mode to operate in. Options are: \fIfind-all\fR (the default),
+\fIonly-matches\fR, \fIpattern\fR, \fIreplacement\fR, \fIreplace-all\fR
+(implied by \fB--replace\fR), or any other grammar rule name.
 
 .B \--help
 Print the usage and exit.
 
-.B <pattern>
-The main pattern for bpeg to match. By default, this pattern
-is in "string literal" mode (i.e. a backslash is requres for
-non-literal patterns). The default mode is to find \fBall\fR
-occurrences of the pattern and highlight them.
+.B <string-pattern>
+The main pattern for bpeg to match. By default, this pattern is a string
+pattern (see the \fBSTRING PATTERNS\fR section below).
 
-.B <input file>
-The input file to search (default: stdin).
+.B <input files...>
+The input files to search. If no input files are provided and data was
+piped in, that data will be used instead. If neither are provided,
+\fBbpeg\fR will search through all files in the current directory and
+its subdirectories (recursively).
+
+.SH PATTERNS
+Bpeg patterns are based off of a combination of Parsing Expression Grammars
+and regular expression syntax. The syntax is designed to map closely to
+verbal descriptions of the patterns, and prefix operators are preferred over
+suffix operators (as is common in regex syntax).
+
+Some patterns additionally have "multi-line" variants, which means that they
+include the newline character.
+
+.I <pat1> <pat2>
+A chain of patterns, pronounced \fI<pat1>\fB-then-\fI<pat2>\fR
+
+.I <pat1> \fB/\fI <pat2>\fR
+A series of ordered choices (if one pattern matches, the following patterns
+will not be attempted), pronounced \fI<pat1>\fB-or-\fI<pat2>\fR
+
+.B ..
+Any text \fBup-to\fR the following pattern, if any (multiline: \fB...\fR)
+
+.B .
+\fBAny\fR character (multiline: $.)
+
+.B ^
+\fBStart-of-a-line\fR
+
+.B ^^
+\fBStart-of-the-text\fR
+
+.B $
+\fBEnd-of-a-line\fR (does not include newline character)
+
+.B $$
+\fBEnd-of-the-text\fR
+
+.B _
+Zero or more \fBwhitespace\fR characters (specifically, spaces and tabs)
+
+.B __
+Zero or more \fBwhitespace-or-newline\fR characters
+
+.B `\fI<c>\fR
+The literal \fBcharacter-\fI<c>\fR
+
+.B `\fI<c1>\fB-\fI<c2>\fR
+The \fBcharacter-range-\fI<c1>\fB-to-\fI<c2>\fR
+
+.B \\\fI<esc>\fR
+The \fBescape-sequence-\fI<esc>\fR (\fB\\n\fR, \fB\\x1F\fR, \fB\\033\fR, etc.)
+
+.B \\\fI<esc1>\fB-\fI<esc2>\fR
+The \fBescape-sequence-range-\fI<esc1>\fB-to-\fI<esc2>\fR
+
+.B !\fI<pat>\fR
+\fBNot-\fI<pat>\fR
+
+.B \fI<N> <pat>\fR
+.B \fI<MIN>\fB-\fI<MAX> <pat>\fR
+.B \fI<MIN>\fB+ \fI<pat>\fR
+.B \fI<MAX>\fB- \fI<pat>\fR
+\fI<MIN>\fB-to-\fI<MAX>\fB-\fI<pat>\fBs\fR (repetitions of a pattern)
+
+.B *\fI<pat>\fR
+\fBAny-\fI<pat>\fBs\fR (zero or more)
+
+.B +\fI<pat>\fR
+\fBSome-\fI<pat>\fBs\fR (one or more)
+
+.B \fI<repeating-pat>\fR \fB%\fI <sep>\fR
+\fI<repeating-pat>\fB-separated-by-\fI<sep>\fR (equivalent to \fI<pat>
+\fB*(\fI<sep><pat>\fB)\fR)
+
+.B <\fI<pat>\fR
+\fBJust-after-\fI<pat>\fR (lookbehind)
+
+.B >\fI<pat>\fR
+\fBJust-before-\fI<pat>\fR (lookahead)
+
+.B @\fI<pat>\fR
+\fBCapture-\fI<pat>\fR
+
+.B @[\fI<name>\fB]\fI<pat>\fR
+\fBLet-\fI<name>\fB-equal-\fI<pat>\fR (named capture)
+
+.B {\fI<pat>\fB => "\fI<replacement>\fB"}
+\fBReplace-\fI<pat>\fB-with-\fI<replacement>\fR. Note: \fI<replacement>\fR should
+be a string, and it may contain references to captured values: \fB@0\fR
+(the whole of \fI<pat>\fR), \fB@1\fR (the first capture in \fI<pat>\fR),
+\fB@[\fIfoo\fR]\fR (the capture named \fIfoo\fR in \fI<pat>\fR), etc.
+
+.B \fI<pat1>\fB == \fI<pat2>\fR
+Will match only if \fI<pat1>\fR and \fI<pat2>\fR both match and have the exact
+same length. Pronounced \fI<pat1>\fB-assuming-it-equals-\fI<pat2>\fR
+
+.B (/)
+The empty string (a pattern that always matches).
+
+.B # \fI<comment>\fR
+A comment
+
+.SH STRING PATTERNS
+One of the most common use cases for pattern matching tools is matching plain,
+literal strings, or strings that are primarily plain strings, with one or two
+patterns. \fBbpeg\fR is designed around this fact. The default mode for bpeg
+patterns is "string pattern mode". In string pattern mode, all characters
+are interpreted literally except for the backslash (\fB\\\fR), which may be
+followed by a bpeg pattern (see the \fBPATTERNS\fR section above). Optionally,
+the bpeg pattern may be terminated by a semicolon (\fB;\fR).
 
 .SH EXAMPLES
 .TP
 .B
 ls | bpeg foo
-Find files containing the string "foo"
+Find files containing the string "foo" (a string pattern)
 
 .TP
 .B
@@ -52,9 +173,16 @@ Find files ending with ".c" and replace the extension with ".h"
 
 .TP
 .B
-bpeg -g grammar.bpeg '\\myThing' my_file.txt
-Find ocurrences of the grammar rule "myThing" in the file \fBmy_file.txt\fR
-using the grammar rules defined in \fBgrammar.bpeg\fR
+bpeg -p '"foobar"==id parens' my_file.py
+Find the literal string \fB"foobar"\fR, assuming it's a complete identifier,
+followed by a pair of matching parentheses in the file \fImy_file.py\fR
+
+.TP
+.B
+bpeg -g html -p html-element -D matching-tag=a foo.html
+Using the \fIhtml\fR grammar, find all \fIhtml-element\fRs matching
+the tag \fIa\fR in the file \fIfoo.html\fR
+
 
 .SH AUTHOR
 Bruce Hill (bruce@bruce-hill.com)

@@ -11,17 +11,17 @@ html-element = (
 
 void-element = `< @[tag](id==match-tag) __attributes__ `/? __ `>;
 
-template-element = `< @[tag](id==match-tag) __`> __ >match-body @[body]0+(~~`< / comment / html-element / ~~("</"tag__`>)) ("</"tag__`>);
+template-element = `< @[tag](id==match-tag) __`> __ >match-body @[body]0+(!`<$. / comment / html-element / !("</"tag__`>)$.) ("</"tag__`>);
 
-raw-element = `< @[tag](id==match-tag) __attributes__ `> >match-body @[body]*~~("</"tag__`>) ("</"tag__`>);
+raw-element = `< @[tag](id==match-tag) __attributes__ `> >match-body @[body].. ("</"tag__`>);
 
-normal-element = `< @[tag](id==match-tag) __attributes__ `> >match-body @[body]*(~~`< / comment / html-element / ~~("</"tag__`>)) "</"tag__`>;
+normal-element = `< @[tag](id==match-tag) __attributes__ `> >match-body @[body]*(!`<$. / comment / html-element / !("</"tag__`>)$.) "</"tag__`>;
 
 comment = "<!--" &&"-->";
 
 attributes = *(!(attribute==match-attribute))%__ __(attribute==match-attribute)__ *attribute%__;
 attribute = (+id%`:)__`=__ (id / `" &`" / `' &`');
-attribute = (+id%`:)__`=__ (id / `" *~`" `" / `' *~`' `');
+attribute = (+id%`:)__`=__ (id / `" .. `" / `' .. `');
 match-attribute = attribute;
 match-tag = id;
 match-body = (/);

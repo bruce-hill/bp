@@ -12,7 +12,6 @@
 enum VMOpcode {
     VM_EMPTY = 0,
     VM_ANYCHAR = 1,
-    VM_ANYTHING_BUT,
     VM_STRING,
     VM_RANGE,
     VM_NOT,
@@ -34,7 +33,7 @@ enum VMOpcode {
  */
 typedef struct vm_op_s {
     enum VMOpcode op;
-    unsigned int multiline:1;
+    unsigned int multiline:1, negate:1;
     const char *start, *end;
     // Length of the match, if constant, otherwise -1
     ssize_t len;
