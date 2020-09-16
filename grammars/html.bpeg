@@ -1,7 +1,7 @@
 # HTML grammar
 HTML = __ ?(doctype __) *html-element%__ __;
 
-doctype = "<!DOCTYPE" &`>;
+doctype = "<!DOCTYPE" ..`>;
 
 html-element = (
     >(`<("area"/"base"/"br"/"col"/"embed"/"hr"/"img"/"input"/"link"/"meta"/"param"/"source"/"track"/"wbr")) void-element
@@ -17,11 +17,11 @@ raw-element = `< @[tag](id==match-tag) __attributes__ `> >match-body @[body].. (
 
 normal-element = `< @[tag](id==match-tag) __attributes__ `> >match-body @[body]*(!`<$. / comment / html-element / !("</"tag__`>)$.) "</"tag__`>;
 
-comment = "<!--" &&"-->";
+comment = "<!--" ..."-->";
 
 attributes = *(!(attribute==match-attribute))%__ __(attribute==match-attribute)__ *attribute%__;
-attribute = (+id%`:)__`=__ (id / `" &`" / `' &`');
-attribute = (+id%`:)__`=__ (id / `" .. `" / `' .. `');
+attribute = (+id%`:)__`=__ (id / `" ..`" / `' ..`');
+attribute = (+id%`:)__`=__ (id / `" ..`" / `' ..`');
 match-attribute = attribute;
 match-tag = id;
 match-body = (/);
