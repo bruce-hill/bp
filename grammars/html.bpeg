@@ -9,7 +9,7 @@ html-element = (
   / >(`<("template")) template-element
   / normal-element);
 
-void-element = `< @[tag](id==match-tag) __attributes__ `/? __ `>;
+void-element = `< @[tag](id==match-tag) __attributes__ ?`/ __ `>;
 
 template-element = `< @[tag](id==match-tag) __`> __ >match-body @[body]0+(!`<$. / comment / html-element / !("</"tag__`>)$.) ("</"tag__`>);
 
