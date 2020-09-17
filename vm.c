@@ -275,12 +275,15 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
             return m;
         }
         case VM_REPLACE: {
+            match_t *p = NULL;
+            if (op->args.replace.replace_pat) {
+                p = _match(g, f, str, op->args.replace.replace_pat, flags, rec);
+                if (p == NULL) return NULL;
+            }
             match_t *m = calloc(sizeof(match_t), 1);
             m->start = str;
             m->op = op;
-            if (op->args.replace.replace_pat) {
-                match_t *p = _match(g, f, str, op->args.replace.replace_pat, flags, rec);
-                if (p == NULL) return NULL;
+            if (p) {
                 m->child = p;
                 m->end = p->end;
             } else {
