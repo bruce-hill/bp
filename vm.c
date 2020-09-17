@@ -556,7 +556,7 @@ void print_match(match_t *m, const char *color, int verbose)
         }
     } else {
         const char *name = m->name_or_replacement;
-        if (verbose && m->is_ref && name && isupper(name[0]))
+        if (verbose && m->is_ref && name)
             printf(color ? "\033[0;2;35m{%s:" : "{%s", name);
         //if (m->is_capture && name)
         //    printf("\033[0;2;33m[%s:", name);
@@ -573,7 +573,7 @@ void print_match(match_t *m, const char *color, int verbose)
         }
         if (m->end > prev)
             printf("%s%.*s", color ? color : "", (int)(m->end - prev), prev);
-        if (verbose && m->is_ref && name && isupper(name[0]))
+        if (verbose && m->is_ref && name)
             printf(color ? "\033[0;2;35m}" : "}");
         //if (m->is_capture && name)
         //    printf("\033[0;2;33m]");
