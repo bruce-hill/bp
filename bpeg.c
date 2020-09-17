@@ -25,8 +25,8 @@ static const char *usage = (
     " -h --help                        print the usage and quit\n"
     " -v --verbose                     print verbose debugging info\n"
     " -i --ignore-case                 preform matching case-insensitively\n"
-    " -d --define <name>=<def>         define a grammar rule\n"
-    " -D --define-string <name>=<def>  define a grammar rule (string-pattern)\n"
+    " -d --define <name>:<def>         define a grammar rule\n"
+    " -D --define-string <name>:<def>  define a grammar rule (string-pattern)\n"
     " -p --pattern <pat>               provide a pattern (equivalent to bpeg '\\(<pat>)')\n"
     " -P --pattern-string <pat>        provide a string pattern (may be useful if '<pat>' begins with a '-')\n"
     " -r --replace <replacement>       replace the input pattern with the given replacement\n"
@@ -114,8 +114,8 @@ int main(int argc, char *argv[])
             load_grammar(g, f); // Keep in memory for debug output
         } else if (FLAG("--define") || FLAG("-d")) {
             char *def = flag;
-            char *eq = strchr(def, '=');
-            check(eq, "Rule definitions must include an '='\n\n%s", usage);
+            char *eq = strchr(def, ':');
+            check(eq, "Rule definitions must include an ':'\n\n%s", usage);
             *eq = '\0';
             char *src = ++eq;
             vm_op_t *pat = bpeg_pattern(NULL, src);
@@ -123,8 +123,8 @@ int main(int argc, char *argv[])
             add_def(g, NULL, src, def, pat);
         } else if (FLAG("--define-string") || FLAG("-D")) {
             char *def = flag;
-            char *eq = strchr(def, '=');
-            check(eq, "Rule definitions must include an '='\n\n%s", usage);
+            char *eq = strchr(def, ':');
+            check(eq, "Rule definitions must include an ':'\n\n%s", usage);
             *eq = '\0';
             char *src = ++eq;
             vm_op_t *pat = bpeg_stringpattern(NULL, src);

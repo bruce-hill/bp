@@ -10,8 +10,8 @@ It's written in pure C with no dependencies.
 * `-h` `--help` print the usage and quit
 * `-v` `--verbose` print verbose debugging info
 * `-i` `--ignore-case` perform a case-insensitive match
-* `-d` `--define <name>=<def>` define a grammar rule
-* `-D` `--define-string <name>=<def>` define a grammar rule (string-pattern)
+* `-d` `--define <name>:<def>` define a grammar rule
+* `-D` `--define-string <name>:<def>` define a grammar rule (string-pattern)
 * `-p` `--pattern <pat>` provide a pattern (equivalent to bpeg '
 * `-P` `--pattern-string <pat>` provide a string pattern (equivalent to bpeg '<pat>', but may be useful if '<pat>' begins with a '-')
 * `-r` `--replace <replacement>`   replace the input pattern with the given replacement
