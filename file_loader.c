@@ -38,9 +38,10 @@ file_t *load_file(const char *filename)
     // Calculate line numbers:
     size_t linecap = 10;
     f->lines = calloc(sizeof(const char*), linecap);
-    f->nlines = 1;
+    f->nlines = 0;
     char *p = f->contents;
     for (size_t n = 0; p && *p; ++n) {
+        ++f->nlines;
         if (n >= linecap)
             f->lines = realloc(f->lines, sizeof(const char*)*(linecap *= 2));
         f->lines[n] = p;
@@ -77,6 +78,12 @@ size_t get_line_number(file_t *f, const char *p)
             return n;
     }
     return 0;
+}
+
+size_t get_char_number(file_t *f, const char *p)
+{
+    size_t linenum = get_line_number(f, p);
+    return 1 + (size_t)(p - f->lines[linenum-1]);
 }
 
 const char *get_line(file_t *f, size_t line_number)

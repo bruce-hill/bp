@@ -1,11 +1,17 @@
 # Meta-rules for acting on everything
 pattern = !(/); # Not defined by default
 replacement = !(/); # Not defined by default
-replace-all = 1+(...@replacement) ...;
-find-all = 1+find-next%\n 0-1{!<\n => "\n"};
+replace-all = add-filename 1+(...@replacement) ...;
+find-all = add-filename 1+find-next%\n 0-1{!<\n => "\n"};
 find-next = matching-line / {..\n =>} find-next;
 only-matches = 1+{...@pattern=>'@1\n'};
-matching-line = 1+(..@pattern) ..$;
+matching-line = add-linenum 1+(..@pattern) ..$;
+
+is-tty = !(/); # Defined as either always-match or always-fail, depending on stdout
+print-linenums = is-tty;
+print-filenames = is-tty;
+add-filename = 0-1(print-filenames (is-tty {=>"\033[33;1;4m@&:\033[0m\n"} / {=>"@&:\n"}));
+add-linenum = 0-1(print-linenums (is-tty {=>"\033[2m@#\033[5G|\033[0m "} / {=>"@#| "}));
 
 # Helper definitions (commonly used)
 indent = \n|1+(\t/' ');

@@ -54,11 +54,7 @@ static int run_match(grammar_t *g, const char *filename, vm_op_t *pattern, unsig
     file_t *f = load_file(filename);
     match_t *m = match(g, f, f->contents, pattern, flags);
     if (m != NULL && m->end > m->start + 1) {
-        if (filename != NULL) {
-            if (isatty(STDOUT_FILENO)) printf("\033[1;4;33m%s\033[0m\n", filename);
-            else printf("%s\n", filename);
-        }
-        print_match(m, isatty(STDOUT_FILENO) ? "\033[0m" : NULL, (flags & BPEG_VERBOSE) != 0);
+        print_match(f, m, isatty(STDOUT_FILENO) ? "\033[0m" : NULL, (flags & BPEG_VERBOSE) != 0);
         destroy_file(&f);
         return 0;
     } else {
@@ -156,6 +152,12 @@ int main(int argc, char *argv[])
             printf("Unrecognized flag: %s\n\n%s\n", argv[i], usage);
             return 1;
         }
+    }
+
+    if (isatty(STDOUT_FILENO)) {
+        vm_op_t *p = bpeg_pattern(NULL, "(/)");
+        check(p, "Failed to compile is-tty");
+        add_def(g, NULL, "(/)", "is-tty", p);
     }
 
     vm_op_t *pattern = lookup(g, rule);

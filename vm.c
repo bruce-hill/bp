@@ -1,6 +1,9 @@
 /*
  * vm.c - Code for the BPEG virtual machine that performs the matching.
  */
+
+#include <ctype.h>
+
 #include "vm.h"
 #include "grammar.h"
 #include "utils.h"
@@ -54,7 +57,7 @@ static size_t push_backrefs(grammar_t *g, match_t *m)
     if (m == NULL) return 0;
     if (m->op->op == VM_REF) return 0;
     size_t count = 0;
-    if (m->is_capture && m->name_or_replacement) {
+    if (m->op->op == VM_CAPTURE && m->name_or_replacement) {
         ++count;
         push_backref(g, m->name_or_replacement, m->child);
     }
@@ -232,7 +235,6 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
             m->end = p->end;
             m->op = op;
             m->child = p;
-            m->is_capture = 1;
             if (op->args.capture.name)
                 m->name_or_replacement = op->args.capture.name;
             return m;
@@ -292,7 +294,6 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
             } else {
                 m->end = m->start;
             }
-            m->is_replacement = 1;
             m->name_or_replacement = op->args.replace.replacement;
             return m;
         }
@@ -333,7 +334,6 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
             m->op = op;
             m->child = best;
             m->name_or_replacement = op->args.s;
-            m->is_ref = 1;
             return m;
         }
         case VM_BACKREF: {
@@ -470,6 +470,10 @@ void print_pattern(vm_op_t *op)
             fprintf(stderr, " with \"%s\"", op->args.replace.replacement);
             break;
         }
+        case VM_NODENT: {
+            fprintf(stderr, "the start of a line with the same indentation as the previous line");
+            break;
+        }
         default: break;
     }
 }
@@ -481,8 +485,8 @@ static match_t *get_capture_n(match_t *m, int *n)
 {
     if (!m) return NULL;
     if (*n == 0) return m;
-    if (m->is_capture && *n == 1) return m;
-    if (m->is_capture) --(*n);
+    if (m->op->op == VM_CAPTURE && *n == 1) return m;
+    if (m->op->op == VM_CAPTURE) --(*n);
     for (match_t *c = m->child; c; c = c->nextsibling) {
         match_t *cap = get_capture_n(c, n);
         if (cap) return cap;
@@ -495,7 +499,7 @@ static match_t *get_capture_n(match_t *m, int *n)
  */
 static match_t *get_capture_named(match_t *m, const char *name)
 {
-    if (m->is_capture && m->name_or_replacement && streq(m->name_or_replacement, name))
+    if (m->op->op == VM_CAPTURE && m->name_or_replacement && streq(m->name_or_replacement, name))
         return m;
     for (match_t *c = m->child; c; c = c->nextsibling) {
         match_t *cap = get_capture_named(c, name);
@@ -504,12 +508,30 @@ static match_t *get_capture_named(match_t *m, const char *name)
     return NULL;
 }
 
+static match_t *get_cap(match_t *m, const char **r)
+{
+    if (isdigit(**r)) {
+        int n = (int)strtol(*r, (char**)r, 10);
+        return get_capture_n(m->child, &n);
+    } else if (**r == '[') {
+        char *closing = strchr(*r+1, ']');
+        if (!closing) return NULL;
+        ++(*r);
+        char *name = strndup(*r, (size_t)(closing-*r));
+        match_t *cap = get_capture_named(m, name);
+        free(name);
+        *r = closing + 1;
+        return cap;
+    }
+    return NULL;
+}
+
 /*
  * Print a match with replacements and highlighting.
  */
-void print_match(match_t *m, const char *color, int verbose)
+void print_match(file_t *f, match_t *m, const char *color, int verbose)
 {
-    if (m->is_replacement) {
+    if (m->op->op == VM_REPLACE) {
         if (color) printf("\033[0;34m");
         for (const char *r = m->name_or_replacement; *r; ) {
             if (*r == '\\') {
@@ -523,42 +545,36 @@ void print_match(match_t *m, const char *color, int verbose)
             }
 
             ++r;
-            match_t *cap = NULL;
-            switch (*r) {
-                case '0': case '1': case '2': case '3': case '4':
-                case '5': case '6': case '7': case '8': case '9': {
-                    int n = (int)strtol(r, (char**)&r, 10);
-                    cap = get_capture_n(m->child, &n);
-                    break;
-                }
-                case '[': {
-                    char *closing = strchr(r+1, ']');
-                    if (!closing) {
-                        fputc('@', stdout);
-                        break;
-                    }
-                    ++r;
-                    char *name = strndup(r, (size_t)(closing-r));
-                    cap = get_capture_named(m, name);
-                    free(name);
-                    r = closing + 1;
-                    break;
-                }
-                default: {
-                    fputc('@', stdout);
-                    break;
-                }
+            if (*r == '@') {
+                fputc('@', stdout);
+                continue;
             }
+            if (*r == '#') {
+                ++r;
+                printf("%ld", get_line_number(f, m->start));
+                continue;
+            } else if (*r == ':') {
+                ++r;
+                printf("%ld", get_char_number(f, m->start));
+                continue;
+            } else if (*r == '&') {
+                ++r;
+                printf("%s", f->filename ? f->filename : "-");
+                continue;
+            }
+            match_t *cap = get_cap(m, &r);
             if (cap != NULL) {
-                print_match(cap, color ? "\033[0;35m" : NULL, verbose);
+                print_match(f, cap, color ? "\033[0;35m" : NULL, verbose);
                 if (color) printf("\033[0;34m");
+            } else {
+                fputc('@', stdout);
             }
         }
     } else {
         const char *name = m->name_or_replacement;
-        if (verbose && m->is_ref && name)
+        if (verbose && m->op->op == VM_REF && name)
             printf(color ? "\033[0;2;35m{%s:" : "{%s", name);
-        //if (m->is_capture && name)
+        //if (m->op->op == VM_CAPTURE && name)
         //    printf("\033[0;2;33m[%s:", name);
         const char *prev = m->start;
         for (match_t *child = m->child; child; child = child->nextsibling) {
@@ -568,14 +584,14 @@ void print_match(match_t *m, const char *color, int verbose)
                 continue;
             if (child->start > prev)
                 printf("%s%.*s", color ? color : "", (int)(child->start - prev), prev);
-            print_match(child, color ? (m->is_capture ? "\033[0;31;1m" : color) : NULL, verbose);
+            print_match(f, child, color ? (m->op->op == VM_CAPTURE ? "\033[0;31;1m" : color) : NULL, verbose);
             prev = child->end;
         }
         if (m->end > prev)
             printf("%s%.*s", color ? color : "", (int)(m->end - prev), prev);
-        if (verbose && m->is_ref && name)
+        if (verbose && m->op->op == VM_REF && name)
             printf(color ? "\033[0;2;35m}" : "}");
-        //if (m->is_capture && name)
+        //if (m->op->op == VM_CAPTURE && name)
         //    printf("\033[0;2;33m]");
     }
 }
@@ -588,7 +604,7 @@ static match_t *match_backref(const char *str, vm_op_t *op, match_t *cap, unsign
     ret->op = op;
     match_t **dest = &ret->child;
 
-    if (cap->is_replacement) {
+    if (cap->op->op == VM_REPLACE) {
         for (const char *r = cap->name_or_replacement; *r; ) {
             if (*r == '\\') {
                 ++r;

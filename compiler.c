@@ -252,6 +252,10 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
         }
         // Capture
         case '@': {
+            if (matchchar(&str, '@')) { // @@ -> current position
+                op->op = VM_POSITION;
+                break;
+            }
             op->op = VM_CAPTURE;
             str = after_spaces(str);
             if (matchchar(&str, '[')) {
