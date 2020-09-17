@@ -164,11 +164,11 @@ int main(int argc, char *argv[])
     vm_op_t *pattern = lookup(g, rule);
     check(pattern != NULL, "No such rule: '%s'", rule);
 
-    int ret = 0;
+    int ret = 1;
     if (i < argc) {
         // Files pass in as command line args:
         for (int nfiles = 0; i < argc; nfiles++, i++) {
-            ret |= run_match(g, argv[i], pattern, flags);
+            ret &= run_match(g, argv[i], pattern, flags);
         }
     } else if (isatty(STDIN_FILENO)) {
         // No files, no piped in input, so use * **/*:
@@ -176,12 +176,12 @@ int main(int argc, char *argv[])
         glob("*", 0, NULL, &globbuf);
         glob("**/*", GLOB_APPEND, NULL, &globbuf);
         for (size_t i = 0; i < globbuf.gl_pathc; i++) {
-            ret |= run_match(g, globbuf.gl_pathv[i], pattern, flags);
+            ret &= run_match(g, globbuf.gl_pathv[i], pattern, flags);
         }
         globfree(&globbuf);
     } else {
         // Piped in input:
-        ret |= run_match(g, NULL, pattern, flags);
+        ret &= run_match(g, NULL, pattern, flags);
     }
 
 
