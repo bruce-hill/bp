@@ -5,8 +5,8 @@
 #include "compiler.h"
 #include "utils.h"
 
-static vm_op_t *expand_chain(vm_op_t *first);
-static vm_op_t *expand_choices(vm_op_t *first);
+static vm_op_t *expand_chain(file_t *f, vm_op_t *first);
+static vm_op_t *expand_choices(file_t *f, vm_op_t *first);
 static vm_op_t *chain_together(vm_op_t *first, vm_op_t *second);
 static void set_range(vm_op_t *op, ssize_t min, ssize_t max, vm_op_t *pat, vm_op_t *sep);
 
@@ -31,11 +31,11 @@ static void set_range(vm_op_t *op, ssize_t min, ssize_t max, vm_op_t *pat, vm_op
  * followed by any patterns (e.g. "`x `y"), otherwise return
  * the original input.
  */
-static vm_op_t *expand_chain(vm_op_t *first)
+static vm_op_t *expand_chain(file_t *f, vm_op_t *first)
 {
-    vm_op_t *second = bpeg_simplepattern(first->end);
+    vm_op_t *second = bpeg_simplepattern(f, first->end);
     if (second == NULL) return first;
-    second = expand_chain(second);
+    second = expand_chain(f, second);
     check(second->end > first->end, "No forward progress in chain!");
     return chain_together(first, second);
 }
@@ -45,14 +45,14 @@ static vm_op_t *expand_chain(vm_op_t *first)
  * followed by any "/"-separated patterns (e.g. "`x/`y"), otherwise
  * return the original input.
  */
-static vm_op_t *expand_choices(vm_op_t *first)
+static vm_op_t *expand_choices(file_t *f, vm_op_t *first)
 {
-    first = expand_chain(first);
+    first = expand_chain(f, first);
     const char *str = first->end;
     if (!matchchar(&str, '/')) return first;
-    vm_op_t *second = bpeg_simplepattern(str);
+    vm_op_t *second = bpeg_simplepattern(f, str);
     check(second, "Expected pattern after '/'");
-    second = expand_choices(second);
+    second = expand_choices(f, second);
     vm_op_t *choice = calloc(sizeof(vm_op_t), 1);
     choice->op = VM_OTHERWISE;
     choice->start = first->start;
@@ -84,7 +84,7 @@ static vm_op_t *chain_together(vm_op_t *first, vm_op_t *second)
 /*
  * Compile a string of BPEG code into virtual machine opcodes
  */
-vm_op_t *bpeg_simplepattern(const char *str)
+vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
 {
     if (!*str) return NULL;
     str = after_spaces(str);
@@ -100,7 +100,7 @@ vm_op_t *bpeg_simplepattern(const char *str)
             if (matchchar(&str, '.')) { // ".."
                 if (matchchar(&str, '.')) // "..."
                     op->multiline = 1;
-                vm_op_t *till = bpeg_simplepattern(str);
+                vm_op_t *till = bpeg_simplepattern(f, str);
                 op->op = VM_UPTO_AND;
                 op->len = -1;
                 op->args.pat = till;
@@ -177,7 +177,7 @@ vm_op_t *bpeg_simplepattern(const char *str)
         }
         // Not <pat>
         case '!': {
-            vm_op_t *p = bpeg_simplepattern(str);
+            vm_op_t *p = bpeg_simplepattern(f, str);
             check(p, "Expected pattern after '!'\n");
             str = p->end;
             op->op = VM_NOT;
@@ -202,13 +202,13 @@ vm_op_t *bpeg_simplepattern(const char *str)
             } else {
                 min = n1, max = n1;
             }
-            vm_op_t *pat = bpeg_simplepattern(str);
+            vm_op_t *pat = bpeg_simplepattern(f, str);
             check(pat, "Expected pattern after repetition count");
             str = pat->end;
             str = after_spaces(str);
             vm_op_t *sep = NULL;
             if (matchchar(&str, '%')) {
-                sep = bpeg_simplepattern(str);
+                sep = bpeg_simplepattern(f, str);
                 check(sep, "Expected pattern for separator after '%%'");
                 str = sep->end;
             } else {
@@ -219,7 +219,7 @@ vm_op_t *bpeg_simplepattern(const char *str)
         }
         // Lookbehind
         case '<': {
-            vm_op_t *pat = bpeg_simplepattern(str);
+            vm_op_t *pat = bpeg_simplepattern(f, str);
             check(pat, "Expected pattern after <");
             str = pat->end;
             check(pat->len != -1, "Lookbehind patterns must have a fixed length");
@@ -231,7 +231,7 @@ vm_op_t *bpeg_simplepattern(const char *str)
         }
         // Lookahead
         case '>': {
-            vm_op_t *pat = bpeg_simplepattern(str);
+            vm_op_t *pat = bpeg_simplepattern(f, str);
             check(pat, "Expected pattern after >");
             str = pat->end;
             op->op = VM_BEFORE;
@@ -242,9 +242,9 @@ vm_op_t *bpeg_simplepattern(const char *str)
         // Parentheses
         case '(': {
             free(op);
-            op = bpeg_simplepattern(str);
+            op = bpeg_simplepattern(f, str);
             check(op, "Expected pattern inside parentheses");
-            op = expand_choices(op);
+            op = expand_choices(f, op);
             str = op->end;
             str = after_spaces(str);
             check(matchchar(&str, ')'), "Expected closing ')' instead of \"%s\"", str);
@@ -261,7 +261,7 @@ vm_op_t *bpeg_simplepattern(const char *str)
                 str = closing;
                 check(matchchar(&str, ']'), "Expected closing ']'");
             }
-            vm_op_t *pat = bpeg_simplepattern(str);
+            vm_op_t *pat = bpeg_simplepattern(f, str);
             check(pat, "Expected pattern after @");
             str = pat->end;
             op->args.capture.capture_pat = pat;
@@ -275,9 +275,9 @@ vm_op_t *bpeg_simplepattern(const char *str)
             if (strncmp(str, "=>", 2) == 0) {
                 str += strlen("=>");
             } else {
-                pat = bpeg_simplepattern(str);
+                pat = bpeg_simplepattern(f, str);
                 check(pat, "Invalid pattern after '{'");
-                pat = expand_choices(pat);
+                pat = expand_choices(f, pat);
                 str = pat->end;
                 str = after_spaces(str);
                 check(matchchar(&str, '=') && matchchar(&str, '>'),
@@ -360,7 +360,7 @@ vm_op_t *bpeg_simplepattern(const char *str)
     if (strncmp(after_spaces(str), "==", 2) == 0) {
         str = after_spaces(str)+2;
         vm_op_t *first = op;
-        vm_op_t *second = bpeg_simplepattern(str);
+        vm_op_t *second = bpeg_simplepattern(f, str);
         check(second, "Expected pattern after '=='");
         check(first->len == -1 || second->len == -1 || first->len == second->len,
               "Two patterns cannot possibly match the same (different lengths: %ld != %ld)",
@@ -382,7 +382,7 @@ vm_op_t *bpeg_simplepattern(const char *str)
 /*
  * Similar to bpeg_simplepattern, except that the pattern begins with an implicit, unclosable quote.
  */
-vm_op_t *bpeg_stringpattern(const char *str)
+vm_op_t *bpeg_stringpattern(file_t *f, const char *str)
 {
     vm_op_t *ret = NULL;
     while (*str) {
@@ -395,7 +395,7 @@ vm_op_t *bpeg_stringpattern(const char *str)
         for (; *str; str++) {
             if (*str == '\\') {
                 check(str[1], "Expected more string contents after backslash");
-                interp = bpeg_simplepattern(str + 1);
+                interp = bpeg_simplepattern(f, str + 1);
                 check(interp != NULL, "No valid BPEG pattern detected after backslash");
                 break;
             }
@@ -448,10 +448,10 @@ vm_op_t *bpeg_replacement(vm_op_t *pat, const char *replacement)
     return op;
 }
 
-vm_op_t *bpeg_pattern(const char *str)
+vm_op_t *bpeg_pattern(file_t *f, const char *str)
 {
-    vm_op_t *op = bpeg_simplepattern(str);
-    if (op != NULL) op = expand_choices(op);
+    vm_op_t *op = bpeg_simplepattern(f, str);
+    if (op != NULL) op = expand_choices(f, op);
     return op;
 }
 

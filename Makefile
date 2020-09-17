@@ -6,7 +6,7 @@ CWARN=-Wall -Wpedantic -Wextra -Wno-unknown-pragmas -Wno-missing-field-initializ
 G ?=
 O ?= -O3
 
-CFILES=compiler.c grammar.c utils.c vm.c
+CFILES=compiler.c grammar.c utils.c vm.c file_loader.c
 OBJFILES=$(CFILES:.c=.o)
 
 all: $(NAME)

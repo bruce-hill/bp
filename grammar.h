@@ -7,13 +7,14 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "file_loader.h"
 #include "types.h"
 
 grammar_t *new_grammar(void);
-void add_def(grammar_t *g, const char *src, const char *name, vm_op_t *op);
+void add_def(grammar_t *g, file_t *f, const char *src, const char *name, vm_op_t *op);
 void push_backref(grammar_t *g, const char *name, match_t *capture);
 void pop_backrefs(grammar_t *g, size_t count);
-vm_op_t *load_grammar(grammar_t *g, const char *source);
+vm_op_t *load_grammar(grammar_t *g, file_t *f);
 vm_op_t *lookup(grammar_t *g, const char *name);
 
 #endif

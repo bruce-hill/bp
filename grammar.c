@@ -4,6 +4,7 @@
 
 #include "grammar.h"
 #include "compiler.h"
+#include "file_loader.h"
 #include "utils.h"
 
 grammar_t *new_grammar(void)
@@ -13,12 +14,13 @@ grammar_t *new_grammar(void)
     return g;
 }
 
-void add_def(grammar_t *g, const char *src, const char *name, vm_op_t *op)
+void add_def(grammar_t *g, file_t *f, const char *src, const char *name, vm_op_t *op)
 {
     if (g->defcount >= g->defcapacity) {
         g->definitions = realloc(g->definitions, sizeof(&g->definitions[0])*(g->defcapacity += 32));
     }
     int i = g->defcount;
+    g->definitions[i].file = f;
     g->definitions[i].source = src;
     g->definitions[i].name = name;
     g->definitions[i].op = op;
@@ -29,9 +31,10 @@ void add_def(grammar_t *g, const char *src, const char *name, vm_op_t *op)
  * Load the given grammar (semicolon-separated definitions)
  * and return the first rule defined.
  */
-vm_op_t *load_grammar(grammar_t *g, const char *src)
+vm_op_t *load_grammar(grammar_t *g, file_t *f)
 {
     vm_op_t *ret = NULL;
+    const char *src = f->contents;
     do {
         src = after_spaces(src);
         if (!*src) break;
@@ -41,9 +44,9 @@ vm_op_t *load_grammar(grammar_t *g, const char *src)
         name = strndup(name, (size_t)(name_end-name));
         src = after_spaces(name_end);
         check(matchchar(&src, '='), "Expected '=' in definition");
-        vm_op_t *op = bpeg_pattern(src);
+        vm_op_t *op = bpeg_pattern(f, src);
         check(op, "Couldn't load definition");
-        add_def(g, src, name, op);
+        add_def(g, f, src, name, op);
         if (ret == NULL) {
             ret = op;
         }

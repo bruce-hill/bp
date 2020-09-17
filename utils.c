@@ -153,28 +153,5 @@ size_t unescape_string(char *dest, const char *src, size_t bufsize)
 #undef PUT
 }
 
-/*
- * Read an entire file into memory. (Guaranteeing that ret[-1] == '\0')
- */
-char *readfile(int fd)
-{
-    size_t capacity = 1000, len = 0;
-    char *buf = calloc(sizeof(char), capacity+1);
-    buf[len++] = '\0';
-    ssize_t just_read;
-    while ((just_read=read(fd, &buf[len], capacity-len)) > 0) {
-        len += (size_t)just_read;
-        if (len >= capacity)
-            buf = realloc(buf, sizeof(char)*(capacity *= 2));
-    }
-    buf[len] = '\0';
-    close(fd);
-    return &buf[1];
-}
-
-void freefile(char *f)
-{
-    free(&f[-1]);
-}
 
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1

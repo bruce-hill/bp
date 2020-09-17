@@ -6,6 +6,8 @@
 
 #include <sys/types.h>
 
+#include "file_loader.h"
+
 enum BPEGFlag {
     BPEG_VERBOSE    = 1 << 0,
     BPEG_IGNORECASE = 1 << 1,
@@ -85,6 +87,7 @@ typedef struct match_s {
 typedef struct {
     const char *name;
     const char *source;
+    file_t *file;
     vm_op_t *op;
 } def_t;
 

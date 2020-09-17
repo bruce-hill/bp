@@ -12,6 +12,7 @@
 #include <unistd.h>
 
 #include "compiler.h"
+#include "file_loader.h"
 #include "grammar.h"
 #include "utils.h"
 #include "vm.h"
@@ -50,25 +51,18 @@ static char *getflag(const char *flag, char *argv[], int *i)
 
 static int run_match(grammar_t *g, const char *filename, vm_op_t *pattern, unsigned int flags)
 {
-    char *input;
-    if (filename == NULL || streq(filename, "-")) {
-        input = readfile(STDIN_FILENO);
-    } else {
-        int fd = open(filename, O_RDONLY);
-        check(fd >= 0, "Couldn't open file: %s", filename);
-        input = readfile(fd);
-    }
-    match_t *m = match(g, input, pattern, flags);
+    file_t *f = load_file(filename);
+    match_t *m = match(g, f, f->contents, pattern, flags);
     if (m != NULL && m->end > m->start + 1) {
         if (filename != NULL) {
             if (isatty(STDOUT_FILENO)) printf("\033[1;4;33m%s\033[0m\n", filename);
             else printf("%s\n", filename);
         }
         print_match(m, isatty(STDOUT_FILENO) ? "\033[0m" : NULL, (flags & BPEG_VERBOSE) != 0);
-        freefile(input);
+        destroy_file(&f);
         return 0;
     } else {
-        freefile(input);
+        destroy_file(&f);
         return 1;
     }
 }
@@ -85,12 +79,11 @@ int main(int argc, char *argv[])
     grammar_t *g = new_grammar();
 
     // Load builtins:
-    int fd;
-    if ((fd=open("/etc/xdg/bpeg/builtins.bpeg", O_RDONLY)) >= 0)
-        load_grammar(g, readfile(fd)); // Keep in memory for debugging output
+    if (access("/etc/xdg/bpeg/builtins.bpeg", R_OK) != -1)
+        load_grammar(g, load_file("/etc/xdg/bpeg/builtins.bpeg")); // Keep in memory for debugging output
     sprintf(path, "%s/.config/bpeg/builtins.bpeg", getenv("HOME"));
-    if ((fd=open(path, O_RDONLY)) >= 0)
-        load_grammar(g, readfile(fd)); // Keep in memory for debugging output
+    if (access(path, R_OK) != -1)
+        load_grammar(g, load_file(path)); // Keep in memory for debugging output
 
     int i, npatterns = 0;
     check(argc > 1, "%s", usage);
@@ -106,63 +99,58 @@ int main(int argc, char *argv[])
         } else if (streq(argv[i], "--ignore-case") || streq(argv[i], "-i")) {
             flags |= BPEG_IGNORECASE;
         } else if (FLAG("--replace") || FLAG("-r")) {
-            vm_op_t *p = bpeg_replacement(bpeg_pattern("pattern"), flag);
+            vm_op_t *p = bpeg_replacement(bpeg_pattern(NULL, "pattern"), flag);
             check(p, "Replacement failed to compile");
-            add_def(g, flag, "replacement", p);
+            add_def(g, NULL, flag, "replacement", p);
             rule = "replace-all";
         } else if (FLAG("--grammar") || FLAG("-g")) {
-            int fd;
-            if (streq(flag, "-")) {
-                fd = STDIN_FILENO;
-            } else {
-                fd = open(flag, O_RDONLY);
-                if (fd < 0) {
-                    sprintf(path, "%s/.config/bpeg/%s.bpeg", getenv("HOME"), flag);
-                    fd = open(path, O_RDONLY);
-                }
-                if (fd < 0) {
-                    sprintf(path, "/etc/xdg/bpeg/%s.bpeg", flag);
-                    fd = open(path, O_RDONLY);
-                }
-                check(fd >= 0, "Couldn't find grammar: %s", flag);
+            file_t *f = load_file(flag);
+            if (f == NULL) {
+                sprintf(path, "%s/.config/bpeg/%s.bpeg", getenv("HOME"), flag);
+                f = load_file(path);
             }
-            load_grammar(g, readfile(fd)); // Keep in memory for debug output
+            if (f == NULL) {
+                sprintf(path, "/etc/xdg/bpeg/%s.bpeg", flag);
+                f = load_file(path);
+            }
+            check(f != NULL, "Couldn't find grammar: %s", flag);
+            load_grammar(g, f); // Keep in memory for debug output
         } else if (FLAG("--define") || FLAG("-d")) {
             char *def = flag;
             char *eq = strchr(def, '=');
             check(eq, "Rule definitions must include an '='\n\n%s", usage);
             *eq = '\0';
             char *src = ++eq;
-            vm_op_t *pat = bpeg_pattern(src);
+            vm_op_t *pat = bpeg_pattern(NULL, src);
             check(pat, "Failed to compile pattern");
-            add_def(g, src, def, pat);
+            add_def(g, NULL, src, def, pat);
         } else if (FLAG("--define-string") || FLAG("-D")) {
             char *def = flag;
             char *eq = strchr(def, '=');
             check(eq, "Rule definitions must include an '='\n\n%s", usage);
             *eq = '\0';
             char *src = ++eq;
-            vm_op_t *pat = bpeg_stringpattern(src);
+            vm_op_t *pat = bpeg_stringpattern(NULL, src);
             check(pat, "Failed to compile pattern");
-            add_def(g, src, def, pat);
+            add_def(g, NULL, src, def, pat);
         } else if (FLAG("--pattern") || FLAG("-p")) {
             check(npatterns == 0, "Cannot define multiple patterns");
-            vm_op_t *p = bpeg_pattern(flag);
+            vm_op_t *p = bpeg_pattern(NULL, flag);
             check(p, "Pattern failed to compile: '%s'", flag);
-            add_def(g, flag, "pattern", p);
+            add_def(g, NULL, flag, "pattern", p);
             ++npatterns;
         } else if (FLAG("--pattern-string") || FLAG("-P")) {
-            vm_op_t *p = bpeg_stringpattern(flag);
+            vm_op_t *p = bpeg_stringpattern(NULL, flag);
             check(p, "Pattern failed to compile");
-            add_def(g, flag, "pattern", p);
+            add_def(g, NULL, flag, "pattern", p);
             ++npatterns;
         } else if (FLAG("--mode") || FLAG("-m")) {
             rule = flag;
         } else if (argv[i][0] != '-') {
             if (npatterns > 0) break;
-            vm_op_t *p = bpeg_stringpattern(argv[i]);
+            vm_op_t *p = bpeg_stringpattern(NULL, argv[i]);
             check(p, "Pattern failed to compile");
-            add_def(g, argv[i], "pattern", p);
+            add_def(g, NULL, argv[i], "pattern", p);
             ++npatterns;
         } else {
             printf("Unrecognized flag: %s\n\n%s\n", argv[i], usage);
