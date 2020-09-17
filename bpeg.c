@@ -54,7 +54,7 @@ static int run_match(grammar_t *g, const char *filename, vm_op_t *pattern, unsig
     file_t *f = load_file(filename);
     match_t *m = match(g, f, f->contents, pattern, flags);
     if (m != NULL && m->end > m->start + 1) {
-        print_match(f, m, isatty(STDOUT_FILENO) ? "\033[0m" : NULL, (flags & BPEG_VERBOSE) != 0);
+        print_match(f, m);
         destroy_file(&f);
         return 0;
     } else {

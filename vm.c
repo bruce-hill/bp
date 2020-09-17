@@ -529,10 +529,9 @@ static match_t *get_cap(match_t *m, const char **r)
 /*
  * Print a match with replacements and highlighting.
  */
-void print_match(file_t *f, match_t *m, const char *color, int verbose)
+void print_match(file_t *f, match_t *m)
 {
     if (m->op->op == VM_REPLACE) {
-        if (color) printf("\033[0;34m");
         for (const char *r = m->name_or_replacement; *r; ) {
             if (*r == '\\') {
                 ++r;
@@ -564,18 +563,12 @@ void print_match(file_t *f, match_t *m, const char *color, int verbose)
             }
             match_t *cap = get_cap(m, &r);
             if (cap != NULL) {
-                print_match(f, cap, color ? "\033[0;35m" : NULL, verbose);
-                if (color) printf("\033[0;34m");
+                print_match(f, cap);
             } else {
                 fputc('@', stdout);
             }
         }
     } else {
-        const char *name = m->name_or_replacement;
-        if (verbose && m->op->op == VM_REF && name)
-            printf(color ? "\033[0;2;35m{%s:" : "{%s", name);
-        //if (m->op->op == VM_CAPTURE && name)
-        //    printf("\033[0;2;33m[%s:", name);
         const char *prev = m->start;
         for (match_t *child = m->child; child; child = child->nextsibling) {
             // Skip children from e.g. zero-width matches like >@foo
@@ -583,16 +576,12 @@ void print_match(file_t *f, match_t *m, const char *color, int verbose)
                   prev <= child->end && child->end <= m->end))
                 continue;
             if (child->start > prev)
-                printf("%s%.*s", color ? color : "", (int)(child->start - prev), prev);
-            print_match(f, child, color ? (m->op->op == VM_CAPTURE ? "\033[0;31;1m" : color) : NULL, verbose);
+                printf("%.*s", (int)(child->start - prev), prev);
+            print_match(f, child);
             prev = child->end;
         }
         if (m->end > prev)
-            printf("%s%.*s", color ? color : "", (int)(m->end - prev), prev);
-        if (verbose && m->op->op == VM_REF && name)
-            printf(color ? "\033[0;2;35m}" : "}");
-        //if (m->op->op == VM_CAPTURE && name)
-        //    printf("\033[0;2;33m]");
+            printf("%.*s", (int)(m->end - prev), prev);
     }
 }
 
