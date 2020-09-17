@@ -52,6 +52,7 @@ static char *getflag(const char *flag, char *argv[], int *i)
 static int run_match(grammar_t *g, const char *filename, vm_op_t *pattern, unsigned int flags)
 {
     file_t *f = load_file(filename);
+    check(f, "Could not open file: %s", filename);
     match_t *m = match(g, f, f->contents, pattern, flags);
     if (m != NULL && m->end > m->start + 1) {
         print_match(f, m);
