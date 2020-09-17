@@ -1,29 +1,29 @@
 # Meta-rules for acting on everything
 pattern = !(/); # Not defined by default
 replacement = !(/); # Not defined by default
-replace-all = +(...@replacement) ...;
-find-all = +find-next%\n ?{!<\n => "\n"};
+replace-all = 1+(...@replacement) ...;
+find-all = 1+find-next%\n 0-1{!<\n => "\n"};
 find-next = matching-line / {..\n =>} find-next;
-only-matches = +{...@pattern=>'@1\n'};
-matching-line = +(..@pattern) ..$;
+only-matches = 1+{...@pattern=>'@1\n'};
+matching-line = 1+(..@pattern) ..$;
 
 # Helper definitions (commonly used)
-indent = \n|+(\t/' ');
+indent = \n|1+(\t/' ');
 dedent = $ !(\n|);
-indented-block = |` ..$ *(\n|..$);
+indented-block = |` ..$ 0+(\n|..$);
 crlf = \r\n;
 cr = \r; r = \r;
-anglebraces = `< *(anglebraces / !`>.) `>;
-brackets = `[ *(brackets / !`].) `];
-braces = `{ *(braces / !`}.) `};
-parens = `( *(parens / !`).) `);
-id = !<(`a-z/`A-Z/`_/`0-9) (`a-z/`A-Z/`_) *(`a-z/`A-Z/`_/`0-9);
-word = !<(`a-z/`A-Z/`_/`0-9) +(`a-z/`A-Z) !>(`0-9/`_);
+anglebraces = `< 0+(anglebraces / !`>.) `>;
+brackets = `[ 0+(brackets / !`].) `];
+braces = `{ 0+(braces / !`}.) `};
+parens = `( 0+(parens / !`).) `);
+id = !<(`a-z/`A-Z/`_/`0-9) (`a-z/`A-Z/`_) 0+(`a-z/`A-Z/`_/`0-9);
+word = !<(`a-z/`A-Z/`_/`0-9) 1+(`a-z/`A-Z) !>(`0-9/`_);
 HEX = `0-9/`A-F;
 Hex = `0-9/`a-f/`A-F;
 hex = `0-9/`a-f;
-number = +`0-9 ?(`. *`0-9) / `. +`0-9;
-int = +`0-9;
+number = 1+`0-9 0-1(`. 0+`0-9) / `. 1+`0-9;
+int = 1+`0-9;
 digit = `0-9;
 Abc = `a-z/`A-Z;
 ABC = `A-Z;
@@ -42,5 +42,5 @@ $$ = !$.;
 $ = !.;
 ^^ = !<$.;
 ^ = !<.;
-__ = *(` /\t/\n/\r/comment);
-_ = *(` /\t);
+__ = 0+(` /\t/\n/\r/comment);
+_ = 0+(` /\t);

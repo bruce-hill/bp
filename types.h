@@ -20,7 +20,7 @@ enum VMOpcode {
     VM_STRING,
     VM_RANGE,
     VM_NOT,
-    VM_UPTO,
+    VM_UPTO_AND,
     VM_REPEAT,
     VM_BEFORE,
     VM_AFTER,

@@ -1,13 +1,13 @@
 # This is a file defining the BPEG grammar using BPEG syntax
 
-Grammar = __ *Def%(__`;__) ?(`;__);
+Grammar = __ 0+Def%(__`;__) 0-1(`;__);
 Def = @[name]Ref __ `= __ @[definition]extended-pat;
 
 # This is used for command line arguments:
-String-pattern = *(`\ pat ?`; / .);
+String-pattern = 0+(`\ pat 0-1`; / .);
 
 pat = suffixed-pat / simple-pat;
-simple-pat = Empty / Upto / Dot / String / Char-range / Char / Escape-range / Escape / No
+simple-pat = Empty / Upto-and / Dot / String / Char-range / Char / Escape-range / Escape / No
     / Nodent / Repeat / After / Before / Capture / Replace / Ref / parens;
 suffixed-pat = Eq-pat;
 
@@ -16,8 +16,8 @@ Eq-pat = @[first]simple-pat "==" @[second]pat;
 Empty = `/ >(__ (`)/`}));
 Dot = `. !`.;
 String = (
-        `" @[s]*(Escape / !`"$.) `"
-      / `' @[s]*(Escape / !`'$.) `'
+        `" @[s]0+(Escape / !`"$.) `"
+      / `' @[s]0+(Escape / !`'$.) `'
     );
 Char-range = `` @[low]. `- @[high].;
 Char = `` @[s].;
@@ -30,35 +30,31 @@ escape-sequence = (
     );
 No = `! _ @pat;
 Nodent = `|;
-Upto = 2-3`. ?>(_@pat);
+Upto-and = 2-3`. 0-1(_@pat);
 Repeat = (
         @[min]int _ `- _ @[max]int
-      /{@[min]{=>"0"}=>} @[max]int _ `-
       / @[min]int _ `+   @[max](/)
       / @[min]@[max]int
-      /{@[min]{=>"1"}=>} `+ @[max](/)
-      /{@[min]{=>"0"}=>} `* @[max](/)
-      /{@[min]{=>"0"}=>} `? {@[max]{=>"1"}=>}
-    ) _ @[repeat-pat]pat ?( __ `% __ @[sep]pat);
+    ) _ @[repeat-pat]pat 0-1( __ `% __ @[sep]pat);
 After = `< _ pat;
 Before = `> _ pat;
-Capture = `@ ?(_ `[ @[capture-name]Ref `]) _ @[capture]pat;
+Capture = `@ 0-1(_ `[ @[capture-name]Ref `]) _ @[capture]pat;
 Replace = `{ __ (
-      ?(@[replace-pat]extended-pat __) "=>" ?(__ @[replacement]String)
+      0-1(@[replace-pat]extended-pat __) "=>" 0-1(__ @[replacement]String)
     ) __ `};
 Ref = @[name](
         "^^" / "^" / "__" / "_" / "$$" / "$" /
-        (`a-z/`A-Z) *(`a-z/`A-Z/`0-9/`-));
+        (`a-z/`A-Z) 0+(`a-z/`A-Z/`0-9/`-));
 
 parens = `( __ extended-pat __ `);
 
-Chain = +@pat % (__);
-Otherwise = +@(Chain/pat) % (__`/__);
+Chain = 2+@pat % (__);
+Otherwise = 2+@(Chain/pat) % (__`/__);
 extended-pat = Otherwise / Chain / pat;
 
 # Special-symbol rules:
-_  = *(`  / \t);
-__ = *(`  / \t / \r / \n / comment);
+_  = 0+(`  / \t);
+__ = 0+(`  / \t / \r / \n / comment);
 $$ = !$.;
 $  = !.;
 ^^ = !<$.;

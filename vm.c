@@ -19,7 +19,7 @@ static const char *opcode_names[] = {
     [VM_STRING] = "STRING",
     [VM_RANGE] = "RANGE",
     [VM_NOT] = "NOT",
-    [VM_UPTO] = "UPTO",
+    [VM_UPTO_AND] = "UPTO_AND",
     [VM_REPEAT] = "REPEAT",
     [VM_BEFORE] = "BEFORE",
     [VM_AFTER] = "AFTER",
@@ -127,7 +127,7 @@ static match_t *_match(grammar_t *g, const char *str, vm_op_t *op, unsigned int 
             m->end = str;
             return m;
         }
-        case VM_UPTO: {
+        case VM_UPTO_AND: {
             match_t *m = calloc(sizeof(match_t), 1);
             m->start = str;
             m->op = op;
@@ -136,7 +136,8 @@ static match_t *_match(grammar_t *g, const char *str, vm_op_t *op, unsigned int 
                     prev = str;
                     match_t *p = _match(g, str, op->args.pat, flags, rec);
                     if (p) {
-                        destroy_match(&p);
+                        m->child = p;
+                        str = p->end;
                         break;
                     }
                     // This isn't in the for() structure because there needs to
@@ -410,8 +411,8 @@ void print_pattern(vm_op_t *op)
             fprintf(stderr, ")");
             break;
         }
-        case VM_UPTO: {
-            fprintf(stderr, "text up to (");
+        case VM_UPTO_AND: {
+            fprintf(stderr, "text up to and including (");
             print_pattern(op->args.pat);
             fprintf(stderr, ")");
             break;

@@ -101,10 +101,11 @@ vm_op_t *bpeg_simplepattern(const char *str)
                 if (matchchar(&str, '.')) // "..."
                     op->multiline = 1;
                 vm_op_t *till = bpeg_simplepattern(str);
-                // Don't advance str, the following pattern will be re-matched.
-                op->op = VM_UPTO;
+                op->op = VM_UPTO_AND;
                 op->len = -1;
                 op->args.pat = till;
+                if (till)
+                    str = till->end;
                 break;
             } else {
               anychar:
@@ -205,38 +206,15 @@ vm_op_t *bpeg_simplepattern(const char *str)
             check(pat, "Expected pattern after repetition count");
             str = pat->end;
             str = after_spaces(str);
+            vm_op_t *sep = NULL;
             if (matchchar(&str, '%')) {
-                vm_op_t *sep = bpeg_simplepattern(str);
+                sep = bpeg_simplepattern(str);
                 check(sep, "Expected pattern for separator after '%%'");
                 str = sep->end;
-                set_range(op, min, max, pat, sep);
             } else {
                 str = pat->end;
-                set_range(op, min, max, pat, NULL);
             }
-            break;
-        }
-        // Special repetitions:
-        case '+': case '*': case '?': {
-            ssize_t min = -1, max = -1;
-            switch (c) {
-                case '+': min = 1, max = -1; break;
-                case '*': min = 0, max = -1; break;
-                case '?': min = 0, max = 1; break;
-            }
-            vm_op_t *pat = bpeg_simplepattern(str);
-            check(pat, "Expected pattern after '%c'", c);
-            str = pat->end;
-            str = after_spaces(str);
-            if (matchchar(&str, '%')) {
-                vm_op_t *sep = bpeg_simplepattern(str);
-                check(sep, "Expected pattern for separator after '%%'");
-                str = sep->end;
-                set_range(op, min, max, pat, sep);
-            } else {
-                str = pat->end;
-                set_range(op, min, max, pat, NULL);
-            }
+            set_range(op, min, max, pat, sep);
             break;
         }
         // Lookbehind
@@ -269,7 +247,7 @@ vm_op_t *bpeg_simplepattern(const char *str)
             op = expand_choices(op);
             str = op->end;
             str = after_spaces(str);
-            check(matchchar(&str, ')'), "Expected closing parenthesis");
+            check(matchchar(&str, ')'), "Expected closing ')' instead of \"%s\"", str);
             break;
         }
         // Capture
