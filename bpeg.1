@@ -73,7 +73,7 @@ A series of ordered choices (if one pattern matches, the following patterns
 will not be attempted), pronounced \fI<pat1>\fB-or-\fI<pat2>\fR
 
 .B ..
-Any text \fBup-to\fR the following pattern, if any (multiline: \fB...\fR)
+Any text \fBup-to-and-including\fR the following pattern, if any (multiline: \fB...\fR)
 
 .B .
 \fBAny\fR character (multiline: $.)
@@ -117,15 +117,9 @@ The \fBescape-sequence-range-\fI<esc1>\fB-to-\fI<esc2>\fR
 .B \fI<MAX>\fB- \fI<pat>\fR
 \fI<MIN>\fB-to-\fI<MAX>\fB-\fI<pat>\fBs\fR (repetitions of a pattern)
 
-.B *\fI<pat>\fR
-\fBAny-\fI<pat>\fBs\fR (zero or more)
-
-.B +\fI<pat>\fR
-\fBSome-\fI<pat>\fBs\fR (one or more)
-
 .B \fI<repeating-pat>\fR \fB%\fI <sep>\fR
 \fI<repeating-pat>\fB-separated-by-\fI<sep>\fR (equivalent to \fI<pat>
-\fB*(\fI<sep><pat>\fB)\fR)
+\fB0+(\fI<sep><pat>\fB)\fR)
 
 .B <\fI<pat>\fR
 \fBJust-after-\fI<pat>\fR (lookbehind)
