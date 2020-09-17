@@ -77,7 +77,7 @@ size_t get_line_number(file_t *f, const char *p)
         if (f->lines[n] > p)
             return n;
     }
-    return 0;
+    return f->nlines;
 }
 
 size_t get_char_number(file_t *f, const char *p)

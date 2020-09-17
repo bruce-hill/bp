@@ -1,26 +1,26 @@
 # HTML grammar
-HTML = __ 0-1(doctype __) 0+html-element%__ __;
+HTML: __ 0-1(doctype __) 0+html-element%__ __
 
-doctype = "<!DOCTYPE" ..`>;
+doctype: "<!DOCTYPE" ..`>
 
-html-element = (
+html-element: (
     >(`<("area"/"base"/"br"/"col"/"embed"/"hr"/"img"/"input"/"link"/"meta"/"param"/"source"/"track"/"wbr")) void-element
   / >(`<("script"/"style"/"textarea"/"title")) raw-element
   / >(`<("template")) template-element
-  / normal-element);
+  / normal-element)
 
-void-element = `< @[tag](id==match-tag) __attributes__ 0-1`/ __ `>;
+void-element: `< @[tag](id==match-tag) __attributes__ 0-1`/ __ `>
 
-template-element = `< @[tag](id==match-tag) __`> __ >match-body @[body]0+(!`<$. / comment / html-element / !("</"tag__`>)$.) ("</"tag__`>);
+template-element: `< @[tag](id==match-tag) __`> __ >match-body @[body]0+(!`<$. / comment / html-element / !("</"tag__`>)$.) ("</"tag__`>)
 
-raw-element = `< @[tag](id==match-tag) __attributes__ `> >match-body @[body].. ("</"tag__`>);
+raw-element: `< @[tag](id==match-tag) __attributes__ `> >match-body @[body].. ("</"tag__`>)
 
-normal-element = `< @[tag](id==match-tag) __attributes__ `> >match-body @[body]0+(!`<$. / comment / html-element / !("</"tag__`>)$.) "</"tag__`>;
+normal-element: `< @[tag](id==match-tag) __attributes__ `> >match-body @[body]0+(!`<$. / comment / html-element / !("</"tag__`>)$.) "</"tag__`>
 
-comment = "<!--" ..."-->";
+comment: "<!--" ..."-->"
 
-attributes = 0+attribute%__;
-attribute = (1+id%`:)__`=__ (id / `" ..`" / `' ..`');
-attribute = (1+id%`:)__`=__ (id / `" ..`" / `' ..`');
-match-tag = id;
-match-body = '';
+attributes: 0+attribute%__
+attribute: (1+id%`:)__`=__ (id / `" ..`" / `' ..`')
+attribute: (1+id%`:)__`=__ (id / `" ..`" / `' ..`')
+match-tag: id
+match-body: ''

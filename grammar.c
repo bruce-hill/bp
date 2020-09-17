@@ -33,25 +33,33 @@ void add_def(grammar_t *g, file_t *f, const char *src, const char *name, vm_op_t
  */
 vm_op_t *load_grammar(grammar_t *g, file_t *f)
 {
+    check(f, "Null file provided");
     vm_op_t *ret = NULL;
     const char *src = f->contents;
-    do {
-        src = after_spaces(src);
-        if (!*src) break;
+    src = after_spaces(src);
+    while (*src) {
         const char *name = src;
         const char *name_end = after_name(name);
         check(name_end > name, "Invalid name for definition");
         name = strndup(name, (size_t)(name_end-name));
         src = after_spaces(name_end);
-        check(matchchar(&src, '='), "Expected '=' in definition");
+        check(matchchar(&src, ':'), "Expected ':' in definition");
         vm_op_t *op = bpeg_pattern(f, src);
-        check(op, "Couldn't load definition");
+        if (op == NULL) break;
+        //check(op, "Couldn't load definition");
         add_def(g, f, src, name, op);
         if (ret == NULL) {
             ret = op;
         }
         src = op->end;
-    } while (*src && matchchar(&src, ';')); 
+        src = after_spaces(src);
+        if (*src && matchchar(&src, ';'))
+            src = after_spaces(src);
+    }
+    if (src < &f->contents[f->length-1]) {
+        fprint_line(stderr, f, src, NULL, "Invalid BPEG pattern");
+        _exit(1);
+    }
     return ret;
 }
 

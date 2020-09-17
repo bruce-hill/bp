@@ -86,9 +86,8 @@ static vm_op_t *chain_together(vm_op_t *first, vm_op_t *second)
  */
 vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
 {
-    if (!*str) return NULL;
     str = after_spaces(str);
-    check(*str, "Expected a pattern");
+    if (!*str) return NULL;
     vm_op_t *op = calloc(sizeof(vm_op_t), 1);
     op->start = str;
     op->len = -1;
@@ -320,6 +319,11 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
             } else {
                 op->args.s = strndup(&c, 1);
             }
+            if (*after_spaces(str) == ':') {
+                free((char*)op->args.s);
+                free(op);
+                return NULL;
+            }
             op->op = VM_REF;
             break;
         }
@@ -333,6 +337,10 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
                 --str;
                 const char *refname = str;
                 str = after_name(str);
+                if (*after_spaces(str) == ':') {
+                    free(op);
+                    return NULL;
+                }
                 op->op = VM_REF;
                 op->args.s = strndup(refname, (size_t)(str - refname));
                 break;
