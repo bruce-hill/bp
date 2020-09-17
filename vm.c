@@ -137,14 +137,16 @@ static match_t *_match(grammar_t *g, const char *str, vm_op_t *op, unsigned int 
                     match_t *p = _match(g, str, op->args.pat, flags, rec);
                     if (p) {
                         m->child = p;
-                        str = p->end;
-                        break;
+                        m->end = p->end;
+                        return m;
                     }
                     // This isn't in the for() structure because there needs to
                     // be at least once chance to match the pattern, even if
                     // we're at the end of the string already (e.g. "..$").
                     if (*str && (op->multiline || *str != '\n')) ++str;
                 }
+                destroy_match(&m);
+                return NULL;
             } else if (op->multiline) {
                 while (*str) ++str;
             } else {
