@@ -96,9 +96,8 @@ void fprint_line(FILE *dest, file_t *f, const char *start, const char *end, cons
 {
     size_t linenum = get_line_number(f, start);
     const char *line = get_line(f, linenum);
-    size_t charnum = 1 + (size_t)(start - line);
-    fprintf(dest, "\033[1m%s:%ld:%ld:\033[0m %s\n",
-            f->filename, linenum, charnum, msg);
+    size_t charnum = get_char_number(f, start);
+    fprintf(dest, "\033[1m%s:%ld:\033[0m %s\n", f->filename, linenum, msg);
     const char *eol = linenum == f->nlines ? strchr(line, '\0') : strchr(line, '\n');
     if (end == NULL || end > eol) end = eol;
     fprintf(dest, "\033[2m% 5ld |\033[0m %.*s\033[41;30m%.*s\033[0m%.*s\n",
@@ -106,10 +105,10 @@ void fprint_line(FILE *dest, file_t *f, const char *start, const char *end, cons
             (int)charnum - 1, line,
             (int)(end - &line[charnum-1]), &line[charnum-1],
             (int)(eol - end), end);
-    fprintf(dest, "       ");
+    fprintf(dest, "       \033[34;1m");
     const char *p = line - 1;
     for (; p < start; ++p) fputc(' ', dest);
     if (start == end) ++end;
     for (; p < end; ++p) fputc('^', dest);
-    fputc('\n', dest);
+    fprintf(dest, "\033[0m\n");
 }
