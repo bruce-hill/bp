@@ -7,13 +7,12 @@ Def: @[name]id __ `: __ @[definition]extended-pat
 String-pattern: 0+(`\ pat 0-1`; / .)
 
 pat: suffixed-pat / simple-pat
-simple-pat: Empty / Upto-and / Dot / String / Char-range / Char / Escape-range / Escape / No
+simple-pat: Upto-and / Dot / String / Char-range / Char / Escape-range / Escape / No
     / Nodent / Repeat / After / Before / Capture / Replace / Ref / parens
 suffixed-pat: Eq-pat
 
 Eq-pat: @[first]simple-pat "==" @[second]pat
 
-Empty: `/ >(__ (`)/`}))
 Dot: `. !`.
 String: (
         `" @[s]0+(Escape / !`"$.) `"
