@@ -17,7 +17,6 @@ enum BPEGFlag {
  * BPEG virtual machine opcodes (these must be kept in sync with the names in vm.c)
  */
 enum VMOpcode {
-    VM_EMPTY = 0,
     VM_ANYCHAR = 1,
     VM_STRING,
     VM_RANGE,

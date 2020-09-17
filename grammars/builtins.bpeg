@@ -1,5 +1,5 @@
-yes = (/);
-no = !(/);
+yes = '';
+no = !'';
 
 # Configurable options:
 is-tty = no; # Defined as either always-match or always-fail, depending on stdout
@@ -8,8 +8,8 @@ print-filenames = is-tty;
 highlight = is-tty;
 
 # Meta-rules for acting on everything:
-pattern = !(/); # Not defined by default
-replacement = !(/); # Not defined by default
+pattern = !''; # Not defined by default
+replacement = !''; # Not defined by default
 replace-all = define-highlights add-filename 1+(...@hl-replacement) ...;
 find-all = define-highlights add-filename 1+find-next%\n 0-1{!<\n => "\n"};
 find-next = matching-line / {..\n =>} find-next;
@@ -50,7 +50,7 @@ c-block-comment = '/*' ... '*/';
 c-line-comment = '//' ..$;
 c-comment = c-line-comment / c-block-comment;
 hash-comment = `# ..$;
-comment = !(/); # No default definition, can be overridden
+comment = !''; # No default definition, can be overridden
 WS = ` /\t/\n/\r/comment;
 ws = ` /\t;
 $$ = !$.;

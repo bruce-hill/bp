@@ -33,7 +33,7 @@ Nodent = `|;
 Upto-and = 2-3`. 0-1(_@pat);
 Repeat = (
         @[min]int _ `- _ @[max]int
-      / @[min]int _ `+   @[max](/)
+      / @[min]int _ `+   @[max]''
       / @[min]@[max]int
     ) _ @[repeat-pat]pat 0-1( __ `% __ @[sep]pat);
 After = `< _ pat;

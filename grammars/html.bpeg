@@ -19,9 +19,8 @@ normal-element = `< @[tag](id==match-tag) __attributes__ `> >match-body @[body]0
 
 comment = "<!--" ..."-->";
 
-attributes = 0+(!(attribute==match-attribute))%__ __(attribute==match-attribute)__ 0+attribute%__;
+attributes = 0+attribute%__;
 attribute = (1+id%`:)__`=__ (id / `" ..`" / `' ..`');
 attribute = (1+id%`:)__`=__ (id / `" ..`" / `' ..`');
-match-attribute = attribute;
 match-tag = id;
-match-body = (/);
+match-body = '';

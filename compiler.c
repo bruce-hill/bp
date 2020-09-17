@@ -323,17 +323,6 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
             op->op = VM_REF;
             break;
         }
-        // Empty choice (/) or {/}
-        case '/': {
-            const char *next = after_spaces(str);
-            if (*next == ')' || *next == '}') {
-                op->op = VM_EMPTY;
-            } else {
-                free(op);
-                return NULL;
-            }
-            break;
-        }
         case '|': {
             op->op = VM_NODENT;
             break;

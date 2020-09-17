@@ -17,7 +17,6 @@ static match_t *get_capture_named(match_t *m, const char *name);
  * The names of the opcodes (keep in sync with the enum definition above)
  */
 static const char *opcode_names[] = {
-    [VM_EMPTY] = "EMPTY",
     [VM_ANYCHAR] = "ANYCHAR",
     [VM_STRING] = "STRING",
     [VM_RANGE] = "RANGE",
@@ -83,13 +82,6 @@ typedef struct recursive_ref_s {
 static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, unsigned int flags, recursive_ref_t *rec)
 {
     switch (op->op) {
-        case VM_EMPTY: {
-            match_t *m = calloc(sizeof(match_t), 1);
-            m->op = op;
-            m->start = str;
-            m->end = str;
-            return m;
-        }
         case VM_ANYCHAR: {
             if (!*str || (!op->multiline && *str == '\n'))
                 return NULL;
@@ -382,7 +374,6 @@ void print_pattern(vm_op_t *op)
 {
     switch (op->op) {
         case VM_REF: fprintf(stderr, "a $%s", op->args.s); break;
-        case VM_EMPTY: fprintf(stderr, "the empty string"); break;
         case VM_ANYCHAR: fprintf(stderr, "any char"); break;
         case VM_STRING: fprintf(stderr, "string \"%s\"", op->args.s); break;
         case VM_RANGE: {

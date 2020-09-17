@@ -156,9 +156,9 @@ int main(int argc, char *argv[])
     }
 
     if (isatty(STDOUT_FILENO)) {
-        vm_op_t *p = bpeg_pattern(NULL, "(/)");
+        vm_op_t *p = bpeg_pattern(NULL, "''");
         check(p, "Failed to compile is-tty");
-        add_def(g, NULL, "(/)", "is-tty", p);
+        add_def(g, NULL, "''", "is-tty", p);
     }
 
     vm_op_t *pattern = lookup(g, rule);
