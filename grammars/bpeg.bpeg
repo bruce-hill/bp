@@ -1,7 +1,9 @@
 # This is a file defining the BPEG grammar using BPEG syntax
 
-Grammar: __ 0+(Def 0-1(__`;))%__ __
-Def: @[name]id __ `: __ @[definition]extended-pat
+Grammar: __ 0+(Def 0-1(__`;))%__ __ ($$ / @[!]{... => "Could not parse this code"})
+Def: @[name]id __ `: __ (@[definition]extended-pat
+    / $$ @[!]{=>"No definition for rule"}
+    / @[!]{...>(`;/id__`:/$) => "Invalid definition: @0"})
 
 # This is used for command line arguments:
 String-pattern: 0+(`\ pat 0-1`; / .)
@@ -9,14 +11,20 @@ String-pattern: 0+(`\ pat 0-1`; / .)
 pat: suffixed-pat / simple-pat
 simple-pat: Upto-and / Dot / String / Char-range / Char / Escape-range / Escape / No
     / Nodent / Repeat / After / Before / Capture / Replace / Ref / parens
-suffixed-pat: Eq-pat
+
+suffixed-pat: Eq-pat / simple-pat (
+      @[!]{`* => "'*' is not a BPEG operator. Use 0+<pat> instead of <pat>*"}
+    / @[!]{`+ => "'+' is not a BPEG operator. Use 1+<pat> instead of <pat>+"}
+    / @[!]{`? => "'?' is not a BPEG operator. Use 0-1<pat> or 1-<pat> instead of <pat>?"}
+    / @[!]{`= => "'=' is not valid here. Perhaps you meant '==' or ':'"}
+)
 
 Eq-pat: @[first]simple-pat "==" @[second]pat
 
 Dot: `. !`.
 String: (
-        `" @[s]0+(Escape / !`"$.) `"
-      / `' @[s]0+(Escape / !`'$.) `'
+        `" @[s]0+(Escape / !`".) (`" / @[!]{=> "Expected closing quote here"})
+      / `' @[s]0+(Escape / !`'.) (`' / @[!]{=> "Expected closing quote here"})
     )
 Char-range: `` @[low]. `- @[high].
 Char: `` @[s].
@@ -37,13 +45,13 @@ Repeat: (
     ) _ @[repeat-pat]pat 0-1( __ `% __ @[sep]pat)
 After: `< _ pat
 Before: `> _ pat
-Capture: `@ 0-1(_ `[ @[capture-name](...>`]) `]) _ @[capture]pat
+Capture: `@ 0-1(_ `[ @[capture-name](...>(`]/$$)) (`] / @[!]{=>"Expected closing bracket here"})) _ @[capture]pat
 Replace: `{ __ (
       0-1(@[replace-pat]extended-pat __) "=>" 0-1(__ @[replacement]String)
-    ) __ `}
+    ) __ (`} / @[!]{=> "Expected closing brace here"})
 Ref: @[name]id !>(__`:)
 
-parens: `( __ extended-pat __ `)
+parens: `( __ extended-pat (__ `) / @[!]{=> "Expected closing parenthesis here"})
 
 Chain: 2+@pat % (__)
 Otherwise: 2+@(Chain/pat) % (__`/__)

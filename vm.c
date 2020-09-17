@@ -56,9 +56,9 @@ static size_t push_backrefs(grammar_t *g, match_t *m)
     if (m == NULL) return 0;
     if (m->op->op == VM_REF) return 0;
     size_t count = 0;
-    if (m->op->op == VM_CAPTURE && m->name_or_replacement) {
+    if (m->op->op == VM_CAPTURE && m->value.name) {
         ++count;
-        push_backref(g, m->name_or_replacement, m->child);
+        push_backref(g, m->value.name, m->child);
     }
     if (m->child) count += push_backrefs(g, m->child);
     if (m->nextsibling) count += push_backrefs(g, m->nextsibling);
@@ -228,7 +228,7 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
             m->op = op;
             m->child = p;
             if (op->args.capture.name)
-                m->name_or_replacement = op->args.capture.name;
+                m->value.name = op->args.capture.name;
             return m;
         }
         case VM_OTHERWISE: {
@@ -286,7 +286,7 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
             } else {
                 m->end = m->start;
             }
-            m->name_or_replacement = op->args.replace.replacement;
+            m->value.replacement = op->args.replace.replacement;
             return m;
         }
         case VM_REF: {
@@ -325,7 +325,7 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
             m->end = best->end;
             m->op = op;
             m->child = best;
-            m->name_or_replacement = op->args.s;
+            m->value.name = op->args.s;
             return m;
         }
         case VM_BACKREF: {
@@ -490,7 +490,7 @@ static match_t *get_capture_n(match_t *m, int *n)
  */
 static match_t *get_capture_named(match_t *m, const char *name)
 {
-    if (m->op->op == VM_CAPTURE && m->name_or_replacement && streq(m->name_or_replacement, name))
+    if (m->op->op == VM_CAPTURE && m->value.name && streq(m->value.name, name))
         return m;
     for (match_t *c = m->child; c; c = c->nextsibling) {
         match_t *cap = get_capture_named(c, name);
@@ -523,7 +523,7 @@ static match_t *get_cap(match_t *m, const char **r)
 void print_match(file_t *f, match_t *m)
 {
     if (m->op->op == VM_REPLACE) {
-        for (const char *r = m->name_or_replacement; *r; ) {
+        for (const char *r = m->value.replacement; *r; ) {
             if (*r == '\\') {
                 ++r;
                 fputc(unescapechar(r, &r), stdout);
@@ -585,7 +585,7 @@ static match_t *match_backref(const char *str, vm_op_t *op, match_t *cap, unsign
     match_t **dest = &ret->child;
 
     if (cap->op->op == VM_REPLACE) {
-        for (const char *r = cap->name_or_replacement; *r; ) {
+        for (const char *r = cap->value.replacement; *r; ) {
             if (*r == '\\') {
                 ++r;
                 if (*(str++) != unescapechar(r, &r)) {

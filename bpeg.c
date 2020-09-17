@@ -49,11 +49,28 @@ static char *getflag(const char *flag, char *argv[], int *i)
     return NULL;
 }
 
+static int print_errors(file_t *f, match_t *m)
+{
+    int ret = 0;
+    if (m->op->op == VM_CAPTURE && m->value.name && streq(m->value.name, "!")) {
+        printf("\033[31;1m");
+        print_match(f, m);
+        printf("\033[0m\n");
+        fprint_line(stdout, f, m->start, m->end, "");
+        return 1;
+    }
+    if (m->child) ret += print_errors(f, m->child);
+    if (m->nextsibling) ret += print_errors(f, m->nextsibling);
+    return ret;
+}
+
 static int run_match(grammar_t *g, const char *filename, vm_op_t *pattern, unsigned int flags)
 {
     file_t *f = load_file(filename);
     check(f, "Could not open file: %s", filename);
     match_t *m = match(g, f, f->contents, pattern, flags);
+    if (m && print_errors(f, m) > 0)
+        _exit(1);
     if (m != NULL && m->end > m->start + 1) {
         print_match(f, m);
         destroy_file(&f);

@@ -101,9 +101,15 @@ void fprint_line(FILE *dest, file_t *f, const char *start, const char *end, cons
             f->filename, linenum, charnum, msg);
     const char *eol = linenum == f->nlines ? strchr(line, '\0') : strchr(line, '\n');
     if (end == NULL || end > eol) end = eol;
-    fprintf(dest, "\033[2m% 5ld |\033[0m %.*s\033[31;4;1m%.*s\033[0m%.*s\n",
+    fprintf(dest, "\033[2m% 5ld |\033[0m %.*s\033[41;30m%.*s\033[0m%.*s\n",
             linenum,
             (int)charnum - 1, line,
             (int)(end - &line[charnum-1]), &line[charnum-1],
             (int)(eol - end), end);
+    fprintf(dest, "       ");
+    const char *p = line - 1;
+    for (; p < start; ++p) fputc(' ', dest);
+    if (start == end) ++end;
+    for (; p < end; ++p) fputc('^', dest);
+    fputc('\n', dest);
 }
