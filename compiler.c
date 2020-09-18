@@ -96,9 +96,12 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
     switch (c) {
         // Any char (dot) ($. is multiline anychar)
         case '.': {
-            if (matchchar(&str, '.')) { // ".."
-                if (matchchar(&str, '.')) // "..."
+            if (*str == '.') { // ".."
+                ++str;
+                if (*str == '.') { // "..."
+                    ++str;
                     op->multiline = 1;
+                }
                 vm_op_t *till = bpeg_simplepattern(f, str);
                 op->op = VM_UPTO_AND;
                 op->len = -1;
@@ -135,7 +138,7 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
         }
         // Escapes
         case '\\': {
-            check(*str, "Expected escape after '\\'");
+            check(*str && *str != '\n', "Expected escape after '\\'");
             op->len = 1;
             char e = unescapechar(str, &str);
             if (*str == '-') { // Escape range (e.g. \x00-\xFF)
@@ -392,6 +395,10 @@ vm_op_t *bpeg_stringpattern(file_t *f, const char *str)
         for (; *str; str++) {
             if (*str == '\\') {
                 check(str[1], "Expected more string contents after backslash");
+                if (str[1] == '\\') {
+                    ++str;
+                    continue;
+                }
                 interp = bpeg_simplepattern(f, str + 1);
                 check(interp != NULL, "No valid BPEG pattern detected after backslash");
                 break;
