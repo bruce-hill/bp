@@ -8,7 +8,7 @@
 
 typedef struct {
     const char *filename;
-    char *contents, **lines;
+    char *contents, **lines, *end;
     size_t length, nlines;
     unsigned int mmapped:1;
 } file_t;

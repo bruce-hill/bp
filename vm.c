@@ -83,7 +83,7 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
 {
     switch (op->op) {
         case VM_ANYCHAR: {
-            if (!*str || (!op->multiline && *str == '\n'))
+            if (str >= f->end - 1 || (!op->multiline && *str == '\n'))
                 return NULL;
             match_t *m = calloc(sizeof(match_t), 1);
             m->op = op;
@@ -138,14 +138,14 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
                     // This isn't in the for() structure because there needs to
                     // be at least once chance to match the pattern, even if
                     // we're at the end of the string already (e.g. "..$").
-                    if (*str && (op->multiline || *str != '\n')) ++str;
+                    if (str < f->end && (op->multiline || *str != '\n')) ++str;
                 }
                 destroy_match(&m);
                 return NULL;
             } else if (op->multiline) {
-                while (*str) ++str;
+                str = f->end;
             } else {
-                while (*str && *str != '\n') ++str;
+                while (str < f->end && *str != '\n') ++str;
             }
             m->end = str;
             return m;

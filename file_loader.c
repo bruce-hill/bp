@@ -33,6 +33,7 @@ file_t *load_file(const char *filename)
             f->contents = realloc(f->contents, sizeof(char)*(capacity *= 2) + 1);
     }
     f->contents[f->length] = '\0';
+    f->end = &f->contents[f->length];
     close(fd);
     
     // Calculate line numbers:
