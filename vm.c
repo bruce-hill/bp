@@ -157,9 +157,10 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
             m->op = op;
 
             match_t **dest = &m->child;
-            const char *prev = str;
             size_t reps = 0;
-            for (;;) {
+            ssize_t max = op->args.repetitions.max;
+            for (reps = 0; max == -1 || reps < (size_t)max; ++reps) {
+                const char *start = str;
                 // Separator
                 match_t *sep = NULL;
                 if (op->args.repetitions.sep != NULL && reps > 0) {
@@ -168,9 +169,23 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
                     str = sep->end;
                 }
                 match_t *p = _match(g, f, str, op->args.repetitions.repeat_pat, flags, rec);
-                if (p == NULL || (p->end == prev && reps > 0)) { // Prevent infinite loops
+                if (p == NULL) {
+                    destroy_match(&sep);
+                    break;
+                }
+                if (p->end == start && reps > 0) {
+                    // Since no forward progress was made on either `pat` or
+                    // `sep` and BPEG does not have mutable state, it's
+                    // guaranteed that no progress will be made on the next
+                    // loop either. We know that this will continue to loop
+                    // until reps==max, so let's just cut to the chase instead
+                    // of looping infinitely.
                     destroy_match(&sep);
                     destroy_match(&p);
+                    if (op->args.repetitions.max == -1)
+                        reps = ~(size_t)0;
+                    else
+                        reps = (size_t)op->args.repetitions.max;
                     break;
                 }
                 if (sep) {
@@ -180,16 +195,9 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
                 *dest = p;
                 dest = &p->nextsibling;
                 str = p->end;
-                prev = str;
-
-                ++reps;
-                if (op->args.repetitions.max != -1 && reps > (size_t)op->args.repetitions.max) {
-                    destroy_match(&m);
-                    return NULL;
-                }
             }
 
-            if ((ssize_t)reps < op->args.repetitions.min) {
+            if (reps < (size_t)op->args.repetitions.min) {
                 destroy_match(&m);
                 return NULL;
             }

@@ -6,14 +6,31 @@ is-tty: no # Defined as either always-match or always-fail, depending on stdout
 print-line-numbers: is-tty
 print-filenames: is-tty
 highlight: is-tty
+include-binary-files: no;
+is-text-file: ^^ >32(\t/\n/\r/\x20-x7e/!\x00-x7f utf8-codepoint/$$)
 
 # Meta-rules for acting on everything:
 pattern: !'' # Not defined by default
 replacement: !'' # Not defined by default
-replace-all: define-highlights add-filename 1+(...@hl-replacement) ...
-find-all: define-highlights add-filename 1+find-next%\n 0-1{!<\n => "\n"}
+replace-all: (
+    (include-binary-files / is-text-file)
+    define-highlights
+    add-filename
+    1+(...@hl-replacement) ...
+)
+find-all: (
+    (include-binary-files / is-text-file)
+    define-highlights
+    add-filename
+    1+find-next%\n 0-1{!<\n => "\n"}
+)
+only-matches: (
+    (include-binary-files / is-text-file)
+    define-highlights
+    add-filename
+    1+{...@hl-pattern=>'@1\n'}
+)
 find-next: matching-line / {..\n =>} find-next
-only-matches: define-highlights 1+{...@hl-pattern=>'@1\n'}
 matching-line: add-line-number 1+(..hl-pattern) ..$
 add-filename: 0-1(print-filenames (is-tty {=>"\033[33;1;4m@&:\033[0m\n"} / {=>"@&:\n"}))
 add-line-number: 0-1(print-line-numbers (is-tty {=>"\033[2m@#\033[5G|\033[0m "} / {=>"@#| "}))
@@ -25,6 +42,12 @@ define-highlights: highlight @[hl-start]{=>"\033[31;1m"} @[hl-end]{=>"\033[0m"} 
 indent: \n|1+(\t/' ')
 dedent: $ !(\n|)
 indented-block: |` ..$ 0+(\n|..$)
+utf8-codepoint: (
+      \x00-x7f
+    / \xc0-xdf 1\x80-xbf
+    / \xe0-xef 2\x80-xbf
+    / \xf0-xf7 3\x80-xbf
+)
 crlf: \r\n
 cr: \r; r: \r
 anglebraces: `< 0+(anglebraces / !`>.) `>
