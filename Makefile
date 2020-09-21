@@ -1,4 +1,5 @@
 NAME=bpeg
+CC ?= gcc
 PREFIX=/usr/local
 CFLAGS=-std=c99 -D_XOPEN_SOURCE=500 -D_GNU_SOURCE -D_POSIX_C_SOURCE=200809L
 CWARN=-Wall -Wpedantic -Wextra -Wno-unknown-pragmas -Wno-missing-field-initializers\
@@ -12,10 +13,10 @@ OBJFILES=$(CFILES:.c=.o)
 all: $(NAME)
 
 .c.o:
-	cc -c $(CFLAGS) $(CWARN) $(G) $(O) -o $@ $<
+	$(CC) -c $(CFLAGS) $(CWARN) $(G) $(O) -o $@ $<
 
 $(NAME): $(OBJFILES) $(NAME).c
-	cc $(CFLAGS) $(CWARN) $(G) $(O) -o $@ $^
+	$(CC) $(CFLAGS) $(CWARN) $(G) $(O) -o $@ $^
 
 clean:
 	rm -f $(NAME) $(OBJFILES)
