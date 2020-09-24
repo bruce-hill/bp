@@ -9,9 +9,13 @@
 #include "types.h"
 #include "file_loader.h"
 
+__attribute__((nonnull(2)))
 vm_op_t *bpeg_simplepattern(file_t *f, const char *str);
+__attribute__((nonnull(2)))
 vm_op_t *bpeg_stringpattern(file_t *f, const char *str);
+__attribute__((nonnull(1,2)))
 vm_op_t *bpeg_replacement(vm_op_t *pat, const char *replacement);
+__attribute__((nonnull(2)))
 vm_op_t *bpeg_pattern(file_t *f, const char *str);
 
 #endif

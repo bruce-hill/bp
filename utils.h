@@ -17,10 +17,15 @@
 #define check(cond, ...) do { if (!(cond)) { fprintf(stderr, __VA_ARGS__); fwrite("\n", 1, 1, stderr); _exit(1); } } while(0)
 #define debug(...) do { if (verbose) fprintf(stderr, __VA_ARGS__); } while(0)
 
+__attribute__((nonnull))
 char unescapechar(const char *escaped, const char **end);
+__attribute__((pure, nonnull, returns_nonnull))
 const char *after_name(const char *str);
+__attribute__((pure, nonnull, returns_nonnull))
 const char *after_spaces(const char *str);
+__attribute__((nonnull))
 int matchchar(const char **str, char c);
+__attribute__((nonnull))
 size_t unescape_string(char *dest, const char *src, size_t bufsize);
 
 #endif

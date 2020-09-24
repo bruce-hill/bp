@@ -33,7 +33,6 @@ void add_def(grammar_t *g, file_t *f, const char *src, const char *name, vm_op_t
  */
 vm_op_t *load_grammar(grammar_t *g, file_t *f)
 {
-    check(f, "Null file provided");
     vm_op_t *ret = NULL;
     const char *src = f->contents;
     src = after_spaces(src);
@@ -81,7 +80,6 @@ vm_op_t *lookup(grammar_t *g, const char *name)
 
 void push_backref(grammar_t *g, const char *name, match_t *capture)
 {
-    check(capture, "No capture provided");
     if (g->backrefcount >= g->backrefcapacity) {
         g->backrefs = realloc(g->backrefs, sizeof(g->backrefs[0])*(g->backrefcapacity += 32));
     }

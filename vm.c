@@ -45,7 +45,7 @@ const char *opcode_name(enum VMOpcode o)
  */
 void destroy_match(match_t **m)
 {
-    if (!m || !*m) return;
+    if (!*m) return;
     destroy_match(&((*m)->child));
     destroy_match(&((*m)->nextsibling));
     *m = NULL;
