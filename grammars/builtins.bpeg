@@ -16,7 +16,7 @@ replace-all: (
     (include-binary-files / is-text-file)
     define-highlights
     add-filename
-    0+(...@hl-replacement) ...
+    0+(...(>pattern hl-replacement)) ...
 )
 find-all: (
     (include-binary-files / is-text-file)
