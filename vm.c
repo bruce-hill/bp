@@ -35,6 +35,22 @@ static const char *opcode_names[] = {
     [VM_NODENT] = "NODENT",
 };
 
+static inline const char *next_char(file_t *f, const char *str)
+{
+    char c = *str;
+    ++str;
+    if (__builtin_expect(!(c & 0x80), 1))
+        return str;
+
+    if (__builtin_expect(str < f->end && !!(*str & 0x80), 1))
+        ++str;
+    if (c > '\xDF' && __builtin_expect(str < f->end && !!(*str & 0x80), 1))
+        ++str;
+    if (c > '\xEF' && __builtin_expect(str < f->end && !!(*str & 0x80), 1))
+        ++str;
+    return str;
+}
+
 const char *opcode_name(enum VMOpcode o)
 {
     return opcode_names[o];
@@ -88,7 +104,7 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
             match_t *m = calloc(sizeof(match_t), 1);
             m->op = op;
             m->start = str;
-            m->end = str+1;
+            m->end = next_char(f, str);
             return m;
         }
         case VM_STRING: {
@@ -138,7 +154,8 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
                     // This isn't in the for() structure because there needs to
                     // be at least once chance to match the pattern, even if
                     // we're at the end of the string already (e.g. "..$").
-                    if (str < f->end && (op->multiline || *str != '\n')) ++str;
+                    if (str < f->end && (op->multiline || *str != '\n'))
+                        str = next_char(f, str);
                 }
                 destroy_match(&m);
                 return NULL;
