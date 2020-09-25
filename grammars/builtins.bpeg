@@ -22,7 +22,9 @@ find-all: (
     (include-binary-files / is-text-file)
     define-highlights
     add-filename
-    1+find-next%\n 0-1{!<\n => "\n"}
+    0+ (!..pattern {..\n=>})
+    1+ (>..pattern add-line-number 1+(..hl-pattern) ..\n / {..\n=>})
+    0-1{!<\n => "\n"}
 )
 only-matches: (
     (include-binary-files / is-text-file)
@@ -30,8 +32,6 @@ only-matches: (
     add-filename
     1+{...@hl-pattern=>'@1\n'}
 )
-find-next: matching-line / {..\n =>} find-next
-matching-line: add-line-number 1+(..hl-pattern) ..$
 add-filename: 0-1(print-filenames (is-tty {=>"\033[33;1;4m@&:\033[0m\n"} / {=>"@&:\n"}))
 add-line-number: 0-1(print-line-numbers (is-tty {=>"\033[2m@#\033[5G|\033[0m "} / {=>"@#| "}))
 hl-pattern: {@[match]pattern define-highlights => "@[hl-start]@[match]@[hl-end]"}
