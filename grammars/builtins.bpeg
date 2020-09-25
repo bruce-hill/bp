@@ -50,10 +50,10 @@ utf8-codepoint: (
 )
 crlf: \r\n
 cr: \r; r: \r
-anglebraces: `< 0+(anglebraces / !`>.) `>
-brackets: `[ 0+(brackets / !`].) `]
-braces: `{ 0+(braces / !`}.) `}
-parens: `( 0+(parens / !`).) `)
+anglebraces: `< 0+(anglebraces / !`>$.) `>
+brackets: `[ 0+(brackets / !`]$.) `]
+braces: `{ 0+(braces / !`}$.) `}
+parens: `( 0+(parens / !`)$.) `)
 id: !<(`a-z/`A-Z/`_/`0-9) (`a-z/`A-Z/`_) 0+(`a-z/`A-Z/`_/`0-9)
 id-char: `a-z/`A-Z/`_/`0-9
 word: !<(`a-z/`A-Z/`_/`0-9) 1+(`a-z/`A-Z) !>(`0-9/`_)
