@@ -1,10 +1,8 @@
 # Definitions of UTF8-compliant identifiers
 utf8-id: utf8-id-start 0+utf8-id-cont
 
-utf8-id-start:
-  `A-Z
-/ `a-z
-/ \xc2 (\xaa / \xb5 / \xba)
+utf8-id-start: `A-Z / `a-z / !\x00-x7F (
+  \xc2 (\xaa / \xb5 / \xba)
 / \xc3 (\x80-x96 / \x98-xb6 / \xb8-xbf)
 / \xc4-xca\x80-xbf
 / \xcb (\x80-x81 / \x86-x91 / \xa0-xa4 / \xac / \xae)
@@ -348,13 +346,10 @@ utf8-id-start:
 	/ \xae (\x80-xae\x80-xbf / \xaf\x80-xa0)
 	/ \xaf (\xa0-xa7\x80-xbf / \xa8\x80-x9d)
 )
+)
 
-utf8-id-cont:
-  `0-9
-/ `A-Z
-/ `_
-/ `a-z
-/ \xc2 (\xaa / \xb5 / \xb7 / \xba)
+utf8-id-cont: `0-9 / `A-Z / `_ / `a-z / !\x00-x7F (
+  \xc2 (\xaa / \xb5 / \xb7 / \xba)
 / \xc3 (\x80-x96 / \x98-xb6 / \xb8-xbf)
 / \xc4-xca\x80-xbf
 / \xcb (\x80-x81 / \x86-x91 / \xa0-xa4 / \xac / \xae)
@@ -737,3 +732,4 @@ utf8-id-cont:
 	/ \xaf (\xa0-xa7\x80-xbf / \xa8\x80-x9d)
 )
 / \xf3\xa0 (\x84-x86\x80-xbf / \x87\x80-xaf)
+)
