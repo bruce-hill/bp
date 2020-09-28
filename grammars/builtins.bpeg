@@ -30,7 +30,7 @@ only-matches: (
     (include-binary-files / is-text-file)
     define-highlights
     add-filename
-    1+{...@hl-pattern=>'@1\n'}
+    1+{...@hl-pattern =>'@1\n'}
 )
 add-filename: [print-filenames (is-tty {=>"\033[33;1;4m@&:\033[0m\n"} / {=>"@&:\n"})]
 add-line-number: [print-line-numbers (is-tty {=>"\033[2m@#\033[5G|\033[0m "} / {=>"@#| "})]

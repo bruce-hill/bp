@@ -532,14 +532,14 @@ static match_t *get_cap(match_t *m, const char **r)
     if (isdigit(**r)) {
         int n = (int)strtol(*r, (char**)r, 10);
         return get_capture_n(m->child, &n);
-    } else if (**r == '[') {
-        char *closing = strchr(*r+1, ']');
-        if (!closing) return NULL;
-        ++(*r);
-        char *name = strndup(*r, (size_t)(closing-*r));
+    } else {
+        const char *end = after_name(*r);
+        if (end == *r) return NULL;
+        char *name = strndup(*r, (size_t)(end-*r));
         match_t *cap = get_capture_named(m, name);
         free(name);
-        *r = closing + 1;
+        *r = end;
+        if (*end == ';') ++(*r);
         return cap;
     }
     return NULL;
@@ -638,26 +638,17 @@ static match_t *match_backref(const char *str, vm_op_t *op, match_t *cap, unsign
                     cap = get_capture_n(cap->child, &n);
                     break;
                 }
-                case '[': {
-                    char *closing = strchr(r+1, ']');
-                    if (!closing) {
-                        if (*(str++) != '@') {
-                            destroy_match(&ret);
-                            return NULL;
-                        }
-                    }
-                    ++r;
-                    char *name = strndup(r, (size_t)(closing-r));
-                    cap = get_capture_named(cap, name);
-                    free(name);
-                    r = closing + 1;
-                    break;
-                }
                 default: {
-                    if (*(str++) != '@') {
+                    const char *end = after_name(r);
+                    if (end == r) {
                         destroy_match(&ret);
                         return NULL;
                     }
+                    char *name = strndup(r, (size_t)(end-r));
+                    cap = get_capture_named(cap, name);
+                    free(name);
+                    r = end;
+                    if (*r == ';') ++r;
                     break;
                 }
             }
