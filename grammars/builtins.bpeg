@@ -49,7 +49,7 @@ utf8-codepoint: (
     / \xf0-xf7 3\x80-xbf
 )
 crlf: \r\n
-cr: \r; r: \r
+cr: \r
 anglebraces: `< 0+(anglebraces / !`>$.) `>
 brackets: `[ 0+(brackets / !`]$.) `]
 braces: `{ 0+(braces / !`}$.) `}
@@ -66,9 +66,9 @@ digit: `0-9
 Abc: `a-z/`A-Z
 ABC: `A-Z
 abc: `a-z
-esc: \e; e: \e
-tab: \t; t: \t
-nl: \n; lf: \n; n: \n
+esc: \e
+tab: \t
+nl: \n; lf: \n
 c-block-comment: '/*' ... '*/'
 c-line-comment: '//' ..$
 c-comment: c-line-comment / c-block-comment

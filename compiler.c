@@ -395,6 +395,12 @@ vm_op_t *bpeg_stringpattern(file_t *f, const char *str)
         for (; *str; str++) {
             if (*str == '\\') {
                 check(str[1], "Expected more string contents after backslash");
+                const char *after_escape;
+                char e = unescapechar(&str[1], &after_escape);
+                if (e != str[1]) {
+                    str = after_escape - 1;
+                    continue;
+                }
                 if (str[1] == '\\') {
                     ++str;
                     continue;

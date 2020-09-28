@@ -7,7 +7,7 @@ Def: @[name]id _ `: __ (
     / @[!]{...>(`;/id_`:/$) => "Invalid definition: @0"})
 
 # This is used for command line arguments:
-String-pattern: 0+(`\ pat 0-1`; / .)
+String-pattern: 0+(`\ (escape-sequence / pat 0-1`;) / .)
 
 pat: suffixed-pat / simple-pat
 simple-pat: Upto-and / Dot / String / Char-range / Char / Escape-range / Escape / No
@@ -37,7 +37,6 @@ escape-sequence: (
        `n/`t/`r/`e/`b/`a/`v
       / 1-3 `0-7
       / `x 2 (`0-9/`a-f/`A-F)
-      / .
     )
 No: `! (_@pat / @[!]{=>"Expected a pattern after the exclamation mark"})
 Nodent: `|
