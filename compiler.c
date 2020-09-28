@@ -252,16 +252,24 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
             check(matchchar(&str, ')'), "Expected closing ')' instead of \"%s\"", str);
             break;
         }
+        // Square brackets
+        case '[': {
+            vm_op_t *pat = bpeg_simplepattern(f, str);
+            check(pat, "Expected pattern inside square brackets");
+            pat = expand_choices(f, pat);
+            str = pat->end;
+            str = after_spaces(str);
+            check(matchchar(&str, ']'), "Expected closing ']' instead of \"%s\"", str);
+            set_range(op, 0, 1, pat, NULL);
+            break;
+        }
         // Capture
         case '@': {
             op->op = VM_CAPTURE;
-            str = after_spaces(str);
-            if (matchchar(&str, '[')) {
-                char *closing = strchr(str, ']');
-                check(closing, "Expected closing ']'");
-                op->args.capture.name = strndup(str, (size_t)(closing-str));
-                str = closing;
-                check(matchchar(&str, ']'), "Expected closing ']'");
+            const char *a = *str == '!' ? &str[1] : after_name(str);
+            if (a > str && *after_spaces(a) == '=') {
+                op->args.capture.name = strndup(str, (size_t)(a-str));
+                str = a + 1;
             }
             vm_op_t *pat = bpeg_simplepattern(f, str);
             check(pat, "Expected pattern after @");

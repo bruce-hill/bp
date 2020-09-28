@@ -111,10 +111,12 @@ The \fBescape-sequence-range-\fI<esc1>\fB-to-\fI<esc2>\fR
 .B !\fI<pat>\fR
 \fBNot-\fI<pat>\fR
 
+.B [\fI<pat>\fR]
+\fBMaybe-\fI<pat>\fR
+
 .B \fI<N> <pat>\fR
 .B \fI<MIN>\fB-\fI<MAX> <pat>\fR
 .B \fI<MIN>\fB+ \fI<pat>\fR
-.B \fI<MAX>\fB- \fI<pat>\fR
 \fI<MIN>\fB-to-\fI<MAX>\fB-\fI<pat>\fBs\fR (repetitions of a pattern)
 
 .B \fI<repeating-pat>\fR \fB%\fI <sep>\fR
@@ -130,7 +132,7 @@ The \fBescape-sequence-range-\fI<esc1>\fB-to-\fI<esc2>\fR
 .B @\fI<pat>\fR
 \fBCapture-\fI<pat>\fR
 
-.B @[\fI<name>\fB]\fI<pat>\fR
+.B @\fI<name>\fB=\fI<pat>\fR
 \fBLet-\fI<name>\fB-equal-\fI<pat>\fR (named capture)
 
 .B {\fI<pat>\fB => "\fI<replacement>\fB"}
