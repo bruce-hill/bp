@@ -49,7 +49,7 @@ Repeat: (
 Optional: `[ __ extended-pat (__`] / @!={=> "Expected closing square bracket here"})
 After: `< _ pat
 Before: `> _ pat
-Capture: `@ [_ @capture-name=(id/`!) !"=>" `=] _ (@capture=pat / @!={=> "Expected pattern to capture"})
+Capture: `@ [_ @capture-name=(id/`!) __ !"=>" `=] __ (@capture=pat / @!={=> "Expected pattern to capture"})
 Replace: `{ __ (
       [@replace-pat=extended-pat __] "=>" [__ @replacement=String]
     ) __ (`} / @!={=> "Expected closing brace here"})

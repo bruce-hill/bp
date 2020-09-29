@@ -267,9 +267,9 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
         case '@': {
             op->op = VM_CAPTURE;
             const char *a = *str == '!' ? &str[1] : after_name(str);
-            if (a > str && a[0] == '=' && a[1] != '>') {
+            if (a > str && after_spaces(a)[0] == '=' && after_spaces(a)[1] != '>') {
                 op->args.capture.name = strndup(str, (size_t)(a-str));
-                str = a + 1;
+                str = after_spaces(a) + 1;
             }
             vm_op_t *pat = bpeg_simplepattern(f, str);
             check(pat, "Expected pattern after @");
