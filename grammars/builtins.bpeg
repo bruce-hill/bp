@@ -23,7 +23,7 @@ find-all: (
     define-highlights
     add-filename
     *(!..pattern {..\n=>})
-    +(>..pattern add-line-number +(..hl-pattern) ..\n / {..\n=>})
+    +(>..pattern add-line-number +(..hl-pattern) ..(\n/$) / {..(\n/$)=>})
     [{!<\n => "\n"}]
 )
 only-matches: (
@@ -39,20 +39,18 @@ hl-replacement: {@match=replacement define-highlights => "@hl-start;@match;@hl-e
 define-highlights: highlight @hl-start={=>"\033[31;1m"} @hl-end={=>"\033[0m"} / @hl-start="" @hl-end=""
 
 # Helper definitions (commonly used)
-#(
 url: (
     "file://" +(`/ *url-char)
     / "mailto:" email
-    / ("https"/"http"/"ftp") "://" [+url-char [`: +url-char] `@] (ipv4/ipv6/domain) [`: int] [url-path]
+    / ("https"/"http"/"ftp") "://" [>..`@ +url-char [`: +url-char] `@]
+        (ipv4/ipv6/domain) [`: int] [url-path]
 )
-url-path: +(`/ *url-char) [`? +(+url-char`=+url-char]
+url-path: +(`/ *url-char) [`? +(+url-char`=+url-char)%`&]
 ipv4: 4 int % `.
 ipv6: 8 (4 Hex) % `:
-domain: +(Abc/digit/`-)%`.
+domain: +(+(Abc/digit/`-))%`.
 url-char: Abc/digit/`$/`-/`_/`./`+/`!/`*/`'/`(/`)/`,/`%
 
-url: @(https?|ftp)://(-\.)?([^\s/?\.#-]+\.?)+(/[^\s]*)?$@iS
-)#
 indent: \n|+(\t/' ')
 dedent: $ !(\n|)
 indented-block: |` ..$ *(\n|..$)
