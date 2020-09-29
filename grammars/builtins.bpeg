@@ -50,6 +50,7 @@ ipv4: 4 int % `.
 ipv6: 8 (4 Hex) % `:
 domain: +(+(Abc/digit/`-))%`.
 url-char: Abc/digit/`$/`-/`_/`./`+/`!/`*/`'/`(/`)/`,/`%
+email: +(Abc/digit/`./`-/`+) `@ domain
 
 indent: \n|+(\t/' ')
 dedent: $ !(\n|)
