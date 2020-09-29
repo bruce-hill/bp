@@ -5,6 +5,7 @@
 #include <ctype.h>
 #include <fcntl.h>
 #include <limits.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
@@ -12,6 +13,23 @@
 #include <unistd.h>
 
 #include "file_loader.h"
+
+static void populate_lines(file_t *f)
+{
+    // Calculate line numbers:
+    size_t linecap = 10;
+    f->lines = calloc(sizeof(const char*), linecap);
+    f->nlines = 0;
+    char *p = f->contents;
+    for (size_t n = 0; p && p < f->end; ++n) {
+        ++f->nlines;
+        if (n >= linecap)
+            f->lines = realloc(f->lines, sizeof(const char*)*(linecap *= 2));
+        f->lines[n] = p;
+        p = strchr(p, '\n');
+        if (p) ++p;
+    }
+}
 
 /*
  * Read an entire file into memory.
@@ -23,7 +41,7 @@ file_t *load_file(const char *filename)
     if (fd < 0) return NULL;
     file_t *f = calloc(sizeof(file_t), 1);
     f->filename = strdup(filename);
-    // TODO: use mmap when possible
+
     struct stat sb;
     if (fstat(fd, &sb) == -1)
         goto skip_mmap;
@@ -51,21 +69,22 @@ file_t *load_file(const char *filename)
 
   finished_loading:
     f->end = &f->contents[f->length];
-    
-    // Calculate line numbers:
-    size_t linecap = 10;
-    f->lines = calloc(sizeof(const char*), linecap);
-    f->nlines = 0;
-    char *p = f->contents;
-    for (size_t n = 0; p && *p; ++n) {
-        ++f->nlines;
-        if (n >= linecap)
-            f->lines = realloc(f->lines, sizeof(const char*)*(linecap *= 2));
-        f->lines[n] = p;
-        p = strchr(p, '\n');
-        if (p) ++p;
-    }
+    populate_lines(f);
+    return f;
+}
 
+/*
+ * Create a virtual file from a string.
+ */
+file_t *spoof_file(const char *filename, char *text)
+{
+    if (filename == NULL) filename = "";
+    file_t *f = calloc(sizeof(file_t), 1);
+    f->filename = strdup(filename);
+    f->contents = text;
+    f->length = strlen(text);
+    f->end = &f->contents[f->length];
+    populate_lines(f);
     return f;
 }
 
@@ -113,12 +132,19 @@ const char *get_line(file_t *f, size_t line_number)
     return f->lines[line_number - 1];
 }
 
-void fprint_line(FILE *dest, file_t *f, const char *start, const char *end, const char *msg)
+void fprint_line(FILE *dest, file_t *f, const char *start, const char *end, const char *fmt, ...)
 {
     size_t linenum = get_line_number(f, start);
     const char *line = get_line(f, linenum);
     size_t charnum = get_char_number(f, start);
-    fprintf(dest, "\033[1m%s:%ld:\033[0m %s\n", f->filename, linenum, msg);
+    fprintf(dest, "\033[1m%s:%ld:\033[0m ", f->filename, linenum);
+
+    va_list args;
+    va_start(args, fmt);
+    vfprintf(dest, fmt, args);
+    va_end(args);
+    fputc('\n', dest);
+
     const char *eol = linenum == f->nlines ? strchr(line, '\0') : strchr(line, '\n');
     if (end == NULL || end > eol) end = eol;
     fprintf(dest, "\033[2m% 5ld |\033[0m %.*s\033[41;30m%.*s\033[0m%.*s\n",

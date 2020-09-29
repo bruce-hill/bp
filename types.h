@@ -48,7 +48,7 @@ typedef struct vm_op_s {
     union {
         const char *s;
         struct {
-            char low, high;
+            unsigned char low, high;
         } range;
         struct {
             ssize_t min, max;

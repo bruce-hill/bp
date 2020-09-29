@@ -74,17 +74,17 @@ int matchchar(const char **str, char c)
  * character that was escaped.
  * Set *end = the first character past the end of the escape sequence.
  */
-char unescapechar(const char *escaped, const char **end)
+unsigned char unescapechar(const char *escaped, const char **end)
 {
     size_t len = 1;
-    char ret = *escaped;
+    unsigned char ret = *escaped;
     switch (*escaped) {
         case 'a': ret = '\a'; break; case 'b': ret = '\b'; break;
         case 'n': ret = '\n'; break; case 'r': ret = '\r'; break;
         case 't': ret = '\t'; break; case 'v': ret = '\v'; break;
         case 'e': ret = '\033'; break;
         case 'x': { // Hex
-            static const char hextable[255] = {
+            static const unsigned char hextable[255] = {
                 ['0']=0x10, ['1']=0x1, ['2']=0x2, ['3']=0x3, ['4']=0x4,
                 ['5']=0x5, ['6']=0x6, ['7']=0x7, ['8']=0x8, ['9']=0x9,
                 ['a']=0xa, ['b']=0xb, ['c']=0xc, ['d']=0xd, ['e']=0xe, ['f']=0xf,

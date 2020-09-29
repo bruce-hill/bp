@@ -5,6 +5,8 @@
 #include "compiler.h"
 #include "utils.h"
 
+#define file_err(f, ...) do { fprint_line(stderr, f, __VA_ARGS__); _exit(1); } while(0)
+
 static vm_op_t *expand_chain(file_t *f, vm_op_t *first);
 static vm_op_t *expand_choices(file_t *f, vm_op_t *first);
 static vm_op_t *chain_together(vm_op_t *first, vm_op_t *second);
@@ -42,7 +44,9 @@ static vm_op_t *expand_chain(file_t *f, vm_op_t *first)
     vm_op_t *second = bpeg_simplepattern(f, first->end);
     if (second == NULL) return first;
     second = expand_chain(f, second);
-    check(second->end > first->end, "No forward progress in chain!");
+    if (second->end <= first->end)
+        file_err(f, second->end, second->end,
+                 "This chain is not parsing properly");
     return chain_together(first, second);
 }
 
@@ -57,7 +61,8 @@ static vm_op_t *expand_choices(file_t *f, vm_op_t *first)
     const char *str = first->end;
     if (!matchchar(&str, '/')) return first;
     vm_op_t *second = bpeg_simplepattern(f, str);
-    check(second, "Expected pattern after '/'");
+    if (!second)
+        file_err(f, str, str, "There should be a pattern here after a '/'");
     second = expand_choices(f, second);
     vm_op_t *choice = calloc(sizeof(vm_op_t), 1);
     choice->op = VM_OTHERWISE;
@@ -98,6 +103,7 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
     op->start = str;
     op->len = -1;
     char c = *str;
+    const char *origin = str;
     ++str;
     switch (c) {
         // Any char (dot) ($. is multiline anychar)
@@ -126,12 +132,15 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
         case '`': {
             char literal[2] = {*str, '\0'};
             ++str;
-            check(literal[0], "Expected character after '`'\n");
+            if (!literal[0] || literal[0] == '\n')
+                file_err(f, str, str, "There should be a character here after the '`'");
             op->len = 1;
             if (matchchar(&str, '-')) { // Range
                 char c2 = *str;
-                check(c2, "Expected character after '-'");
-                check(c2 >= literal[0], "Character range must be low-to-high");
+                if (!c2 || c2 == '\n')
+                    file_err(f, str, str, "There should be a character here to complete the character range.");
+                if (c2 < literal[0])
+                    file_err(f, origin, str+1, "Character ranges must be low-to-high, but this is high-to-low.");
                 op->op = VM_RANGE;
                 op->args.range.low = literal[0];
                 op->args.range.high = c2;
@@ -145,13 +154,19 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
         // Escapes
         case '\\': {
             check(*str && *str != '\n', "Expected escape after '\\'");
+            if (!*str || *str == '\n')
+                file_err(f, str, str, "There should be an escape sequence here after this backslash.");
             op->len = 1;
-            char e = unescapechar(str, &str);
+            unsigned char e = unescapechar(str, &str);
             if (*str == '-') { // Escape range (e.g. \x00-\xFF)
                 ++str;
-                char e2 = unescapechar(str, &str);
-                check(e2, "Expected character after '-'");
-                check(e2 >= e, "Character range must be low-to-high");
+                const char *seqstart = str;
+                unsigned char e2 = unescapechar(str, &str);
+                if (str == seqstart)
+                    file_err(f, seqstart, str+1, "This value isn't a valid escape sequence");
+                if (e2 < e)
+                    file_err(f, origin, str, "Escape ranges should be low-to-high, but this is high-to-low.");
+                printf("%d - %d\n", (int)e, (int)e2);
                 op->op = VM_RANGE;
                 op->args.range.low = e;
                 op->args.range.high = e2;
@@ -228,9 +243,13 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
         // Lookbehind
         case '<': {
             vm_op_t *pat = bpeg_simplepattern(f, str);
-            check(pat, "Expected pattern after <");
+            if (!pat)
+                file_err(f, str, str, "There should be a pattern after this '<'");
             str = pat->end;
-            check(pat->len != -1, "Lookbehind patterns must have a fixed length");
+            if (pat->len == -1)
+                file_err(f, origin, pat->end,
+                         "Sorry, variable-length lookbehind patterns like this are not supported.\n"
+                         "Please use a fixed-length lookbehind pattern instead.");
             str = pat->end;
             op->op = VM_AFTER;
             op->len = 0;
@@ -240,7 +259,8 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
         // Lookahead
         case '>': {
             vm_op_t *pat = bpeg_simplepattern(f, str);
-            check(pat, "Expected pattern after >");
+            if (!pat)
+                file_err(f, str, str, "There should be a pattern after this '>'");
             str = pat->end;
             op->op = VM_BEFORE;
             op->len = 0;
@@ -251,11 +271,13 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
         case '(': {
             free(op);
             op = bpeg_simplepattern(f, str);
-            check(op, "Expected pattern inside parentheses");
+            if (!op)
+                file_err(f, str, str, "Expected a pattern inside parentheses");
             op = expand_choices(f, op);
             str = op->end;
             str = after_spaces(str);
-            check(matchchar(&str, ')'), "Expected closing ')' instead of \"%s\"", str);
+            if (!matchchar(&str, ')'))
+                file_err(f, origin, str, "This parenthesis is not closed");
             break;
         }
         // Square brackets
@@ -279,7 +301,8 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
             vm_op_t *sep = NULL;
             if (matchchar(&str, '%')) {
                 sep = bpeg_simplepattern(f, str);
-                check(sep, "Expected pattern for separator after '%%'");
+                if (!sep)
+                    file_err(f, str, str, "Expected pattern for separator after '%%'");
                 str = sep->end;
             }
             set_range(op, min, -1, pat, sep);
@@ -387,7 +410,7 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
 
     // Postfix operators:
   postfix:
-    if (f ? str >= f->end : !*str) return op;
+    if (str >= f->end) return op;
     str = after_spaces(str);
     if ((str[0] == '=' || str[0] == '!') && str[1] == '=') { // Equality <pat1>==<pat2> and inequality <pat1>!=<pat2>
         int equal = str[0] == '=';
@@ -431,7 +454,7 @@ vm_op_t *bpeg_stringpattern(file_t *f, const char *str)
             if (*str == '\\') {
                 check(str[1], "Expected more string contents after backslash");
                 const char *after_escape;
-                char e = unescapechar(&str[1], &after_escape);
+                unsigned char e = unescapechar(&str[1], &after_escape);
                 if (e != str[1]) {
                     str = after_escape - 1;
                     continue;

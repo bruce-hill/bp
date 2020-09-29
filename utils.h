@@ -18,7 +18,7 @@
 #define debug(...) do { if (verbose) fprintf(stderr, __VA_ARGS__); } while(0)
 
 __attribute__((nonnull))
-char unescapechar(const char *escaped, const char **end);
+unsigned char unescapechar(const char *escaped, const char **end);
 __attribute__((pure, nonnull, returns_nonnull))
 const char *after_name(const char *str);
 __attribute__((pure, nonnull, returns_nonnull))

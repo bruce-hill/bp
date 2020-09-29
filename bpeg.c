@@ -56,7 +56,7 @@ static int print_errors(file_t *f, match_t *m)
         printf("\033[31;1m");
         print_match(f, m);
         printf("\033[0m\n");
-        fprint_line(stdout, f, m->start, m->end, "");
+        fprint_line(stdout, f, m->start, m->end, " ");
         return 1;
     }
     if (m->child) ret += print_errors(f, m->child);
@@ -113,9 +113,10 @@ int main(int argc, char *argv[])
         } else if (streq(argv[i], "--ignore-case") || streq(argv[i], "-i")) {
             flags |= BPEG_IGNORECASE;
         } else if (FLAG("--replace") || FLAG("-r")) {
-            vm_op_t *p = bpeg_replacement(bpeg_pattern(NULL, "pattern"), flag);
+            file_t *replace_file = spoof_file("<replace argument>", flag);
+            vm_op_t *p = bpeg_replacement(bpeg_pattern(replace_file, "pattern"), flag);
             check(p, "Replacement failed to compile");
-            add_def(g, NULL, flag, "replacement", p);
+            add_def(g, replace_file, flag, "replacement", p);
             rule = "replace-all";
         } else if (FLAG("--grammar") || FLAG("-g")) {
             file_t *f = load_file(flag);
@@ -135,36 +136,41 @@ int main(int argc, char *argv[])
             check(eq, "Rule definitions must include an ':'\n\n%s", usage);
             *eq = '\0';
             char *src = ++eq;
-            vm_op_t *pat = bpeg_pattern(NULL, src);
+            file_t *def_file = spoof_file(def, flag);
+            vm_op_t *pat = bpeg_pattern(def_file, src);
             check(pat, "Failed to compile pattern");
-            add_def(g, NULL, src, def, pat);
+            add_def(g, def_file, src, def, pat);
         } else if (FLAG("--define-string") || FLAG("-D")) {
             char *def = flag;
             char *eq = strchr(def, ':');
             check(eq, "Rule definitions must include an ':'\n\n%s", usage);
             *eq = '\0';
             char *src = ++eq;
-            vm_op_t *pat = bpeg_stringpattern(NULL, src);
+            file_t *def_file = spoof_file(def, flag);
+            vm_op_t *pat = bpeg_stringpattern(def_file, src);
             check(pat, "Failed to compile pattern");
-            add_def(g, NULL, src, def, pat);
+            add_def(g, def_file, src, def, pat);
         } else if (FLAG("--pattern") || FLAG("-p")) {
             check(npatterns == 0, "Cannot define multiple patterns");
-            vm_op_t *p = bpeg_pattern(NULL, flag);
+            file_t *arg_file = spoof_file("<pattern argument>", flag);
+            vm_op_t *p = bpeg_pattern(arg_file, flag);
             check(p, "Pattern failed to compile: '%s'", flag);
-            add_def(g, NULL, flag, "pattern", p);
+            add_def(g, arg_file, flag, "pattern", p);
             ++npatterns;
         } else if (FLAG("--pattern-string") || FLAG("-P")) {
-            vm_op_t *p = bpeg_stringpattern(NULL, flag);
+            file_t *arg_file = spoof_file("<pattern argument>", flag);
+            vm_op_t *p = bpeg_stringpattern(arg_file, flag);
             check(p, "Pattern failed to compile");
-            add_def(g, NULL, flag, "pattern", p);
+            add_def(g, arg_file, flag, "pattern", p);
             ++npatterns;
         } else if (FLAG("--mode") || FLAG("-m")) {
             rule = flag;
         } else if (argv[i][0] != '-') {
             if (npatterns > 0) break;
-            vm_op_t *p = bpeg_stringpattern(NULL, argv[i]);
+            file_t *arg_file = spoof_file("<pattern argument>", flag);
+            vm_op_t *p = bpeg_stringpattern(arg_file, argv[i]);
             check(p, "Pattern failed to compile");
-            add_def(g, NULL, argv[i], "pattern", p);
+            add_def(g, arg_file, argv[i], "pattern", p);
             ++npatterns;
         } else {
             printf("Unrecognized flag: %s\n\n%s\n", argv[i], usage);
@@ -173,9 +179,10 @@ int main(int argc, char *argv[])
     }
 
     if (isatty(STDOUT_FILENO)) {
-        vm_op_t *p = bpeg_pattern(NULL, "''");
+        file_t *is_tty_file = spoof_file("<is-tty>", flag);
+        vm_op_t *p = bpeg_pattern(is_tty_file, "''");
         check(p, "Failed to compile is-tty");
-        add_def(g, NULL, "''", "is-tty", p);
+        add_def(g, is_tty_file, "''", "is-tty", p);
     }
 
     vm_op_t *pattern = lookup(g, rule);
