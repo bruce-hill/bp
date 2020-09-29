@@ -24,6 +24,12 @@ static void set_range(vm_op_t *op, ssize_t min, ssize_t max, vm_op_t *pat, vm_op
     op->args.repetitions.max = max;
     op->args.repetitions.repeat_pat = pat;
     op->args.repetitions.sep = sep;
+    if (!op->start) op->start = pat->start;
+    if (!op->end) op->end = pat->end;
+    if (sep) {
+        if (sep->start < op->start) op->start = sep->start;
+        if (sep->end > op->end) op->end = sep->end;
+    }
 }
 
 /*
@@ -365,8 +371,26 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
 
     // Postfix operators:
   postfix:
-    if (strncmp(after_spaces(str), "==", 2) == 0) {
-        str = after_spaces(str)+2;
+    if (f ? str >= f->end : !*str) return op;
+    str = after_spaces(str);
+    if (*str == '*' || *str == '+' || *str == '?') { // Repetitions: <pat>*, <pat>+, <pat>?
+        char operator = *str;
+        ++str;
+        vm_op_t *pat = op;
+        vm_op_t *sep = NULL;
+        if (operator != '?' && matchchar(&str, '%')) {
+            sep = bpeg_simplepattern(f, str);
+            check(sep, "Expected pattern for separator after '%%'");
+            str = sep->end;
+        }
+        op = calloc(sizeof(vm_op_t), 1);
+        set_range(op, operator == '+' ? 1 : 0, operator == '?' ? 1 : -1, pat, sep);
+        op->start = pat->start;
+        op->end = str;
+        op->len = -1;
+        goto postfix;
+    } else if (strncmp(str, "==", 2) == 0) { // Equality <pat1>==<pat2>
+        str = after_spaces(str+2);
         vm_op_t *first = op;
         vm_op_t *second = bpeg_simplepattern(f, str);
         check(second, "Expected pattern after '=='");

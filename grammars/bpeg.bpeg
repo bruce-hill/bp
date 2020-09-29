@@ -9,17 +9,21 @@ Def: @name=id _ `: __ (
 # This is used for command line arguments:
 String-pattern: 0+(`\ (escape-sequence / pat [`;]) / .)
 
-pat: suffixed-pat / simple-pat
+pat: simple-pat !(__("=="/`*/`+/`?)) / suffixed-pat
 simple-pat: Upto-and / Dot / String / Char-range / Char / Escape-range / Escape / No
     / Nodent / Repeat / Optional / After / Before / Capture / Replace / Ref / parens
 
-suffixed-pat: Eq-pat / simple-pat [
-      @!={`* => "'*' is not a BPEG operator. Use 0+<pat> instead of <pat>*"}
-    / @!={`+ => "'+' is not a BPEG operator. Use 1+<pat> instead of <pat>+"}
-    / @!={`? => "'?' is not a BPEG operator. Use [<pat>] instead of <pat>?"}
-]
+suffixed-pat: (
+      Eq-pat
+    / Star-pat
+    / Plus-pat
+    / Question-pat
+)
 
-Eq-pat: @first=simple-pat "==" @second=pat
+Eq-pat: @first=pat__"=="__@second=pat
+Star-pat: pat __ `* @min={=>"0"} @max="" [__`%__@sep=pat]
+Plus-pat: pat __ `+ @min={=>"1"} @max="" [__`%__@sep=pat]
+Question-pat: pat __ `?
 
 Dot: `. !`.
 String: (

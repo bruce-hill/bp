@@ -44,11 +44,13 @@ Pattern            | Meaning
 `\n`, `\033`, `\x0A`, etc. | An escape sequence character
 `\x00-xFF`         | An escape sequence range (byte `0x00` through `0xFF` here)
 `!pat`             | `pat` does not match at the current position
-`[pat]`            | Zero or one occurrences of `pat` (optional pattern)
+`[pat]` or `pat?`  | Zero or one occurrences of `pat` (optional pattern)
 `5 pat`            | Exactly 5 occurrences of `pat`
 `2-4 pat`          | Between 2 and 4 occurrences of `pat` (inclusive)
 `5+ pat`           | 5 or more occurrences of `pat`
-`0+ pat % sep`     | 0 or more occurrences of `pat`, separated by `sep` (e.g. `0+ int % ","` matches `1,2,3`)
+`5+ pat % sep`     | 5 or more occurrences of `pat`, separated by `sep` (e.g. `0+ int % ","` matches `1,2,3`)
+`pat*` `pat* % sep`| 0 or more occurrences of `pat` (optionally separated by `sep`)
+`pat+` `pat+ % sep`| 1 or more occurrences of `pat` (optionally separated by `sep`)
 `<pat`             | `pat` matches just before the current position (backref)
 `>pat`             | `pat` matches just in front of the current position (lookahead)
 `@pat`             | Capture `pat` (used for text replacement and backreferences)
