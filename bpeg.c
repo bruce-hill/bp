@@ -114,9 +114,10 @@ int main(int argc, char *argv[])
             flags |= BPEG_IGNORECASE;
         } else if (FLAG("--replace") || FLAG("-r")) {
             file_t *replace_file = spoof_file("<replace argument>", flag);
-            vm_op_t *p = bpeg_replacement(bpeg_pattern(replace_file, "pattern"), flag);
-            check(p, "Replacement failed to compile");
-            add_def(g, replace_file, flag, "replacement", p);
+            vm_op_t *patref = bpeg_pattern(replace_file, "pattern");
+            vm_op_t *rep = bpeg_replacement(replace_file, patref, flag);
+            check(rep, "Replacement failed to compile: %s", flag);
+            add_def(g, replace_file, flag, "replacement", rep);
             rule = "replace-all";
         } else if (FLAG("--grammar") || FLAG("-g")) {
             file_t *f = load_file(flag);
@@ -138,7 +139,7 @@ int main(int argc, char *argv[])
             char *src = ++eq;
             file_t *def_file = spoof_file(def, flag);
             vm_op_t *pat = bpeg_pattern(def_file, src);
-            check(pat, "Failed to compile pattern");
+            check(pat, "Failed to compile pattern: %s", flag);
             add_def(g, def_file, src, def, pat);
         } else if (FLAG("--define-string") || FLAG("-D")) {
             char *def = flag;
@@ -148,28 +149,28 @@ int main(int argc, char *argv[])
             char *src = ++eq;
             file_t *def_file = spoof_file(def, flag);
             vm_op_t *pat = bpeg_stringpattern(def_file, src);
-            check(pat, "Failed to compile pattern");
+            check(pat, "Failed to compile pattern: %s", flag);
             add_def(g, def_file, src, def, pat);
         } else if (FLAG("--pattern") || FLAG("-p")) {
             check(npatterns == 0, "Cannot define multiple patterns");
             file_t *arg_file = spoof_file("<pattern argument>", flag);
             vm_op_t *p = bpeg_pattern(arg_file, flag);
-            check(p, "Pattern failed to compile: '%s'", flag);
+            check(p, "Pattern failed to compile: %s", flag);
             add_def(g, arg_file, flag, "pattern", p);
             ++npatterns;
         } else if (FLAG("--pattern-string") || FLAG("-P")) {
             file_t *arg_file = spoof_file("<pattern argument>", flag);
             vm_op_t *p = bpeg_stringpattern(arg_file, flag);
-            check(p, "Pattern failed to compile");
+            check(p, "Pattern failed to compile: %s", flag);
             add_def(g, arg_file, flag, "pattern", p);
             ++npatterns;
         } else if (FLAG("--mode") || FLAG("-m")) {
             rule = flag;
         } else if (argv[i][0] != '-') {
             if (npatterns > 0) break;
-            file_t *arg_file = spoof_file("<pattern argument>", flag);
+            file_t *arg_file = spoof_file("<pattern argument>", argv[i]);
             vm_op_t *p = bpeg_stringpattern(arg_file, argv[i]);
-            check(p, "Pattern failed to compile");
+            check(p, "Pattern failed to compile: %s", argv[i]);
             add_def(g, arg_file, argv[i], "pattern", p);
             ++npatterns;
         } else {

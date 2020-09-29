@@ -142,8 +142,8 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
                 if (c2 < literal[0])
                     file_err(f, origin, str+1, "Character ranges must be low-to-high, but this is high-to-low.");
                 op->op = VM_RANGE;
-                op->args.range.low = literal[0];
-                op->args.range.high = c2;
+                op->args.range.low = (unsigned char)literal[0];
+                op->args.range.high = (unsigned char)c2;
                 ++str;
             } else {
                 op->op = VM_STRING;
@@ -153,7 +153,6 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
         }
         // Escapes
         case '\\': {
-            check(*str && *str != '\n', "Expected escape after '\\'");
             if (!*str || *str == '\n')
                 file_err(f, str, str, "There should be an escape sequence here after this backslash.");
             op->len = 1;
@@ -166,12 +165,11 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
                     file_err(f, seqstart, str+1, "This value isn't a valid escape sequence");
                 if (e2 < e)
                     file_err(f, origin, str, "Escape ranges should be low-to-high, but this is high-to-low.");
-                printf("%d - %d\n", (int)e, (int)e2);
                 op->op = VM_RANGE;
                 op->args.range.low = e;
                 op->args.range.high = e2;
             } else {
-                char literal[2] = {e, '\0'};
+                char literal[2] = {(char)e, '\0'};
                 op->op = VM_STRING;
                 op->args.s = strdup(literal);
             }
@@ -183,7 +181,9 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
             char *literal = (char*)str;
             for (; *str && *str != endquote; str++) {
                 if (*str == '\\') {
-                    check(str[1], "Expected more string contents after backslash");
+                    if (!str[1] || str[1] == '\n')
+                        file_err(f, str, str+1,
+                                 "There should be an escape sequence after this backslash.");
                     ++str;
                 }
             }
@@ -195,13 +195,14 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
             op->len = (ssize_t)len;
             op->args.s = literal;
 
-            check(matchchar(&str, endquote), "Missing closing quote");
+            if (!matchchar(&str, endquote))
+                file_err(f, origin, str, "This string doesn't have a closing quote.");
             break;
         }
         // Not <pat>
         case '!': {
             vm_op_t *p = bpeg_simplepattern(f, str);
-            check(p, "Expected pattern after '!'\n");
+            if (!p) file_err(f, str, str, "There should be a pattern after this '!'");
             str = p->end;
             op->op = VM_NOT;
             op->len = 0;
@@ -226,13 +227,15 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
                 min = n1, max = n1;
             }
             vm_op_t *pat = bpeg_simplepattern(f, str);
-            check(pat, "Expected pattern after repetition count");
+            if (!pat)
+                file_err(f, str, str, "There should be a pattern after this repetition count.");
             str = pat->end;
             str = after_spaces(str);
             vm_op_t *sep = NULL;
             if (matchchar(&str, '%')) {
                 sep = bpeg_simplepattern(f, str);
-                check(sep, "Expected pattern for separator after '%%'");
+                if (!sep)
+                    file_err(f, str, str, "There should be a separator pattern after this '%%'");
                 str = sep->end;
             } else {
                 str = pat->end;
@@ -272,22 +275,24 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
             free(op);
             op = bpeg_simplepattern(f, str);
             if (!op)
-                file_err(f, str, str, "Expected a pattern inside parentheses");
+                file_err(f, str, str, "There should be a valid pattern after this parenthesis.");
             op = expand_choices(f, op);
             str = op->end;
             str = after_spaces(str);
             if (!matchchar(&str, ')'))
-                file_err(f, origin, str, "This parenthesis is not closed");
+                file_err(f, origin, str, "This parenthesis group isn't properly closed.");
             break;
         }
         // Square brackets
         case '[': {
             vm_op_t *pat = bpeg_simplepattern(f, str);
-            check(pat, "Expected pattern inside square brackets");
+            if (!pat)
+                file_err(f, str, str, "There should be a valid pattern after this square bracket.");
             pat = expand_choices(f, pat);
             str = pat->end;
             str = after_spaces(str);
-            check(matchchar(&str, ']'), "Expected closing ']' instead of \"%s\"", str);
+            if (!matchchar(&str, ']'))
+                file_err(f, origin, str, "This square bracket group isn't properly closed.");
             set_range(op, 0, 1, pat, NULL);
             break;
         }
@@ -295,14 +300,15 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
         case '*': case '+': {
             ssize_t min = c == '*' ? 0 : 1;
             vm_op_t *pat = bpeg_simplepattern(f, str);
-            check(pat, "Expected pattern after '%c'", *str);
+            if (!pat)
+                file_err(f, str, str, "There should be a valid pattern here after the '%c'", c);
             str = pat->end;
             str = after_spaces(str);
             vm_op_t *sep = NULL;
             if (matchchar(&str, '%')) {
                 sep = bpeg_simplepattern(f, str);
                 if (!sep)
-                    file_err(f, str, str, "Expected pattern for separator after '%%'");
+                    file_err(f, str, str, "There should be a separator pattern after the '%%' here.");
                 str = sep->end;
             }
             set_range(op, min, -1, pat, sep);
@@ -317,7 +323,8 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
                 str = after_spaces(a) + 1;
             }
             vm_op_t *pat = bpeg_simplepattern(f, str);
-            check(pat, "Expected pattern after @");
+            if (!pat)
+                file_err(f, str, str, "There should be a valid pattern here to capture after the '@'");
             str = pat->end;
             op->args.capture.capture_pat = pat;
             op->len = pat->len;
@@ -331,12 +338,13 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
                 str += strlen("=>");
             } else {
                 pat = bpeg_simplepattern(f, str);
-                check(pat, "Invalid pattern after '{'");
+                if (!pat)
+                    file_err(f, str, str, "There should be a valid pattern inside this replacement.");
                 pat = expand_choices(f, pat);
                 str = pat->end;
                 str = after_spaces(str);
-                check(matchchar(&str, '=') && matchchar(&str, '>'),
-                      "Expected '=>' after pattern in replacement");
+                if (!(matchchar(&str, '=') && matchchar(&str, '>')))
+                    file_err(f, str, str, "There should be a '=>' after a pattern inside a replacement.");
             }
             str = after_spaces(str);
 
@@ -345,18 +353,22 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
             if (matchchar(&str, '}')) {
                 replacement = strdup("");
             } else {
-                check(matchchar(&str, '"') || matchchar(&str, '\''),
-                      "Expected string literal for replacement");
-                replacement = str;
+                if (!(matchchar(&str, '"') || matchchar(&str, '\'')))
+                    file_err(f, str, str, "There should be a string literal as a replacement here.");
+                const char *repstr = str;
                 for (; *str && *str != quote; str++) {
                     if (*str == '\\') {
-                        check(str[1], "Expected more string contents after backslash");
+                        if (!str[1] || str[1] == '\n')
+                            file_err(f, str, str+1,
+                                     "There should be an escape sequence after this backslash.");
                         ++str;
                     }
                 }
-                replacement = strndup(replacement, (size_t)(str-replacement));
-                check(matchchar(&str, quote), "Expected closing quote");
-                check(matchchar(&str, '}'), "Expected a closing '}'");
+                replacement = strndup(repstr, (size_t)(str-repstr));
+                if (!matchchar(&str, quote))
+                    file_err(f, &repstr[-1], str, "This string doesn't have a closing quote.");
+                if (!matchchar(&str, '}'))
+                    file_err(f, origin, str, "This replacement doesn't have a closing '}'");
             }
             op->op = VM_REPLACE;
             op->args.replace.replace_pat = pat;
@@ -417,10 +429,12 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
         str = after_spaces(str+2);
         vm_op_t *first = op;
         vm_op_t *second = bpeg_simplepattern(f, str);
-        check(second, "Expected pattern after '%c='", equal? '=' : '!');
+        if (!second)
+            file_err(f, str, str, "The '%c=' operator expects a pattern before and after.", equal?'=':'!');
         if (equal) {
-            check(first->len == -1 || second->len == -1 || first->len == second->len,
-                  "Two patterns cannot possibly match the same (different lengths: %ld != %ld)",
+            if (!(first->len == -1 || second->len == -1 || first->len == second->len))
+                file_err(f, origin, second->end,
+                  "These two patterns cannot possibly give the same result (different lengths: %ld != %ld)",
                   first->len, second->len);
         }
         op = calloc(sizeof(vm_op_t), 1);
@@ -452,7 +466,8 @@ vm_op_t *bpeg_stringpattern(file_t *f, const char *str)
         vm_op_t *interp = NULL;
         for (; *str; str++) {
             if (*str == '\\') {
-                check(str[1], "Expected more string contents after backslash");
+                if (!str[1] || str[1] == '\n')
+                    file_err(f, str, str, "There should be an escape sequence or pattern here after this backslash.");
                 const char *after_escape;
                 unsigned char e = unescapechar(&str[1], &after_escape);
                 if (e != str[1]) {
@@ -464,7 +479,8 @@ vm_op_t *bpeg_stringpattern(file_t *f, const char *str)
                     continue;
                 }
                 interp = bpeg_simplepattern(f, str + 1);
-                check(interp != NULL, "No valid BPEG pattern detected after backslash");
+                if (interp == NULL)
+                    file_err(f, str, str+1, "This isn't a valid escape sequence or pattern.");
                 break;
             }
         }
@@ -496,7 +512,7 @@ vm_op_t *bpeg_stringpattern(file_t *f, const char *str)
  * Given a pattern and a replacement string, compile the two into a replacement
  * VM opcode.
  */
-vm_op_t *bpeg_replacement(vm_op_t *pat, const char *replacement)
+vm_op_t *bpeg_replacement(file_t *f, vm_op_t *pat, const char *replacement)
 {
     vm_op_t *op = calloc(sizeof(vm_op_t), 1);
     op->op = VM_REPLACE;
@@ -506,7 +522,8 @@ vm_op_t *bpeg_replacement(vm_op_t *pat, const char *replacement)
     const char *p = replacement;
     for (; *p; p++) {
         if (*p == '\\') {
-            check(p[1], "Expected more string contents after backslash");
+            if (!p[1] || p[1] == '\n')
+                file_err(f, p, p, "There should be an escape sequence or pattern here after this backslash.");
             ++p;
         }
     }

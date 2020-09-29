@@ -77,7 +77,7 @@ int matchchar(const char **str, char c)
 unsigned char unescapechar(const char *escaped, const char **end)
 {
     size_t len = 1;
-    unsigned char ret = *escaped;
+    unsigned char ret = (unsigned char)*escaped;
     switch (*escaped) {
         case 'a': ret = '\a'; break; case 'b': ret = '\b'; break;
         case 'n': ret = '\n'; break; case 'r': ret = '\r'; break;
