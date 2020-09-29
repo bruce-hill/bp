@@ -63,7 +63,7 @@ Pattern            | Meaning
 See `man ./bpeg.1` for more details.
 
 ## License
-BPEG is provided under the MIT license with the Commons Clause
+BPEG is provided under the MIT license with the [Commons Clause](https://commonsclause.com/)
 (you can't sell this software without the developer's permission, but you're
 otherwise free to use, modify, and redistribute it free of charge).
 See [LICENSE](LICENSE) for details.
