@@ -180,10 +180,11 @@ int main(int argc, char *argv[])
     }
 
     if (isatty(STDOUT_FILENO)) {
-        file_t *is_tty_file = spoof_file("<is-tty>", flag);
-        vm_op_t *p = bpeg_pattern(is_tty_file, "''");
+        char *epsilon = "''";
+        file_t *is_tty_file = spoof_file("<is-tty>", epsilon);
+        vm_op_t *p = bpeg_pattern(is_tty_file, epsilon);
         check(p, "Failed to compile is-tty");
-        add_def(g, is_tty_file, "''", "is-tty", p);
+        add_def(g, is_tty_file, epsilon, "is-tty", p);
     }
 
     vm_op_t *pattern = lookup(g, rule);

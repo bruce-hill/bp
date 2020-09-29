@@ -545,7 +545,7 @@ static match_t *get_cap(match_t *m, const char **r)
         match_t *cap = get_capture_named(m, name);
         free(name);
         *r = end;
-        if (*end == ';') ++(*r);
+        if (**r == ';') ++(*r);
         return cap;
     }
     return NULL;
