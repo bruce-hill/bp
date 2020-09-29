@@ -1,43 +1,37 @@
 # This is a file defining the BPEG grammar using BPEG syntax
 
-Grammar: __ 0+(Def [__`;])%__ __ ($$ / @!={... => "Could not parse this code"})
+Grammar: __ *(Def [__`;])%__ __ ($$ / @!={... => "Could not parse this code"})
 Def: @name=id _ `: __ (
       @definition=extended-pat
     / $$ @!={=>"No definition for rule"}
     / @!={...>(`;/id_`:/$) => "Invalid definition: @0"})
 
 # This is used for command line arguments:
-String-pattern: 0+(`\ (escape-sequence / pat [`;]) / .)
+String-pattern: *(`\ (escape-sequence / pat [`;]) / .)
 
-pat: simple-pat !(__("!="/"=="/`*/`+/`?)) / suffixed-pat
+pat: simple-pat !(__("!="/"==")) / suffixed-pat
 simple-pat: Upto-and / Dot / String / Char-range / Char / Escape-range / Escape / No
     / Nodent / Repeat / Optional / After / Before / Capture / Replace / Ref / parens
 
 suffixed-pat: (
       Eq-pat
     / Not-eq-pat
-    / Star-pat
-    / Plus-pat
-    / Question-pat
 )
 
 Eq-pat: @first=pat__"=="__@second=pat
 Not-eq-pat: @first=pat__"!="__@second=pat
-Star-pat: pat __ `* @min={=>"0"} @max="" [__`%__@sep=pat]
-Plus-pat: pat __ `+ @min={=>"1"} @max="" [__`%__@sep=pat]
-Question-pat: pat __ `?
 
 Dot: `. !`.
 String: (
-        `" @s=0+(Escape / !`".) (`" / @!={=> "Expected closing quote here"})
-      / `' @s=0+(Escape / !`'.) (`' / @!={=> "Expected closing quote here"})
+        `" @s=*(Escape / !`".) (`" / @!={=> "Expected closing quote here"})
+      / `' @s=*(Escape / !`'.) (`' / @!={=> "Expected closing quote here"})
     )
 Char-range: `` @low=. `- (@high=. / @!={=> "Expected a second character to form a character range"})
 Char: `` (@s=. / @!={=> "Expected a character following the '`'"})
 Escape-range: `\ @low=escape-sequence `- @high=escape-sequence
 Escape: `\ (@s=escape-sequence
     / $ @!={=>"Backslashes are used for escape sequences, not splitting lines"}
-    / @!={. 0+(Abc/`0-9) => "Invalid escape sequence: '@0'"}
+    / @!={. *(Abc/`0-9) => "Invalid escape sequence: '@0'"}
 )
 escape-sequence: (
        `n/`t/`r/`e/`b/`a/`v
@@ -68,17 +62,17 @@ Otherwise: 2+@(Chain/pat)%(__`/__)
 extended-pat: Otherwise / Chain / pat
 
 # Special-symbol rules:
-_:  0+(`  / \t)
-__: 0+(`  / \t / \r / \n / comment)
+_:  *(`  / \t)
+__: *(`  / \t / \r / \n / comment)
 $$: !$.
 $:  !.
 ^^: !<$.
 ^:  !<.
 
-id: "^^" / "^" / "__" / "_" / "$$" / "$" / (`a-z/`A-Z) 0+(`a-z/`A-Z/`0-9/`-)
+id: "^^" / "^" / "__" / "_" / "$$" / "$" / (`a-z/`A-Z) *(`a-z/`A-Z/`0-9/`-)
 
 line-comment: `# .. $
-block-comment: "#(" 0+(block-comment / !")#" .) ")#"
+block-comment: "#(" *(block-comment / !")#" .) ")#"
 
 # Note: comments are undefined by default in regular BPEG
 comment: block-comment / line-comment

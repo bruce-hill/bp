@@ -16,21 +16,21 @@ replace-all: (
     (include-binary-files / is-text-file)
     define-highlights
     add-filename
-    0+(...(>pattern hl-replacement)) ...
+    *(...(>pattern hl-replacement)) ...
 )
 find-all: (
     (include-binary-files / is-text-file)
     define-highlights
     add-filename
-    0+ (!..pattern {..\n=>})
-    1+ (>..pattern add-line-number 1+(..hl-pattern) ..\n / {..\n=>})
+    *(!..pattern {..\n=>})
+    +(>..pattern add-line-number +(..hl-pattern) ..\n / {..\n=>})
     [{!<\n => "\n"}]
 )
 only-matches: (
     (include-binary-files / is-text-file)
     define-highlights
     add-filename
-    1+{...@hl-pattern =>'@1\n'}
+    +{...@hl-pattern =>'@1\n'}
 )
 add-filename: [print-filenames (is-tty {=>"\033[33;1;4m@&:\033[0m\n"} / {=>"@&:\n"})]
 add-line-number: [print-line-numbers (is-tty {=>"\033[2m@#\033[5G|\033[0m "} / {=>"@#| "})]
@@ -41,21 +41,21 @@ define-highlights: highlight @hl-start={=>"\033[31;1m"} @hl-end={=>"\033[0m"} / 
 # Helper definitions (commonly used)
 #(
 url: (
-    "file://" 1+(`/ 0+url-char)
+    "file://" +(`/ *url-char)
     / "mailto:" email
-    / ("https"/"http"/"ftp") "://" [1+url-char [`: 1+url-char] `@] (ipv4/ipv6/domain) [`: int] [url-path]
+    / ("https"/"http"/"ftp") "://" [+url-char [`: +url-char] `@] (ipv4/ipv6/domain) [`: int] [url-path]
 )
-url-path: 1+(`/ 0+url-char) [`? 1+(1+url-char`=1+url-char]
+url-path: +(`/ *url-char) [`? +(+url-char`=+url-char]
 ipv4: 4 int % `.
 ipv6: 8 (4 Hex) % `:
-domain: 1+(Abc/digit/`-)%`.
+domain: +(Abc/digit/`-)%`.
 url-char: Abc/digit/`$/`-/`_/`./`+/`!/`*/`'/`(/`)/`,/`%
 
 url: @(https?|ftp)://(-\.)?([^\s/?\.#-]+\.?)+(/[^\s]*)?$@iS
 )#
-indent: \n|1+(\t/' ')
+indent: \n|+(\t/' ')
 dedent: $ !(\n|)
-indented-block: |` ..$ 0+(\n|..$)
+indented-block: |` ..$ *(\n|..$)
 utf8-codepoint: (
       \x00-x7f
     / \xc0-xdf 1\x80-xbf
@@ -64,18 +64,18 @@ utf8-codepoint: (
 )
 crlf: \r\n
 cr: \r
-anglebraces: `< 0+(anglebraces / !`>$.) `>
-brackets: `[ 0+(brackets / !`]$.) `]
-braces: `{ 0+(braces / !`}$.) `}
-parens: `( 0+(parens / !`)$.) `)
-id: !<(`a-z/`A-Z/`_/`0-9) (`a-z/`A-Z/`_) 0+(`a-z/`A-Z/`_/`0-9)
+anglebraces: `< *(anglebraces / !`>$.) `>
+brackets: `[ *(brackets / !`]$.) `]
+braces: `{ *(braces / !`}$.) `}
+parens: `( *(parens / !`)$.) `)
+id: !<(`a-z/`A-Z/`_/`0-9) (`a-z/`A-Z/`_) *(`a-z/`A-Z/`_/`0-9)
 id-char: `a-z/`A-Z/`_/`0-9
-word: !<(`a-z/`A-Z/`_/`0-9) 1+(`a-z/`A-Z) !>(`0-9/`_)
+word: !<(`a-z/`A-Z/`_/`0-9) +(`a-z/`A-Z) !>(`0-9/`_)
 HEX: `0-9/`A-F
 Hex: `0-9/`a-f/`A-F
 hex: `0-9/`a-f
-number: 1+`0-9 [`. 0+`0-9] / `. 1+`0-9
-int: 1+`0-9
+number: +`0-9 [`. *`0-9] / `. +`0-9
+int: +`0-9
 digit: `0-9
 Abc: `a-z/`A-Z
 ABC: `A-Z
@@ -94,5 +94,5 @@ $$: !$.
 $:  !.
 ^^: !<$.
 ^:  !<.
-__: 0+(` /\t/\n/\r/comment)
-_:  0+(` /\t)
+__: *(` /\t/\n/\r/comment)
+_:  *(` /\t)

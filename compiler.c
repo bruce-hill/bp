@@ -269,6 +269,22 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
             set_range(op, 0, 1, pat, NULL);
             break;
         }
+        // Repeating
+        case '*': case '+': {
+            ssize_t min = c == '*' ? 0 : 1;
+            vm_op_t *pat = bpeg_simplepattern(f, str);
+            check(pat, "Expected pattern after '%c'", *str);
+            str = pat->end;
+            str = after_spaces(str);
+            vm_op_t *sep = NULL;
+            if (matchchar(&str, '%')) {
+                sep = bpeg_simplepattern(f, str);
+                check(sep, "Expected pattern for separator after '%%'");
+                str = sep->end;
+            }
+            set_range(op, min, -1, pat, sep);
+            break;
+        }
         // Capture
         case '@': {
             op->op = VM_CAPTURE;
@@ -373,23 +389,7 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
   postfix:
     if (f ? str >= f->end : !*str) return op;
     str = after_spaces(str);
-    if (*str == '*' || *str == '+' || *str == '?') { // Repetitions: <pat>*, <pat>+, <pat>?
-        char operator = *str;
-        ++str;
-        vm_op_t *pat = op;
-        vm_op_t *sep = NULL;
-        if (operator != '?' && matchchar(&str, '%')) {
-            sep = bpeg_simplepattern(f, str);
-            check(sep, "Expected pattern for separator after '%%'");
-            str = sep->end;
-        }
-        op = calloc(sizeof(vm_op_t), 1);
-        set_range(op, operator == '+' ? 1 : 0, operator == '?' ? 1 : -1, pat, sep);
-        op->start = pat->start;
-        op->end = str;
-        op->len = -1;
-        goto postfix;
-    } else if ((str[0] == '=' || str[0] == '!') && str[1] == '=') { // Equality <pat1>==<pat2> and inequality <pat1>!=<pat2>
+    if ((str[0] == '=' || str[0] == '!') && str[1] == '=') { // Equality <pat1>==<pat2> and inequality <pat1>!=<pat2>
         int equal = str[0] == '=';
         str = after_spaces(str+2);
         vm_op_t *first = op;

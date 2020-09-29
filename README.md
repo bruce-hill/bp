@@ -49,8 +49,8 @@ Pattern            | Meaning
 `2-4 pat`          | Between 2 and 4 occurrences of `pat` (inclusive)
 `5+ pat`           | 5 or more occurrences of `pat`
 `5+ pat % sep`     | 5 or more occurrences of `pat`, separated by `sep` (e.g. `0+ int % ","` matches `1,2,3`)
-`pat*` `pat* % sep`| 0 or more occurrences of `pat` (optionally separated by `sep`)
-`pat+` `pat+ % sep`| 1 or more occurrences of `pat` (optionally separated by `sep`)
+`*pat`             | 0 or more occurrences of `pat` (shorthand for `0+pat`)
+`+pat`             | 1 or more occurrences of `pat` (shorthand for `1+pat`)
 `<pat`             | `pat` matches just before the current position (backref)
 `>pat`             | `pat` matches just in front of the current position (lookahead)
 `@pat`             | Capture `pat` (used for text replacement and backreferences)
