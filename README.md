@@ -59,6 +59,7 @@ Pattern            | Meaning
 `{pat @other => "@1"}` | Match `pat` followed by `other` and replace it with the text of `other`
 `{pat @keep=other => "@keep"}` | Match `pat` followed by `other` and replace it with the text of `other`
 `pat1==pat2`       | `pat1`, assuming `pat2` also matches with the same length
+`pat1!=pat2`       | `pat1`, unless `pat2` also matches with the same length
 `#( block comment )#` | A block comment
 `# line comment`   | A line comment
 

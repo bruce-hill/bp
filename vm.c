@@ -30,6 +30,7 @@ static const char *opcode_names[] = {
     [VM_CHAIN] = "CHAIN",
     [VM_REPLACE] = "REPLACE",
     [VM_EQUAL] = "EQUAL",
+    [VM_NOT_EQUAL] = "NOT_EQUAL",
     [VM_REF] = "REF",
     [VM_BACKREF] = "BACKREF",
     [VM_NODENT] = "NODENT",
@@ -280,23 +281,28 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
             m1->nextsibling = m2;
             return m;
         }
-        case VM_EQUAL: {
+        case VM_EQUAL: case VM_NOT_EQUAL: {
             match_t *m1 = _match(g, f, str, op->args.multiple.first, flags, rec);
             if (m1 == NULL) return NULL;
 
-            // <p1>==<p2> matches iff both have the same start and end point:
+            // <p1>==<p2> matches iff both have the same start and end point
+            // <p1>!=<p2> matches iff <p1> matches, but is not equal to <p2>
             match_t *m2 = _match(g, f, str, op->args.multiple.second, flags, rec);
-            if (m2 == NULL || m2->end != m1->end) {
+            if ((m2 == NULL || m2->end != m1->end) == (op->op == VM_EQUAL)) {
                 destroy_match(&m1);
                 destroy_match(&m2);
                 return NULL;
             }
             match_t *m = calloc(sizeof(match_t), 1);
             m->start = str;
-            m->end = m2->end;
+            m->end = m1->end;
             m->op = op;
             m->child = m1;
-            m1->nextsibling = m2;
+            if (op->op == VM_EQUAL) {
+                m1->nextsibling = m2;
+            } else {
+                destroy_match(&m2);
+            }
             return m;
         }
         case VM_REPLACE: {

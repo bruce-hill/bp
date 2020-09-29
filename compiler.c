@@ -389,19 +389,22 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
         op->end = str;
         op->len = -1;
         goto postfix;
-    } else if (strncmp(str, "==", 2) == 0) { // Equality <pat1>==<pat2>
+    } else if ((str[0] == '=' || str[0] == '!') && str[1] == '=') { // Equality <pat1>==<pat2> and inequality <pat1>!=<pat2>
+        int equal = str[0] == '=';
         str = after_spaces(str+2);
         vm_op_t *first = op;
         vm_op_t *second = bpeg_simplepattern(f, str);
-        check(second, "Expected pattern after '=='");
-        check(first->len == -1 || second->len == -1 || first->len == second->len,
-              "Two patterns cannot possibly match the same (different lengths: %ld != %ld)",
-              first->len, second->len);
+        check(second, "Expected pattern after '%c='", equal? '=' : '!');
+        if (equal) {
+            check(first->len == -1 || second->len == -1 || first->len == second->len,
+                  "Two patterns cannot possibly match the same (different lengths: %ld != %ld)",
+                  first->len, second->len);
+        }
         op = calloc(sizeof(vm_op_t), 1);
-        op->op = VM_EQUAL;
+        op->op = equal ? VM_EQUAL : VM_NOT_EQUAL;
         op->start = str;
         op->end = second->end;
-        op->len = (first->len == -1 || second->len == -1) ? -1 : first->len;
+        op->len = first->len != -1 ? first->len : second->len;
         op->args.multiple.first = first;
         op->args.multiple.second = second;
         str = op->end;
