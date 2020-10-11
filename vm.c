@@ -100,7 +100,7 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
 {
     switch (op->op) {
         case VM_ANYCHAR: {
-            if (str >= f->end - 1 || (!op->multiline && *str == '\n'))
+            if (str >= f->end || (!op->multiline && *str == '\n'))
                 return NULL;
             match_t *m = calloc(sizeof(match_t), 1);
             m->op = op;

@@ -23,7 +23,7 @@ find-all: (
     define-highlights
     add-filename
     *(!..pattern {..\n=>})
-    +(>..pattern add-line-number +(..hl-pattern) ..(\n/$) / {..(\n/$)=>})
+    +(>..pattern add-line-number +(..hl-pattern) ..(\n/$$) / {..\n=>})
     [{!<\n => "\n"}]
 )
 only-matches: (
