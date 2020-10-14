@@ -366,31 +366,27 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
             return match_backref(str, op, (match_t*)op->args.backref, flags);
         }
         case VM_NODENT: {
+            if (*str != '\n') return NULL;
+            const char *start = str;
+
             size_t linenum = get_line_number(f, str);
-            if (linenum == 1) { // First line
-                if (str > f->contents)
-                    return NULL;
-                match_t *m = calloc(sizeof(match_t), 1);
-                m->start = str;
-                m->end = str;
-                m->op = op;
-                return m;
-            } else if (str[-1] != '\n') {
-                return NULL; // Not at beginning of line
-            }
-            const char *p = get_line(f, linenum - 1);
-            // Count indentation:
+            const char *p = get_line(f, linenum);
+
+            // Current indentation:
             char denter = *p;
             int dents = 0;
             if (denter == ' ' || denter == '\t') {
                 for (; *p == denter; ++p) ++dents;
             }
+
+            // Subsequent indentation:
+            while (*str == '\n') ++str;
             for (int i = 0; i < dents; i++) {
                 if (str[i] != denter) return NULL;
             }
 
             match_t *m = calloc(sizeof(match_t), 1);
-            m->start = str;
+            m->start = start;
             m->end = &str[dents];
             m->op = op;
             return m;
@@ -496,7 +492,7 @@ void print_pattern(vm_op_t *op)
             break;
         }
         case VM_NODENT: {
-            fprintf(stderr, "the start of a line with the same indentation as the previous line");
+            fprintf(stderr, "a new line with the same indentation as the previous line");
             break;
         }
         default: break;
@@ -569,7 +565,7 @@ void print_match(file_t *f, match_t *m)
             }
 
             ++r;
-            if (*r == '@') {
+            if (*r == '@' || *r == '\0') {
                 fputc('@', stdout);
                 continue;
             }

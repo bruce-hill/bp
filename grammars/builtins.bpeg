@@ -52,9 +52,9 @@ domain: +(+(Abc/digit/`-))%`.
 url-char: Abc/digit/`$/`-/`_/`./`+/`!/`*/`'/`(/`)/`,/`%
 email: +(Abc/digit/`./`-/`+) `@ domain
 
-indent: \n|+(\t/' ')
-dedent: $ !(\n|)
-indented-block: |` ..$ *(\n|..$)
+nodent: | !(\t/` )
+indent: | (` /\t)
+dedent: $ !(nodent/indent)
 utf8-codepoint: (
       \x00-x7f
     / \xc0-xdf 1\x80-xbf
