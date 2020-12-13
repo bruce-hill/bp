@@ -281,6 +281,8 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
             str = after_spaces(str);
             if (!matchchar(&str, ')'))
                 file_err(f, origin, str, "This parenthesis group isn't properly closed.");
+            op->start = origin;
+            op->end = str;
             break;
         }
         // Square brackets
@@ -328,6 +330,17 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
             str = pat->end;
             op->args.capture.capture_pat = pat;
             op->len = pat->len;
+            break;
+        }
+        // Hide
+        case '~': {
+            vm_op_t *pat = bpeg_simplepattern(f, str);
+            if (!pat)
+                file_err(f, str, str, "There should be a pattern after this '~'");
+            str = pat->end;
+            op->op = VM_HIDE;
+            op->len = 0;
+            op->args.pat = pat;
             break;
         }
         // Replacement

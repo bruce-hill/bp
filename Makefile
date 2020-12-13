@@ -1,4 +1,4 @@
-NAME=bpeg
+NAME=bp
 CC ?= gcc
 PREFIX=/usr/local
 CFLAGS=-std=c99 -D_XOPEN_SOURCE=500 -D_GNU_SOURCE -D_POSIX_C_SOURCE=200809L
@@ -7,7 +7,7 @@ CWARN=-Wall -Wpedantic -Wextra -Wno-unknown-pragmas -Wno-missing-field-initializ
 G ?=
 O ?= -O3
 
-CFILES=compiler.c grammar.c utils.c vm.c file_loader.c
+CFILES=compiler.c grammar.c utils.c vm.c file_loader.c viz.c
 OBJFILES=$(CFILES:.c=.o)
 
 all: $(NAME)
@@ -15,7 +15,7 @@ all: $(NAME)
 .c.o:
 	$(CC) -c $(CFLAGS) $(CWARN) $(G) $(O) -o $@ $<
 
-$(NAME): $(OBJFILES) $(NAME).c
+$(NAME): $(OBJFILES) bpeg.c
 	$(CC) $(CFLAGS) $(CWARN) $(G) $(O) -o $@ $^
 
 clean:
@@ -29,8 +29,8 @@ install: $(NAME)
 	fi; \
 	[ ! "$$prefix" ] && prefix="/usr/local"; \
 	[ ! "$$sysconfdir" ] && sysconfdir=/etc; \
-	mkdir -pv -m 755 "$$prefix/share/man/man1" "$$prefix/bin" "$$sysconfdir/xdg/bpeg" \
-	&& cp -rv grammars/* "$$sysconfdir/xdg/bpeg/" \
+	mkdir -pv -m 755 "$$prefix/share/man/man1" "$$prefix/bin" "$$sysconfdir/xdg/bp" \
+	&& cp -rv grammars/* "$$sysconfdir/xdg/bp/" \
 	&& cp -v $(NAME).1 "$$prefix/share/man/man1/" \
 	&& rm -f "$$prefix/bin/$(NAME)" \
 	&& cp -v $(NAME) "$$prefix/bin/"
@@ -44,7 +44,7 @@ uninstall:
 	[ ! "$$prefix" ] && prefix="/usr/local"; \
 	[ ! "$$sysconfdir" ] && sysconfdir=/etc; \
 	echo "Deleting..."; \
-	rm -rvf "$$prefix/bin/$(NAME)" "$$prefix/share/man/man1/$(NAME).1" "$$sysconfdir/xdg/bpeg"; \
+	rm -rvf "$$prefix/bin/$(NAME)" "$$prefix/share/man/man1/$(NAME).1" "$$sysconfdir/xdg/bp"; \
 	printf "\033[1mIf you created any config files in ~/.config/$(NAME), you may want to delete them manually.\033[0m\n"
 
 .PHONY: all, clean, install, uninstall

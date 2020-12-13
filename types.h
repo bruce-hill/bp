@@ -11,6 +11,7 @@
 enum BPEGFlag {
     BPEG_VERBOSE    = 1 << 0,
     BPEG_IGNORECASE = 1 << 1,
+    BPEG_EXPLAIN    = 1 << 2,
 };
 
 /*
@@ -26,6 +27,7 @@ enum VMOpcode {
     VM_BEFORE,
     VM_AFTER,
     VM_CAPTURE,
+    VM_HIDE,
     VM_OTHERWISE,
     VM_CHAIN,
     VM_EQUAL,

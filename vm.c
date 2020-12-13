@@ -26,6 +26,7 @@ static const char *opcode_names[] = {
     [VM_BEFORE] = "BEFORE",
     [VM_AFTER] = "AFTER",
     [VM_CAPTURE] = "CAPTURE",
+    [VM_HIDE] = "HIDE",
     [VM_OTHERWISE] = "OTHERWISE",
     [VM_CHAIN] = "CHAIN",
     [VM_REPLACE] = "REPLACE",
@@ -257,6 +258,16 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
                 m->value.name = op->args.capture.name;
             return m;
         }
+        case VM_HIDE: {
+            match_t *p = _match(g, f, str, op->args.pat, flags, rec);
+            if (p == NULL) return NULL;
+            match_t *m = calloc(sizeof(match_t), 1);
+            m->start = str;
+            m->end = p->end;
+            m->op = op;
+            m->child = p;
+            return m;
+        }
         case VM_OTHERWISE: {
             match_t *m = _match(g, f, str, op->args.multiple.first, flags, rec);
             if (m == NULL) m = _match(g, f, str, op->args.multiple.second, flags, rec);
@@ -450,6 +461,12 @@ void print_pattern(vm_op_t *op)
             fprintf(stderr, ")");
             break;
         }
+        case VM_HIDE: {
+            fprintf(stderr, "hidden (");
+            print_pattern(op->args.pat);
+            fprintf(stderr, ")");
+            break;
+        }
         case VM_CAPTURE: {
             fprintf(stderr, "capture (");
             print_pattern(op->args.pat);
@@ -547,63 +564,185 @@ static match_t *get_cap(match_t *m, const char **r)
     return NULL;
 }
 
+typedef struct {
+    size_t line, printed_line;
+    const char *color;
+} print_state_t;
+
+static void print_line_number(print_state_t *state, print_options_t options)
+{
+    state->printed_line = state->line;
+    if (!(options & PRINT_LINE_NUMBERS)) return;
+    if (options & PRINT_COLOR)
+        printf("\033[0;2m% 5ld\033(0\x78\033(B%s", state->line, state->color);
+    else
+        printf("% 5ld|", state->line);
+}
+
 /*
  * Print a match with replacements and highlighting.
  */
-void print_match(file_t *f, match_t *m)
+static void _print_match(file_t *f, match_t *m, print_state_t *state, print_options_t options)
 {
-    if (m->op->op == VM_REPLACE) {
+    static const char *hl = "\033[0;31;1m";
+    const char *old_color = state->color;
+    if (m->op->op == VM_HIDE) {
+        // TODO: handle replacements?
+        for (const char *p = m->start; p < m->end; p++) {
+            if (*p == '\n') ++state->line;
+        }
+    } else if (m->op->op == VM_REPLACE) {
+        if (options & PRINT_COLOR && state->color != hl) {
+            state->color = hl;
+            printf("%s", state->color);
+        }
         for (const char *r = m->value.replacement; *r; ) {
+            if (*r == '@' && r[1] && r[1] != '@') {
+                ++r;
+                match_t *cap = get_cap(m, &r);
+                if (cap != NULL) {
+                    _print_match(f, cap, state, options);
+                    continue;
+                } else {
+                    --r;
+                }
+            }
+
+            if (state->printed_line != state->line)
+                print_line_number(state, options);
+
             if (*r == '\\') {
                 ++r;
-                fputc(unescapechar(r, &r), stdout);
+                unsigned char c = unescapechar(r, &r);
+                fputc(c, stdout);
+                if (c == '\n') ++state->line;
                 continue;
-            } else if (*r != '@') {
+            } else if (*r == '\n') {
+                fputc('\n', stdout);
+                ++state->line;
+                ++r;
+                continue;
+            } else {
                 fputc(*r, stdout);
                 ++r;
                 continue;
             }
-
-            ++r;
-            if (*r == '@' || *r == '\0') {
-                fputc('@', stdout);
-                continue;
-            }
-            if (*r == '#') {
-                ++r;
-                printf("%ld", get_line_number(f, m->start));
-                continue;
-            } else if (*r == ':') {
-                ++r;
-                printf("%ld", get_char_number(f, m->start));
-                continue;
-            } else if (*r == '&') {
-                ++r;
-                printf("%s", f->filename ? f->filename : "-");
-                continue;
-            }
-            match_t *cap = get_cap(m, &r);
-            if (cap != NULL) {
-                print_match(f, cap);
-            } else {
-                fputc('@', stdout);
-            }
         }
     } else {
+        if (m->op->op == VM_CAPTURE) {
+            if (options & PRINT_COLOR && state->color != hl) {
+                state->color = hl;
+                printf("%s", state->color);
+            }
+        }
+
         const char *prev = m->start;
         for (match_t *child = m->child; child; child = child->nextsibling) {
             // Skip children from e.g. zero-width matches like >@foo
             if (!(prev <= child->start && child->start <= m->end &&
                   prev <= child->end && child->end <= m->end))
                 continue;
-            if (child->start > prev)
-                printf("%.*s", (int)(child->start - prev), prev);
-            print_match(f, child);
+            if (child->start > prev) {
+                for (const char *p = prev; p < child->start; ++p) {
+                    if (state->printed_line != state->line)
+                        print_line_number(state, options);
+                    fputc(*p, stdout);
+                    if (*p == '\n') ++state->line;
+                }
+            }
+            _print_match(f, child, state, options);
             prev = child->end;
         }
-        if (m->end > prev)
-            printf("%.*s", (int)(m->end - prev), prev);
+        if (m->end > prev) {
+            for (const char *p = prev; p < m->end; ++p) {
+                if (state->printed_line != state->line)
+                    print_line_number(state, options);
+                fputc(*p, stdout);
+                if (*p == '\n') ++state->line;
+            }
+        }
     }
+    if (options & PRINT_COLOR && old_color != state->color) {
+        printf("%s", old_color);
+        state->color = old_color;
+    }
+}
+
+void print_match(file_t *f, match_t *m, print_options_t options)
+{
+    print_state_t state = {.line = 1, .color = "\033[0m"};
+    _print_match(f, m, &state, options);
+}
+
+/*
+ * Print a match as JSON
+ */
+static int _json_match(FILE *f, const char *text, match_t *m, int comma)
+#define VERBOSE_JSON 1
+#if VERBOSE_JSON
+{
+    if (comma) fprintf(f, ",\n");
+    comma = 0;
+    fprintf(f, "{\"type\":\"");
+    for (const char *c = m->op->start; c < m->op->end; c++) {
+        switch (*c) {
+            case '"': fprintf(f, "\\\""); break;
+            case '\\': fprintf(f, "\\\\"); break;
+            case '\t': fprintf(f, "\\t"); break;
+            case '\n': fprintf(f, "↵"); break;
+            default: fprintf(f, "%c", *c); break;
+        }
+    }
+    fprintf(f, "\",\"start\":%ld,\"end\":%ld,\"children\":[",
+            m->start - text, m->end - text);
+    for (match_t *child = m->child; child; child = child->nextsibling) {
+        comma |= _json_match(f, text, child, comma);
+    }
+    fprintf(f, "]}");
+    return 1;
+}
+#else
+{
+    if (m->op->op == VM_STRING) {
+        if (comma) fprintf(f, ",\n");
+        comma = 0;
+        fprintf(f, "{\"type\":\"\\\"");
+        for (const char *c = m->op->args.s; *c; c++) {
+            switch (*c) {
+                case '"': fprintf(f, "\\\""); break;
+                case '\\': fprintf(f, "\\\\"); break;
+                case '\t': fprintf(f, "\\t"); break;
+                case '\n': fprintf(f, "↵"); break;
+                default: fprintf(f, "%c", *c); break;
+            }
+        }
+        fprintf(f, "\\\"\",\"start\":%ld,\"end\":%ld,\"children\":[",
+                m->start - text, m->end - text);
+    } else if (m->op->op == VM_REF) {
+        if (comma) fprintf(f, ",\n");
+        comma = 0;
+        fprintf(f, "{\"type\":\"%s\",\"start\":%ld,\"end\":%ld,\"children\":[",
+                m->op->args.s, m->start - text, m->end - text);
+    } else if (m->op->op == VM_CAPTURE && m->value.name) {
+        if (comma) fprintf(f, ",\n");
+        comma = 0;
+        fprintf(f, "{\"type\":\"@%s\",\"start\":%ld,\"end\":%ld,\"children\":[",
+                m->value.name, m->start - text, m->end - text);
+    }
+    for (match_t *child = m->child; child; child = child->nextsibling) {
+        comma |= _json_match(f, text, child, comma);
+    }
+    if (m->op->op == VM_REF || m->op->op == VM_STRING || (m->op->op == VM_CAPTURE && m->value.name)) {
+        fprintf(f, "]}");
+        return 1;
+    }
+    return comma;
+}
+#endif
+
+void json_match(FILE *f, const char *text, match_t *m)
+{
+    _json_match(f, text, m, 0);
 }
 
 static match_t *match_backref(const char *str, vm_op_t *op, match_t *cap, unsigned int flags)

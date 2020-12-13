@@ -1,7 +1,7 @@
 /*
  * bpeg.c - Source code for the bpeg parser
  *
- * See `man ./bpeg.1` for more details
+ * See `man ./bp.1` for more details
  */
 #include <fcntl.h>
 #include <glob.h>
@@ -15,23 +15,27 @@
 #include "file_loader.h"
 #include "grammar.h"
 #include "utils.h"
+#include "viz.h"
 #include "vm.h"
 
 static const char *usage = (
-    "BPEG - a Parsing Expression Grammar command line tool\n\n"
+    "BP - a Parsing Expression Grammar command line tool\n\n"
     "Usage:\n"
-    "  bpeg [flags] <pattern> [<input files>...]\n\n"
+    "  bp [flags] <pattern> [<input files>...]\n\n"
     "Flags:\n"
     " -h --help                        print the usage and quit\n"
     " -v --verbose                     print verbose debugging info\n"
+    " -e --explain                     explain the matches\n"
     " -i --ignore-case                 preform matching case-insensitively\n"
     " -d --define <name>:<def>         define a grammar rule\n"
     " -D --define-string <name>:<def>  define a grammar rule (string-pattern)\n"
-    " -p --pattern <pat>               provide a pattern (equivalent to bpeg '\\(<pat>)')\n"
+    " -p --pattern <pat>               provide a pattern (equivalent to bp '\\(<pat>)')\n"
     " -P --pattern-string <pat>        provide a string pattern (may be useful if '<pat>' begins with a '-')\n"
     " -r --replace <replacement>       replace the input pattern with the given replacement\n"
     " -m --mode <mode>                 set the behavior mode (defult: find-all)\n"
     " -g --grammar <grammar file>      use the specified file as a grammar\n");
+
+static print_options_t print_options = 0;
 
 static char *getflag(const char *flag, char *argv[], int *i)
 {
@@ -54,7 +58,7 @@ static int print_errors(file_t *f, match_t *m)
     int ret = 0;
     if (m->op->op == VM_CAPTURE && m->value.name && streq(m->value.name, "!")) {
         printf("\033[31;1m");
-        print_match(f, m);
+        print_match(f, m, print_options);
         printf("\033[0m\n");
         fprint_line(stdout, f, m->start, m->end, " ");
         return 1;
@@ -66,13 +70,49 @@ static int print_errors(file_t *f, match_t *m)
 
 static int run_match(grammar_t *g, const char *filename, vm_op_t *pattern, unsigned int flags)
 {
+    static int printed_matches = 0;
     file_t *f = load_file(filename);
     check(f, "Could not open file: %s", filename);
     match_t *m = match(g, f, f->contents, pattern, flags);
     if (m && print_errors(f, m) > 0)
         _exit(1);
     if (m != NULL && m->end > m->start + 1) {
-        print_match(f, m);
+        ++printed_matches;
+
+        if (flags & BPEG_EXPLAIN) {
+            if (filename) {
+                printf("\033[1;4m%s:\033[0m\n", filename);
+            }
+            /*
+            if (printed_matches > 1)
+                fprintf(stdout, ",\n");
+            printf("{\"filename\":\"%s\",\"text\":\"", filename ? filename : "-");
+            for (char *c = f->contents; c < f->end; c++) {
+                switch (*c) {
+                    case '"': printf("\\\""); break;
+                    case '\n': printf("\\n"); break;
+                    case '\t': printf("\\t"); break;
+                    case '\\': printf("\\\\"); break;
+                    default: printf("%c", *c); break;
+                }
+            }
+            printf("\",\n\"tree\":{\"type\":\"text\",\"start\":%d,\"end\":%ld,\"children\":[",
+                   0, f->end - f->contents);
+            json_match(stdout, f->contents, m);
+            printf("]}}\n");
+            */
+            visualize_match(m);
+        } else {
+            if (printed_matches > 1)
+                fputc('\n', stdout);
+            if (filename) {
+                if (print_options & PRINT_COLOR)
+                    printf("\033[1;4;33m%s:\033[0m\n", filename);
+                else
+                    printf("%s:\n", filename);
+            }
+            print_match(f, m, print_options);
+        }
         destroy_file(&f);
         return 0;
     } else {
@@ -93,9 +133,9 @@ int main(int argc, char *argv[])
     grammar_t *g = new_grammar();
 
     // Load builtins:
-    if (access("/etc/xdg/bpeg/builtins.bpeg", R_OK) != -1)
-        load_grammar(g, load_file("/etc/xdg/bpeg/builtins.bpeg")); // Keep in memory for debugging output
-    sprintf(path, "%s/.config/bpeg/builtins.bpeg", getenv("HOME"));
+    if (access("/etc/xdg/bp/builtins.bp", R_OK) != -1)
+        load_grammar(g, load_file("/etc/xdg/bp/builtins.bp")); // Keep in memory for debugging output
+    sprintf(path, "%s/.config/bp/builtins.bp", getenv("HOME"));
     if (access(path, R_OK) != -1)
         load_grammar(g, load_file(path)); // Keep in memory for debugging output
 
@@ -110,6 +150,8 @@ int main(int argc, char *argv[])
             return 0;
         } else if (streq(argv[i], "--verbose") || streq(argv[i], "-v")) {
             flags |= BPEG_VERBOSE;
+        } else if (streq(argv[i], "--explain") || streq(argv[i], "-e")) {
+            flags |= BPEG_EXPLAIN;
         } else if (streq(argv[i], "--ignore-case") || streq(argv[i], "-i")) {
             flags |= BPEG_IGNORECASE;
         } else if (FLAG("--replace") || FLAG("-r")) {
@@ -122,11 +164,11 @@ int main(int argc, char *argv[])
         } else if (FLAG("--grammar") || FLAG("-g")) {
             file_t *f = load_file(flag);
             if (f == NULL) {
-                sprintf(path, "%s/.config/bpeg/%s.bpeg", getenv("HOME"), flag);
+                sprintf(path, "%s/.config/bp/%s.bp", getenv("HOME"), flag);
                 f = load_file(path);
             }
             if (f == NULL) {
-                sprintf(path, "/etc/xdg/bpeg/%s.bpeg", flag);
+                sprintf(path, "/etc/xdg/bp/%s.bp", flag);
                 f = load_file(path);
             }
             check(f != NULL, "Couldn't find grammar: %s", flag);
@@ -180,11 +222,7 @@ int main(int argc, char *argv[])
     }
 
     if (isatty(STDOUT_FILENO)) {
-        char *epsilon = "''";
-        file_t *is_tty_file = spoof_file("<is-tty>", epsilon);
-        vm_op_t *p = bpeg_pattern(is_tty_file, epsilon);
-        check(p, "Failed to compile is-tty");
-        add_def(g, is_tty_file, epsilon, "is-tty", p);
+        print_options |= PRINT_COLOR | PRINT_LINE_NUMBERS;
     }
 
     vm_op_t *pattern = lookup(g, rule);
@@ -209,7 +247,6 @@ int main(int argc, char *argv[])
         // Piped in input:
         ret &= run_match(g, NULL, pattern, flags);
     }
-
 
     return ret;
 }
