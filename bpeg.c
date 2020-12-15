@@ -27,6 +27,7 @@ static const char *usage = (
     " -h --help                        print the usage and quit\n"
     " -v --verbose                     print verbose debugging info\n"
     " -e --explain                     explain the matches\n"
+    " -j --json                        print matches as a list of JSON objects\n"
     " -i --ignore-case                 preform matching case-insensitively\n"
     " -d --define <name>:<def>         define a grammar rule\n"
     " -D --define-string <name>:<def>  define a grammar rule (string-pattern)\n"
@@ -135,16 +136,17 @@ int main(int argc, char *argv[])
         if (streq(argv[i], "--")) {
             ++i;
             break;
-        } else if (streq(argv[i], "--help") || streq(argv[i], "-h")) {
+        } else if (streq(argv[i], "--help")) {
+          flag_help:
             printf("%s\n", usage);
             return 0;
-        } else if (streq(argv[i], "--verbose") || streq(argv[i], "-v")) {
+        } else if (streq(argv[i], "--verbose")) {
             flags |= BPEG_VERBOSE;
-        } else if (streq(argv[i], "--explain") || streq(argv[i], "-e")) {
+        } else if (streq(argv[i], "--explain")) {
             flags |= BPEG_EXPLAIN;
-        } else if (streq(argv[i], "--json") || streq(argv[i], "-j")) {
+        } else if (streq(argv[i], "--json")) {
             flags |= BPEG_JSON;
-        } else if (streq(argv[i], "--ignore-case") || streq(argv[i], "-i")) {
+        } else if (streq(argv[i], "--ignore-case")) {
             flags |= BPEG_IGNORECASE;
         } else if (FLAG("--replace") || FLAG("-r")) {
             file_t *replace_file = spoof_file("<replace argument>", flag);
@@ -200,6 +202,19 @@ int main(int argc, char *argv[])
             ++npatterns;
         } else if (FLAG("--mode") || FLAG("-m")) {
             rule = flag;
+        } else if (argv[i][0] == '-' && argv[i][1] && argv[i][1] != '-') { // single-char flags
+            for (char *c = &argv[i][1]; *c; ++c) {
+                switch (*c) {
+                    case 'h': goto flag_help;
+                    case 'v': flags |= BPEG_VERBOSE; break;
+                    case 'e': flags |= BPEG_EXPLAIN; break;
+                    case 'j': flags |= BPEG_JSON; break;
+                    case 'i': flags |= BPEG_IGNORECASE; break;
+                    default:
+                        printf("Unrecognized flag: -%c\n\n%s\n", *c, usage);
+                        return 1;
+                }
+            }
         } else if (argv[i][0] != '-') {
             if (npatterns > 0) break;
             file_t *arg_file = spoof_file("<pattern argument>", argv[i]);

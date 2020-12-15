@@ -7,6 +7,8 @@ bp \- Bruce's Parsing Expression Grammar tool
 .B bp
 [\fI-h\fR|\fI--help\fR]
 [\fI-v\fR|\fI--verbose\fR]
+[\fI-e\fR|\fI--explain\fR]
+[\fI-j\fR|\fI--json\fR]
 [\fI-i\fR|\fI--ignore-case\fR \fI<pattern>\fR]
 [\fI-p\fR|\fI--pattern\fR \fI<pattern>\fR]
 [\fI-P\fR|\fI--pattern-string\fR \fI<string-pattern>\fR]
@@ -22,6 +24,12 @@ bp \- Bruce's Parsing Expression Grammar tool
 .SH OPTIONS
 .B \-v\fR, \fB--verbose
 Print debugging information.
+
+.B \-e\fR, \fB--explain
+Print a visual explanation of the matches.
+
+.B \-j\fR, \fB--json
+Print a JSON list of the matches. (Pairs with \fB--verbose\fR for more detail)
 
 .B \-i\fR, \fB--ignore-case
 Perform pattern matching case-insensitively.
