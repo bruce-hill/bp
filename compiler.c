@@ -162,6 +162,12 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
         case '\\': {
             if (!*str || *str == '\n')
                 file_err(f, str, str, "There should be an escape sequence here after this backslash.");
+
+            if (matchchar(&str, 'N')) { // \N (nodent)
+                op->op = VM_NODENT;
+                break;
+            }
+
             op->len = 1;
             unsigned char e = unescapechar(str, &str);
             if (*str == '-') { // Escape range (e.g. \x00-\xFF)
@@ -397,7 +403,7 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
             break;
         }
         // Special rules:
-        case '_': case '^': case '$': {
+        case '_': case '^': case '$': case '|': {
             if (matchchar(&str, c)) { // double __, ^^, $$
                 char tmp[3] = {c, c, '\0'};
                 op->args.s = strdup(tmp);
@@ -413,10 +419,6 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
                 return NULL;
             }
             op->op = VM_REF;
-            break;
-        }
-        case '|': {
-            op->op = VM_NODENT;
             break;
         }
         default: {
@@ -488,6 +490,13 @@ vm_op_t *bpeg_stringpattern(file_t *f, const char *str)
             if (*str == '\\') {
                 if (!str[1] || str[1] == '\n')
                     file_err(f, str, str, "There should be an escape sequence or pattern here after this backslash.");
+                
+                if (matchchar(&str, 'N')) { // \N (nodent)
+                    interp = calloc(sizeof(vm_op_t), 1);
+                    interp->op = VM_NODENT;
+                    break;
+                }
+
                 const char *after_escape;
                 unsigned char e = unescapechar(&str[1], &after_escape);
                 if (e != str[1]) {

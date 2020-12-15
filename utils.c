@@ -44,6 +44,7 @@ const char *after_spaces(const char *str)
  */
 const char *after_name(const char *str)
 {
+    if (*str == '|') return &str[1];
     if (*str == '^' || *str == '_' || *str == '$') {
         return (str[1] == *str) ? &str[2] : &str[1];
     }

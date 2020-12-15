@@ -39,7 +39,7 @@ vm_op_t *load_grammar(grammar_t *g, file_t *f)
     while (*src) {
         const char *name = src;
         const char *name_end = after_name(name);
-        check(name_end > name, "Invalid name for definition");
+        check(name_end > name, "Invalid name for definition: %s", name);
         name = strndup(name, (size_t)(name_end-name));
         src = after_spaces(name_end);
         check(matchchar(&src, ':'), "Expected ':' in definition");

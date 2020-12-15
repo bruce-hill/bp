@@ -7,11 +7,12 @@ Def: @name=id _ `: __ (
     / @!={...>(`;/id_`:/$) => "Invalid definition: @0"})
 
 # This is used for command line arguments:
-String-pattern: ... % (`\ (escape-sequence / pat [`;]))
+String-pattern: ... % (Nodent / Escape / `\ pat [`;])
 
 pat: simple-pat !(__("!="/"==")) / suffixed-pat
-simple-pat: Upto-and / Dot / String / Char-range / Char / Escape-range / Escape / No
-    / Nodent / Repeat / Optional / After / Before / Capture / Replace / Ref / parens
+simple-pat: Upto-and / Dot / String / Char-range / Char / Nodent / Escape-range
+    / Escape / Repeat / Optional / After / Before / Capture / Replace
+    / Ref / parens
 
 suffixed-pat: (
       Eq-pat
@@ -39,7 +40,7 @@ escape-sequence: (
       / `x 2 (`0-9/`a-f/`A-F)
     )
 No: `! (_@pat / @!={=>"Expected a pattern after the exclamation mark"})
-Nodent: `|
+Nodent: `\ `N
 Upto-and: 2-3`. [_@first=simple-pat] [__`%__@second=simple-pat]
 Repeat: (
         @min='' `* @max=''
@@ -70,7 +71,7 @@ $:  !.
 ^^: !<$.
 ^:  !<.
 
-id: "^^" / "^" / "__" / "_" / "$$" / "$" / (`a-z/`A-Z) *(`a-z/`A-Z/`0-9/`-)
+id: "^^" / "^" / "__" / "_" / "$$" / "$" / "|" / (`a-z/`A-Z) *(`a-z/`A-Z/`0-9/`-)
 
 line-comment: `# .. $
 block-comment: "#("..")#" % block-comment
