@@ -2,6 +2,11 @@
  * compiler.c - Compile strings into BPEG virtual machine code.
  */
 
+#include <ctype.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+
 #include "compiler.h"
 #include "utils.h"
 

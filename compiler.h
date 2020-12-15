@@ -4,10 +4,8 @@
 #ifndef COMPILER__H
 #define COMPILER__H
 
-#include <stdlib.h>
-
-#include "types.h"
 #include "file_loader.h"
+#include "types.h"
 
 __attribute__((nonnull(1,2)))
 vm_op_t *bpeg_simplepattern(file_t *f, const char *str);

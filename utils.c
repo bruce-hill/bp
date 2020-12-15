@@ -1,6 +1,10 @@
 /*
  * utils.c - Some helper code for debugging and error logging.
  */
+
+#include <ctype.h>
+#include <unistd.h>
+
 #include "utils.h"
 
 /* 

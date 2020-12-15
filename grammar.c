@@ -2,9 +2,12 @@
  * grammar.c - Code for defining grammars (sets of rules)
  */
 
-#include "grammar.h"
+#include <stdlib.h>
+#include <string.h>
+
 #include "compiler.h"
 #include "file_loader.h"
+#include "grammar.h"
 #include "utils.h"
 
 grammar_t *new_grammar(void)

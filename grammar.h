@@ -4,9 +4,6 @@
 #ifndef GRAMMAR__H
 #define GRAMMAR__H
 
-#include <stdlib.h>
-#include <string.h>
-
 #include "file_loader.h"
 #include "types.h"
 

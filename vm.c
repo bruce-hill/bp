@@ -3,6 +3,9 @@
  */
 
 #include <ctype.h>
+#include <stdlib.h>
+#include <string.h>
+#include <strings.h>
 
 #include "grammar.h"
 #include "types.h"
