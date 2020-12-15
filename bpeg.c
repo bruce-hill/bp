@@ -81,7 +81,7 @@ static int run_match(grammar_t *g, const char *filename, vm_op_t *pattern, unsig
 
         if (flags & BPEG_EXPLAIN) {
             if (filename) {
-                printf("\033[1;4m%s:\033[0m\n", filename);
+                printf("\033[1;4m%s\033[0m\n", filename);
             }
             /*
             if (printed_matches > 1)
@@ -107,7 +107,7 @@ static int run_match(grammar_t *g, const char *filename, vm_op_t *pattern, unsig
                 fputc('\n', stdout);
             if (filename) {
                 if (print_options & PRINT_COLOR)
-                    printf("\033[1;4;33m%s:\033[0m\n", filename);
+                    printf("\033[1;4;33m%s\033[0m\n", filename);
                 else
                     printf("%s:\n", filename);
             }
