@@ -72,9 +72,6 @@ A chain of patterns, pronounced \fI<pat1>\fB-then-\fI<pat2>\fR
 A series of ordered choices (if one pattern matches, the following patterns
 will not be attempted), pronounced \fI<pat1>\fB-or-\fI<pat2>\fR
 
-.B ..
-Any text \fBup-to-and-including\fR the following pattern, if any (multiline: \fB...\fR)
-
 .B .
 \fBAny\fR character (multiline: $.)
 
@@ -102,10 +99,10 @@ The literal \fBcharacter-\fI<c>\fR
 .B `\fI<c1>\fB-\fI<c2>\fR
 The \fBcharacter-range-\fI<c1>\fB-to-\fI<c2>\fR
 
-.B \\\fI<esc>\fR
+.B \\\\\fI<esc>\fR
 The \fBescape-sequence-\fI<esc>\fR (\fB\\n\fR, \fB\\x1F\fR, \fB\\033\fR, etc.)
 
-.B \\\fI<esc1>\fB-\fI<esc2>\fR
+.B \\\\\fI<esc1>\fB-\fI<esc2>\fR
 The \fBescape-sequence-range-\fI<esc1>\fB-to-\fI<esc2>\fR
 
 .B !\fI<pat>\fR
@@ -132,6 +129,13 @@ The \fBescape-sequence-range-\fI<esc1>\fB-to-\fI<esc2>\fR
 \fI<repeating-pat>\fB-separated-by-\fI<sep>\fR (equivalent to \fI<pat>
 \fB0+(\fI<sep><pat>\fB)\fR)
 
+.B .. \fI<pat>\fR
+Any text \fBup-to-and-including\fR \fI<pat>\fR (multiline: \fB...\fR)
+
+.B .. \fI<pat>\fB % \fI<skip>\fR
+Any text \fBup-to-and-including\fR \fI<pat>\fR, but skipping over instances of \fI<skip>\fR.
+E.g. \fB`"..`" % (`\\.)
+
 .B <\fI<pat>\fR
 \fBJust-after-\fI<pat>\fR (lookbehind)
 
@@ -151,12 +155,12 @@ be a string, and it may contain references to captured values: \fB@0\fR
 \fB@[\fIfoo\fR]\fR (the capture named \fIfoo\fR in \fI<pat>\fR), etc.
 
 .B \fI<pat1>\fB == \fI<pat2>\fR
-Will match only if \fI<pat1>\fR and \fI<pat2>\fR both match and have the exact
-same length. Pronounced \fI<pat1>\fB-assuming-it-equals-\fI<pat2>\fR
+Will match only if \fI<pat1>\fR matches and \fI<pat2>\fR matches the text of \fI<pat1>\fR's
+match. Pronounced \fI<pat1>\fB-if-it-matches-\fI<pat2>\fR
 
 .B \fI<pat1>\fB != \fI<pat2>\fR
-Will match only if \fI<pat1>\fR matches, but \fI<pat2>\fR doesn't also match with the
-same length. Pronounced \fI<pat1>\fB-unless-it-equals-\fI<pat2>\fR
+Will match only if \fI<pat1>\fR matches and \fI<pat2>\fR doesn't match the text of
+\fI<pat1>\fR's match. Pronounced \fI<pat1>\fB-unless-it-matches-\fI<pat2>\fR
 
 .B \fI<pat1>\fB != \fI<pat2>\fR
 Will match only if \fI<pat1>\fR and \fI<pat2>\fR don't both match and have the

@@ -117,9 +117,16 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
                 vm_op_t *till = bpeg_simplepattern(f, str);
                 op->op = VM_UPTO_AND;
                 op->len = -1;
-                op->args.pat = till;
+                op->args.multiple.first = till;
                 if (till)
                     str = till->end;
+                if (matchchar(&str, '%')) {
+                    vm_op_t *skip = bpeg_simplepattern(f, str);
+                    if (!skip)
+                        file_err(f, str, str, "There should be a pattern to skip here after the '%%'");
+                    op->args.multiple.second = skip;
+                    str = skip->end;
+                }
                 break;
             } else {
               anychar:
