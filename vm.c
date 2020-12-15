@@ -110,6 +110,7 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
             return m;
         }
         case VM_STRING: {
+            if (&str[op->len] > f->end) return NULL;
             if ((flags & BPEG_IGNORECASE) ? strncasecmp(str, op->args.s, (size_t)op->len) != 0
                                           : strncmp(str, op->args.s, (size_t)op->len) != 0)
                 return NULL;
