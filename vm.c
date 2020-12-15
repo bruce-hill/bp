@@ -409,18 +409,19 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
 
             size_t linenum = get_line_number(f, str);
             const char *p = get_line(f, linenum);
+            if (p < f->contents) p=f->contents; // Can happen with recursive matching
 
             // Current indentation:
             char denter = *p;
             int dents = 0;
             if (denter == ' ' || denter == '\t') {
-                for (; *p == denter; ++p) ++dents;
+                for (; *p == denter && p < f->end; ++p) ++dents;
             }
 
             // Subsequent indentation:
             while (*str == '\n') ++str;
             for (int i = 0; i < dents; i++) {
-                if (str[i] != denter) return NULL;
+                if (str[i] != denter || &str[i] >= f->end) return NULL;
             }
 
             match_t *m = calloc(sizeof(match_t), 1);
