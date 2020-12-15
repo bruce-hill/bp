@@ -12,6 +12,7 @@ enum BPEGFlag {
     BPEG_VERBOSE    = 1 << 0,
     BPEG_IGNORECASE = 1 << 1,
     BPEG_EXPLAIN    = 1 << 2,
+    BPEG_JSON       = 1 << 3,
 };
 
 /*

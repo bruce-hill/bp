@@ -80,10 +80,10 @@ static int run_match(grammar_t *g, const char *filename, vm_op_t *pattern, unsig
         ++printed_matches;
 
         if (flags & BPEG_EXPLAIN) {
-            if (filename) {
+            if (filename)
                 printf("\033[1;4m%s\033[0m\n", filename);
-            }
-            /*
+            visualize_match(m);
+        } else if (flags & BPEG_JSON) {
             if (printed_matches > 1)
                 fprintf(stdout, ",\n");
             printf("{\"filename\":\"%s\",\"text\":\"", filename ? filename : "-");
@@ -96,12 +96,10 @@ static int run_match(grammar_t *g, const char *filename, vm_op_t *pattern, unsig
                     default: printf("%c", *c); break;
                 }
             }
-            printf("\",\n\"tree\":{\"type\":\"text\",\"start\":%d,\"end\":%ld,\"children\":[",
+            printf("\",\n\"tree\":{\"rule\":\"text\",\"start\":%d,\"end\":%ld,\"children\":[",
                    0, f->end - f->contents);
-            json_match(stdout, f->contents, m);
+            json_match(stdout, f->contents, m, (flags & BPEG_VERBOSE) ? 1 : 0);
             printf("]}}\n");
-            */
-            visualize_match(m);
         } else {
             if (printed_matches > 1)
                 fputc('\n', stdout);
@@ -152,6 +150,8 @@ int main(int argc, char *argv[])
             flags |= BPEG_VERBOSE;
         } else if (streq(argv[i], "--explain") || streq(argv[i], "-e")) {
             flags |= BPEG_EXPLAIN;
+        } else if (streq(argv[i], "--json") || streq(argv[i], "-j")) {
+            flags |= BPEG_JSON;
         } else if (streq(argv[i], "--ignore-case") || streq(argv[i], "-i")) {
             flags |= BPEG_IGNORECASE;
         } else if (FLAG("--replace") || FLAG("-r")) {
@@ -229,6 +229,7 @@ int main(int argc, char *argv[])
     check(pattern != NULL, "No such rule: '%s'", rule);
 
     int ret = 1;
+    if (flags & BPEG_JSON) printf("[");
     if (i < argc) {
         // Files pass in as command line args:
         for (int nfiles = 0; i < argc; nfiles++, i++) {
@@ -247,6 +248,7 @@ int main(int argc, char *argv[])
         // Piped in input:
         ret &= run_match(g, NULL, pattern, flags);
     }
+    if (flags & BPEG_JSON) printf("]");
 
     return ret;
 }

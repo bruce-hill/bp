@@ -595,13 +595,20 @@ void print_match(file_t *f, match_t *m, print_options_t options)
 /*
  * Print a match as JSON
  */
-static int _json_match(FILE *f, const char *text, match_t *m, int comma)
-#define VERBOSE_JSON 1
-#if VERBOSE_JSON
+static int _json_match(FILE *f, const char *text, match_t *m, int comma, int verbose)
 {
+    if (!verbose) {
+        if (m->op->op != VM_REF) {
+            for (match_t *child = m->child; child; child = child->nextsibling) {
+                comma |= _json_match(f, text, child, comma, verbose);
+            }
+            return comma;
+        }
+    }
+
     if (comma) fprintf(f, ",\n");
     comma = 0;
-    fprintf(f, "{\"type\":\"");
+    fprintf(f, "{\"rule\":\"");
     for (const char *c = m->op->start; c < m->op->end; c++) {
         switch (*c) {
             case '"': fprintf(f, "\\\""); break;
@@ -614,53 +621,15 @@ static int _json_match(FILE *f, const char *text, match_t *m, int comma)
     fprintf(f, "\",\"start\":%ld,\"end\":%ld,\"children\":[",
             m->start - text, m->end - text);
     for (match_t *child = m->child; child; child = child->nextsibling) {
-        comma |= _json_match(f, text, child, comma);
+        comma |= _json_match(f, text, child, comma, verbose);
     }
     fprintf(f, "]}");
     return 1;
 }
-#else
-{
-    if (m->op->op == VM_STRING) {
-        if (comma) fprintf(f, ",\n");
-        comma = 0;
-        fprintf(f, "{\"type\":\"\\\"");
-        for (const char *c = m->op->args.s; *c; c++) {
-            switch (*c) {
-                case '"': fprintf(f, "\\\""); break;
-                case '\\': fprintf(f, "\\\\"); break;
-                case '\t': fprintf(f, "\\t"); break;
-                case '\n': fprintf(f, "↵"); break;
-                default: fprintf(f, "%c", *c); break;
-            }
-        }
-        fprintf(f, "\\\"\",\"start\":%ld,\"end\":%ld,\"children\":[",
-                m->start - text, m->end - text);
-    } else if (m->op->op == VM_REF) {
-        if (comma) fprintf(f, ",\n");
-        comma = 0;
-        fprintf(f, "{\"type\":\"%s\",\"start\":%ld,\"end\":%ld,\"children\":[",
-                m->op->args.s, m->start - text, m->end - text);
-    } else if (m->op->op == VM_CAPTURE && m->value.name) {
-        if (comma) fprintf(f, ",\n");
-        comma = 0;
-        fprintf(f, "{\"type\":\"@%s\",\"start\":%ld,\"end\":%ld,\"children\":[",
-                m->value.name, m->start - text, m->end - text);
-    }
-    for (match_t *child = m->child; child; child = child->nextsibling) {
-        comma |= _json_match(f, text, child, comma);
-    }
-    if (m->op->op == VM_REF || m->op->op == VM_STRING || (m->op->op == VM_CAPTURE && m->value.name)) {
-        fprintf(f, "]}");
-        return 1;
-    }
-    return comma;
-}
-#endif
 
-void json_match(FILE *f, const char *text, match_t *m)
+void json_match(FILE *f, const char *text, match_t *m, int verbose)
 {
-    _json_match(f, text, m, 0);
+    _json_match(f, text, m, 0, verbose);
 }
 
 static match_t *match_backref(const char *str, vm_op_t *op, match_t *cap, unsigned int flags)
