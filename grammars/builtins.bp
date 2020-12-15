@@ -49,10 +49,11 @@ utf8-codepoint: (
 )
 crlf: \r\n
 cr: \r
-anglebraces: `< *(anglebraces / $. != `>) `>
-brackets: `[ *(brackets / $. != `]) `]
-braces: `{ *(braces / $. != `}) `}
-parens: `( *(parens / $. != `)) `)
+anglebraces: `<..`> % (anglebraces/string)
+brackets: `[..`] % (brackets/string)
+braces: `{..`} % (braces/string)
+parens: `(..`} % (parens/string)
+string: `"..`" % (`\.) / `'..`' % (`\.)
 id: !<(`a-z/`A-Z/`_/`0-9) (`a-z/`A-Z/`_) *(`a-z/`A-Z/`_/`0-9)
 id-char: `a-z/`A-Z/`_/`0-9
 word: !<(`a-z/`A-Z/`_/`0-9) +(`a-z/`A-Z) !>(`0-9/`_)

@@ -7,7 +7,7 @@ Def: @name=id _ `: __ (
     / @!={...>(`;/id_`:/$) => "Invalid definition: @0"})
 
 # This is used for command line arguments:
-String-pattern: *(`\ (escape-sequence / pat [`;]) / .)
+String-pattern: ... % (`\ (escape-sequence / pat [`;]))
 
 pat: simple-pat !(__("!="/"==")) / suffixed-pat
 simple-pat: Upto-and / Dot / String / Char-range / Char / Escape-range / Escape / No
@@ -40,9 +40,10 @@ escape-sequence: (
     )
 No: `! (_@pat / @!={=>"Expected a pattern after the exclamation mark"})
 Nodent: `|
-Upto-and: 2-3`. [_@simple-pat]
+Upto-and: 2-3`. [_@first=simple-pat] [__`%__@second=simple-pat]
 Repeat: (
-        @min=int _ `- _ @max=int
+        @min='' `* @max=''
+      / @min=int _ `- _ @max=int
       / @min=int _ `+   @max=''
       / @min=@max=int
     ) __ @repeat-pat=pat [__`%__@sep=pat]
@@ -72,7 +73,7 @@ $:  !.
 id: "^^" / "^" / "__" / "_" / "$$" / "$" / (`a-z/`A-Z) *(`a-z/`A-Z/`0-9/`-)
 
 line-comment: `# .. $
-block-comment: "#(" *(block-comment / !")#" .) ")#"
+block-comment: "#("..")#" % block-comment
 
 # Note: comments are undefined by default in regular BPEG
 comment: block-comment / line-comment
