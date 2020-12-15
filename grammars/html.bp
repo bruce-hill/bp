@@ -11,9 +11,7 @@ template-element: "<template>"...("</template>") % (comment / html-element)
 
 raw-element: `< @tag=("script"/"style"/"textarea"/"title") __attributes__ `>...("</"tag__`>)
 
-normal-element: `< @tag=(
-  "area"/"base"/"br"/"col"/"embed"/"hr"/"img"/"input"/"link"/"meta"/"param"/"source"/"track"/"wbr")
-  __attributes__ `>...("</"tag`>) % (comment / html-element)
+normal-element: `< @tag=id __attributes__ `>...("</"tag`>) % (comment / html-element)
 
 comment: "<!--" ..."-->"
 
