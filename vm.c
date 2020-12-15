@@ -296,16 +296,24 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
             match_t *m1 = _match(g, f, str, op->args.multiple.first, flags, rec);
             if (m1 == NULL) return NULL;
 
-            // <p1>==<p2> matches iff both have the same start and end point
-            // <p1>!=<p2> matches iff <p1> matches, but is not equal to <p2>
-            match_t *m2 = _match(g, f, str, op->args.multiple.second, flags, rec);
-            if ((m2 == NULL || m2->end != m1->end) == (op->op == VM_EQUAL)) {
+            // <p1>==<p2> matches iff the text of <p1> matches <p2>
+            // <p1>!=<p2> matches iff the text of <p1> does not match <p2>
+            file_t inner = {
+                .filename=f->filename,
+                .contents=(char*)m1->start, .end=(char*)m1->end,
+                .lines=f->lines, // I think this works, but am not 100% sure
+                .length=(size_t)(m1->end - m1->start),
+                .nlines=1 + get_line_number(f, m1->end)-get_line_number(f, m1->start),
+                .mmapped=f->mmapped,
+            };
+            match_t *m2 = _match(g, &inner, str, op->args.multiple.second, flags, rec);
+            if ((m2 == NULL) == (op->op == VM_EQUAL)) {
                 destroy_match(&m1);
                 destroy_match(&m2);
                 return NULL;
             }
             match_t *m = calloc(sizeof(match_t), 1);
-            m->start = str;
+            m->start = m1->start;
             m->end = m1->end;
             m->op = op;
             m->child = m1;
