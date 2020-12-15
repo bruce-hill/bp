@@ -4,9 +4,10 @@
 
 #include <ctype.h>
 
-#include "vm.h"
 #include "grammar.h"
+#include "types.h"
 #include "utils.h"
+#include "vm.h"
 
 static match_t *match_backref(const char *str, vm_op_t *op, match_t *m, unsigned int flags);
 static size_t push_backrefs(grammar_t *g, match_t *m);
@@ -590,46 +591,6 @@ void print_match(file_t *f, match_t *m, print_options_t options)
 {
     print_state_t state = {.line = 1, .color = "\033[0m"};
     _print_match(f, m, &state, options);
-}
-
-/*
- * Print a match as JSON
- */
-static int _json_match(FILE *f, const char *text, match_t *m, int comma, int verbose)
-{
-    if (!verbose) {
-        if (m->op->op != VM_REF) {
-            for (match_t *child = m->child; child; child = child->nextsibling) {
-                comma |= _json_match(f, text, child, comma, verbose);
-            }
-            return comma;
-        }
-    }
-
-    if (comma) fprintf(f, ",\n");
-    comma = 0;
-    fprintf(f, "{\"rule\":\"");
-    for (const char *c = m->op->start; c < m->op->end; c++) {
-        switch (*c) {
-            case '"': fprintf(f, "\\\""); break;
-            case '\\': fprintf(f, "\\\\"); break;
-            case '\t': fprintf(f, "\\t"); break;
-            case '\n': fprintf(f, "↵"); break;
-            default: fprintf(f, "%c", *c); break;
-        }
-    }
-    fprintf(f, "\",\"start\":%ld,\"end\":%ld,\"children\":[",
-            m->start - text, m->end - text);
-    for (match_t *child = m->child; child; child = child->nextsibling) {
-        comma |= _json_match(f, text, child, comma, verbose);
-    }
-    fprintf(f, "]}");
-    return 1;
-}
-
-void json_match(FILE *f, const char *text, match_t *m, int verbose)
-{
-    _json_match(f, text, m, 0, verbose);
 }
 
 static match_t *match_backref(const char *str, vm_op_t *op, match_t *cap, unsigned int flags)
