@@ -14,6 +14,7 @@
 #include "compiler.h"
 #include "file_loader.h"
 #include "grammar.h"
+#include "json.h"
 #include "utils.h"
 #include "viz.h"
 #include "vm.h"
@@ -89,7 +90,7 @@ static int run_match(grammar_t *g, const char *filename, vm_op_t *pattern, unsig
             printf("{\"filename\":\"%s\",", filename ? filename : "-");
             printf("\"tree\":{\"rule\":\"text\",\"start\":%d,\"end\":%ld,\"children\":[",
                    0, f->end - f->contents);
-            json_match(stdout, f->contents, m, (flags & BPEG_VERBOSE) ? 1 : 0);
+            json_match(f->contents, m, (flags & BPEG_VERBOSE) ? 1 : 0);
             printf("]}}\n");
         } else {
             if (printed_matches > 1)
@@ -239,7 +240,7 @@ int main(int argc, char *argv[])
         // Piped in input:
         ret &= run_match(g, NULL, pattern, flags);
     }
-    if (flags & BPEG_JSON) printf("]");
+    if (flags & BPEG_JSON) printf("]\n");
 
     return ret;
 }
