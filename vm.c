@@ -144,18 +144,26 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
             match_t *m = calloc(sizeof(match_t), 1);
             m->start = str;
             m->op = op;
-            if (op->args.multiple.first) {
+            if (!op->args.multiple.first && !op->args.multiple.second) {
+                if (op->multiline) {
+                    str = f->end;
+                } else {
+                    while (str < f->end && *str != '\n') ++str;
+                }
+            } else {
                 match_t **dest = &m->child;
                 for (const char *prev = NULL; prev < str; ) {
                     prev = str;
-                    match_t *p = _match(g, f, str, op->args.multiple.first, flags, rec);
-                    if (p) {
-                        *dest = p;
-                        m->end = p->end;
-                        return m;
+                    if (op->args.multiple.first) {
+                        match_t *p = _match(g, f, str, op->args.multiple.first, flags, rec);
+                        if (p) {
+                            *dest = p;
+                            m->end = p->end;
+                            return m;
+                        }
                     }
                     if (op->args.multiple.second) {
-                        p = _match(g, f, str, op->args.multiple.second, flags, rec);
+                        match_t *p = _match(g, f, str, op->args.multiple.second, flags, rec);
                         if (p) {
                             *dest = p;
                             dest = &p->nextsibling;
@@ -171,10 +179,6 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
                 }
                 destroy_match(&m);
                 return NULL;
-            } else if (op->multiline) {
-                str = f->end;
-            } else {
-                while (str < f->end && *str != '\n') ++str;
             }
             m->end = str;
             return m;
