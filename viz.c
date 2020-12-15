@@ -10,17 +10,6 @@
 #include "viz.h"
 
 
-/*
-static size_t utf8_len(const char *s)
-{
-    size_t len = 0;
-    while (*s) {
-        len += (*s++ & 0xC0) != 0x80;
-    }
-    return len;
-}
-*/
-
 static int match_height(match_t *m)
 {
     int height = 0;
