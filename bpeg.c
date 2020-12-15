@@ -86,17 +86,8 @@ static int run_match(grammar_t *g, const char *filename, vm_op_t *pattern, unsig
         } else if (flags & BPEG_JSON) {
             if (printed_matches > 1)
                 fprintf(stdout, ",\n");
-            printf("{\"filename\":\"%s\",\"text\":\"", filename ? filename : "-");
-            for (char *c = f->contents; c < f->end; c++) {
-                switch (*c) {
-                    case '"': printf("\\\""); break;
-                    case '\n': printf("\\n"); break;
-                    case '\t': printf("\\t"); break;
-                    case '\\': printf("\\\\"); break;
-                    default: printf("%c", *c); break;
-                }
-            }
-            printf("\",\n\"tree\":{\"rule\":\"text\",\"start\":%d,\"end\":%ld,\"children\":[",
+            printf("{\"filename\":\"%s\",", filename ? filename : "-");
+            printf("\"tree\":{\"rule\":\"text\",\"start\":%d,\"end\":%ld,\"children\":[",
                    0, f->end - f->contents);
             json_match(stdout, f->contents, m, (flags & BPEG_VERBOSE) ? 1 : 0);
             printf("]}}\n");
