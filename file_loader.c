@@ -38,8 +38,9 @@ static void populate_lines(file_t *f)
 file_t *load_file(const char *filename)
 {
     if (filename == NULL) filename = "-";
-    int fd = strcmp(filename, "-") != 0 ? open(filename, O_RDONLY) : STDIN_FILENO;
+    int fd = streq(filename, "-") ? STDIN_FILENO : open(filename, O_RDONLY);
     if (fd < 0) return NULL;
+    size_t length;
     file_t *f = new(file_t);
     f->filename = strdup(filename);
 
@@ -52,24 +53,24 @@ file_t *load_file(const char *filename)
         goto skip_mmap;
 
     f->mmapped = 1;
-    f->length = (size_t)sb.st_size;
+    length = (size_t)sb.st_size;
     goto finished_loading;
 
   skip_mmap:
     f->mmapped = 0;
     size_t capacity = 1000;
-    f->length = 0;
+    length = 0;
     f->contents = xcalloc(sizeof(char), capacity);
     ssize_t just_read;
-    while ((just_read=read(fd, &f->contents[f->length], capacity - f->length)) > 0) {
-        f->length += (size_t)just_read;
-        if (f->length >= capacity)
+    while ((just_read=read(fd, &f->contents[length], capacity - length)) > 0) {
+        length += (size_t)just_read;
+        if (length >= capacity)
             f->contents = xrealloc(f->contents, sizeof(char)*(capacity *= 2) + 1);
     }
     close(fd);
 
   finished_loading:
-    f->end = &f->contents[f->length];
+    f->end = &f->contents[length];
     populate_lines(f);
     return f;
 }
@@ -83,8 +84,7 @@ file_t *spoof_file(const char *filename, char *text)
     file_t *f = new(file_t);
     f->filename = strdup(filename);
     f->contents = text;
-    f->length = strlen(text);
-    f->end = &f->contents[f->length];
+    f->end = &f->contents[strlen(text)];
     populate_lines(f);
     return f;
 }
@@ -101,7 +101,7 @@ void destroy_file(file_t **f)
     }
     if ((*f)->contents) {
         if ((*f)->mmapped) {
-            munmap((*f)->contents, (*f)->length);
+            munmap((*f)->contents, (size_t)((*f)->end - (*f)->contents));
         } else {
             free((*f)->contents);
         }
@@ -160,3 +160,5 @@ void fprint_line(FILE *dest, file_t *f, const char *start, const char *end, cons
     for (; p < end; ++p) fputc('^', dest);
     fprintf(dest, "\033[0m\n");
 }
+
+// vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1

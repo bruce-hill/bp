@@ -5,7 +5,6 @@
 #include <ctype.h>
 #include <stdlib.h>
 #include <string.h>
-#include <strings.h>
 
 #include "grammar.h"
 #include "types.h"
@@ -41,6 +40,7 @@ static const char *opcode_names[] = {
     [VM_NODENT] = "NODENT",
 };
 
+// UTF8-compliant char iteration
 static inline const char *next_char(file_t *f, const char *str)
 {
     char c = *str;
@@ -78,9 +78,9 @@ static size_t push_backrefs(grammar_t *g, match_t *m)
     if (m == NULL) return 0;
     if (m->op->op == VM_REF) return 0;
     size_t count = 0;
-    if (m->op->op == VM_CAPTURE && m->value.name) {
+    if (m->op->op == VM_CAPTURE && m->op->args.capture.name) {
         ++count;
-        push_backref(g, m->value.name, m->child);
+        push_backref(g, m->op->args.capture.name, m->child);
     }
     if (m->child) count += push_backrefs(g, m->child);
     if (m->nextsibling) count += push_backrefs(g, m->nextsibling);
@@ -115,8 +115,8 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
         }
         case VM_STRING: {
             if (&str[op->len] > f->end) return NULL;
-            if ((flags & BPEG_IGNORECASE) ? strncasecmp(str, op->args.s, (size_t)op->len) != 0
-                                          : strncmp(str, op->args.s, (size_t)op->len) != 0)
+            if ((flags & BPEG_IGNORECASE) ? memicmp(str, op->args.s, (size_t)op->len) != 0
+                                          : memcmp(str, op->args.s, (size_t)op->len) != 0)
                 return NULL;
             match_t *m = new(match_t);
             m->op = op;
@@ -273,8 +273,6 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
             m->end = p->end;
             m->op = op;
             m->child = p;
-            if (op->args.capture.name)
-                m->value.name = op->args.capture.name;
             return m;
         }
         case VM_HIDE: {
@@ -321,7 +319,6 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
                 .filename=f->filename,
                 .contents=(char*)m1->start, .end=(char*)m1->end,
                 .lines=f->lines, // I think this works, but am not 100% sure
-                .length=(size_t)(m1->end - m1->start),
                 .nlines=1 + get_line_number(f, m1->end)-get_line_number(f, m1->start),
                 .mmapped=f->mmapped,
             };
@@ -345,8 +342,8 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
         }
         case VM_REPLACE: {
             match_t *p = NULL;
-            if (op->args.replace.replace_pat) {
-                p = _match(g, f, str, op->args.replace.replace_pat, flags, rec);
+            if (op->args.replace.pat) {
+                p = _match(g, f, str, op->args.replace.pat, flags, rec);
                 if (p == NULL) return NULL;
             }
             match_t *m = new(match_t);
@@ -358,7 +355,6 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
             } else {
                 m->end = m->start;
             }
-            m->value.replacement = op->args.replace.replacement;
             return m;
         }
         case VM_REF: {
@@ -397,7 +393,6 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
             m->end = best->end;
             m->op = op;
             m->child = best;
-            m->value.name = op->args.s;
             return m;
         }
         case VM_BACKREF: {
@@ -460,7 +455,8 @@ static match_t *get_capture_n(match_t *m, int *n)
  */
 static match_t *get_capture_named(match_t *m, const char *name)
 {
-    if (m->op->op == VM_CAPTURE && m->value.name && streq(m->value.name, name))
+    if (m->op->op == VM_CAPTURE && m->op->args.capture.name
+        && streq(m->op->args.capture.name, name))
         return m;
     for (match_t *c = m->child; c; c = c->nextsibling) {
         match_t *cap = get_capture_named(c, name);
@@ -519,7 +515,9 @@ static void _print_match(file_t *f, match_t *m, print_state_t *state, print_opti
             state->color = hl;
             printf("%s", state->color);
         }
-        for (const char *r = m->value.replacement; *r; ) {
+        const char *text = m->op->args.replace.text;
+        const char *end = &text[m->op->args.replace.len];
+        for (const char *r = text; r < end; ) {
             if (*r == '@' && r[1] && r[1] != '@') {
                 ++r;
                 match_t *cap = get_cap(m, &r);
@@ -606,7 +604,9 @@ static match_t *match_backref(const char *str, vm_op_t *op, match_t *cap, unsign
     match_t **dest = &ret->child;
 
     if (cap->op->op == VM_REPLACE) {
-        for (const char *r = cap->value.replacement; *r; ) {
+        const char *text = cap->op->args.replace.text;
+        const char *end = &text[cap->op->args.replace.len];
+        for (const char *r = text; r < end; ) {
             if (*r == '\\') {
                 ++r;
                 if (*(str++) != unescapechar(r, &r)) {
@@ -660,8 +660,8 @@ static match_t *match_backref(const char *str, vm_op_t *op, match_t *cap, unsign
         for (match_t *child = cap->child; child; child = child->nextsibling) {
             if (child->start > prev) {
                 size_t len = (size_t)(child->start - prev);
-                if ((flags & BPEG_IGNORECASE) ? strncasecmp(str, prev, len) != 0
-                                              : strncmp(str, prev, len) != 0) {
+                if ((flags & BPEG_IGNORECASE) ? memicmp(str, prev, len) != 0
+                                              : memcmp(str, prev, len) != 0) {
                     destroy_match(&ret);
                     return NULL;
                 }
@@ -680,8 +680,8 @@ static match_t *match_backref(const char *str, vm_op_t *op, match_t *cap, unsign
         }
         if (cap->end > prev) {
             size_t len = (size_t)(cap->end - prev);
-            if ((flags & BPEG_IGNORECASE) ? strncasecmp(str, prev, len) != 0
-                                          : strncmp(str, prev, len) != 0) {
+            if ((flags & BPEG_IGNORECASE) ? memicmp(str, prev, len) != 0
+                                          : memcmp(str, prev, len) != 0) {
                 destroy_match(&ret);
                 return NULL;
             }

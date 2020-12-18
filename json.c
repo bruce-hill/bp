@@ -45,3 +45,5 @@ void json_match(const char *text, match_t *m, int verbose)
 {
     _json_match(text, m, 0, verbose);
 }
+
+// vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1

@@ -146,3 +146,5 @@ void visualize_match(match_t *m)
     _visualize_patterns(m);
     printf("\033[?7h");
 }
+
+// vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1

@@ -63,8 +63,9 @@ typedef struct vm_op_s {
             struct vm_op_s *first, *second;
         } multiple;
         struct {
-            struct vm_op_s *replace_pat;
-            const char *replacement;
+            struct vm_op_s *pat;
+            const char *text;
+            size_t len;
         } replace;
         struct {
             struct vm_op_s *capture_pat;
@@ -81,10 +82,6 @@ typedef struct vm_op_s {
 typedef struct match_s {
     // Where the match starts and ends (end is after the last character)
     const char *start, *end;
-    union {
-        const char *name;
-        const char *replacement;
-    } value;
     struct match_s *child, *nextsibling;
     vm_op_t *op;
 } match_t;

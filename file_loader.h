@@ -9,7 +9,7 @@
 typedef struct {
     const char *filename;
     char *contents, **lines, *end;
-    size_t length, nlines;
+    size_t nlines;
     unsigned int mmapped:1;
 } file_t;
 
@@ -27,3 +27,4 @@ __attribute__((format (printf, 5, 6)))
 void fprint_line(FILE *dest, file_t *f, const char *start, const char *end, const char *fmt, ...);
 
 #endif
+// vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1

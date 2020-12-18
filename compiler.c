@@ -142,24 +142,26 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
         }
         // Char literals
         case '`': {
-            char literal[2] = {*str, '\0'};
+            char c = *str;
             ++str;
-            if (!literal[0] || literal[0] == '\n')
+            if (!c || c == '\n')
                 file_err(f, str, str, "There should be a character here after the '`'");
             op->len = 1;
             if (matchchar(&str, '-')) { // Range
                 char c2 = *str;
                 if (!c2 || c2 == '\n')
                     file_err(f, str, str, "There should be a character here to complete the character range.");
-                if (c2 < literal[0])
+                if (c2 < c)
                     file_err(f, origin, str+1, "Character ranges must be low-to-high, but this is high-to-low.");
                 op->op = VM_RANGE;
-                op->args.range.low = (unsigned char)literal[0];
+                op->args.range.low = (unsigned char)c;
                 op->args.range.high = (unsigned char)c2;
                 ++str;
             } else {
                 op->op = VM_STRING;
-                op->args.s = strdup(literal);
+                char *s = xcalloc(sizeof(char), 2);
+                s[0] = c;
+                op->args.s = s;
             }
             break;
         }
@@ -187,16 +189,17 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
                 op->args.range.low = e;
                 op->args.range.high = e2;
             } else {
-                char literal[2] = {(char)e, '\0'};
                 op->op = VM_STRING;
-                op->args.s = strdup(literal);
+                char *s = xcalloc(sizeof(char), 2);
+                s[0] = (char)e;
+                op->args.s = s;
             }
             break;
         }
         // String literal
         case '"': case '\'': case '\002': {
             char endquote = c == '\002' ? '\003' : c;
-            char *literal = (char*)str;
+            char *start = (char*)str;
             for (; *str && *str != endquote; str++) {
                 if (*str == '\\') {
                     if (!str[1] || str[1] == '\n')
@@ -205,8 +208,9 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
                     ++str;
                 }
             }
-            size_t len = (size_t)(str - literal);
-            literal = strndup(literal, len);
+            size_t len = (size_t)(str - start);
+            char *literal = xcalloc(sizeof(char), len+1);
+            memcpy(literal, start, len);
             len = unescape_string(literal, literal, len);
 
             op->op = VM_STRING;
@@ -381,8 +385,10 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
 
             char quote = *str;
             const char *replacement;
+            size_t replace_len;
             if (matchchar(&str, '}')) {
                 replacement = strdup("");
+                replace_len = 0;
             } else {
                 if (!(matchchar(&str, '"') || matchchar(&str, '\'')))
                     file_err(f, str, str, "There should be a string literal as a replacement here.");
@@ -395,15 +401,18 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
                         ++str;
                     }
                 }
-                replacement = strndup(repstr, (size_t)(str-repstr));
+                replace_len = (size_t)(str-repstr);
+                replacement = xcalloc(sizeof(char), replace_len+1);
+                memcpy((void*)replacement, repstr, (size_t)(str-repstr));
                 if (!matchchar(&str, quote))
                     file_err(f, &repstr[-1], str, "This string doesn't have a closing quote.");
                 if (!matchchar(&str, '}'))
                     file_err(f, origin, str, "This replacement doesn't have a closing '}'");
             }
             op->op = VM_REPLACE;
-            op->args.replace.replace_pat = pat;
-            op->args.replace.replacement = replacement;
+            op->args.replace.pat = pat;
+            op->args.replace.text = replacement;
+            op->args.replace.len = replace_len;
             if (pat != NULL) op->len = pat->len;
             break;
         }
@@ -489,7 +498,7 @@ vm_op_t *bpeg_stringpattern(file_t *f, const char *str)
         strop->start = str;
         strop->len = 0;
         strop->op = VM_STRING;
-        char *literal = (char*)str;
+        char *start = (char*)str;
         vm_op_t *interp = NULL;
         for (; *str; str++) {
             if (*str == '\\') {
@@ -519,8 +528,9 @@ vm_op_t *bpeg_stringpattern(file_t *f, const char *str)
             }
         }
         // End of string
-        size_t len = (size_t)(str - literal);
-        literal = strndup(literal, len);
+        size_t len = (size_t)(str - start);
+        char *literal = xcalloc(sizeof(char), len+1);
+        memcpy(literal, start, len);
         len = unescape_string(literal, literal, len);
         strop->len = (ssize_t)len;
         strop->args.s = literal;
@@ -552,7 +562,7 @@ vm_op_t *bpeg_replacement(file_t *f, vm_op_t *pat, const char *replacement)
     op->op = VM_REPLACE;
     op->start = pat->start;
     op->len = pat->len;
-    op->args.replace.replace_pat = pat;
+    op->args.replace.pat = pat;
     const char *p = replacement;
     for (; *p; p++) {
         if (*p == '\\') {
@@ -561,8 +571,11 @@ vm_op_t *bpeg_replacement(file_t *f, vm_op_t *pat, const char *replacement)
             ++p;
         }
     }
-    replacement = strndup(replacement, (size_t)(p-replacement));
-    op->args.replace.replacement = replacement;
+    size_t rlen = (size_t)(p-replacement);
+    char *rcpy = xcalloc(sizeof(char), rlen + 1);
+    memcpy(rcpy, replacement, rlen);
+    op->args.replace.text = rcpy;
+    op->args.replace.len = rlen;
     return op;
 }
 

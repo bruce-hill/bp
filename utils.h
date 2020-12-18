@@ -29,6 +29,7 @@ int matchchar(const char **str, char c);
 __attribute__((nonnull))
 size_t unescape_string(char *dest, const char *src, size_t bufsize);
 void *memcheck(void *p);
+int memicmp(const void *s1, const void *s2, size_t n);
 
 #endif
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1

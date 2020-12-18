@@ -181,4 +181,14 @@ void *memcheck(void *p)
     return p;
 }
 
+
+int memicmp(const void *v1, const void *v2, size_t n)
+{
+    int result = 0;
+    const char *s1 = (const char*)v1, *s2 = (const char*)v2;
+    while (n-- > 0 && (result = tolower(*(s1++)) - tolower(*(s2++))) == 0)
+        ;
+    return result;
+}
+
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1

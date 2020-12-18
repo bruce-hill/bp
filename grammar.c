@@ -58,7 +58,7 @@ vm_op_t *load_grammar(grammar_t *g, file_t *f)
         if (*src && matchchar(&src, ';'))
             src = after_spaces(src);
     }
-    if (src < &f->contents[f->length-1]) {
+    if (src < f->end) {
         fprint_line(stderr, f, src, NULL, "Invalid BPEG pattern");
         _exit(1);
     }
@@ -108,3 +108,5 @@ void pop_backrefs(grammar_t *g, size_t count)
         --g->backrefcount;
     }
 }
+
+// vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1
