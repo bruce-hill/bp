@@ -9,6 +9,7 @@ bp \- Bruce's Parsing Expression Grammar tool
 [\fI-v\fR|\fI--verbose\fR]
 [\fI-e\fR|\fI--explain\fR]
 [\fI-j\fR|\fI--json\fR]
+[\fI-l\fR|\fI--list-files\fR]
 [\fI-i\fR|\fI--ignore-case\fR \fI<pattern>\fR]
 [\fI-p\fR|\fI--pattern\fR \fI<pattern>\fR]
 [\fI-P\fR|\fI--pattern-string\fR \fI<string-pattern>\fR]
@@ -30,6 +31,9 @@ Print a visual explanation of the matches.
 
 .B \-j\fR, \fB--json
 Print a JSON list of the matches. (Pairs with \fB--verbose\fR for more detail)
+
+.B \-l\fR, \fB--list-files
+Print only the names of files containing matches instead of the matches themselves.
 
 .B \-i\fR, \fB--ignore-case
 Perform pattern matching case-insensitively.

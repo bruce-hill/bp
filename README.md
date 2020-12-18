@@ -12,6 +12,7 @@ It's written in pure C with no dependencies.
 * `-i` `--ignore-case` perform a case-insensitive match
 * `-e` `--explain` print an explanation of the matches
 * `-j` `--json` print matches as JSON objects
+* `-l` `--list-files` print only filenames containing matches
 * `-d` `--define <name>:<def>` define a grammar rule
 * `-D` `--define-string <name>:<def>` define a grammar rule (string-pattern)
 * `-p` `--pattern <pat>` provide a pattern (equivalent to `bp '\(<pat>)'`)
