@@ -128,7 +128,7 @@ static void _visualize_matches(match_node_t *firstmatch, int depth, const char *
 
 static void _visualize_patterns(match_t *m)
 {
-    if (m->op->op == VM_REF && strcmp(m->op->args.s, "pattern") == 0) {
+    if (m->op->op == VM_REF && streq(m->op->args.s, "pattern")) {
         m = m->child;
         match_node_t first = {.m = m};
         _visualize_matches(&first, 0, m->start, (size_t)(m->end - m->start));
