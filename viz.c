@@ -7,6 +7,7 @@
 #include <string.h>
 
 #include "types.h"
+#include "utils.h"
 #include "viz.h"
 
 
@@ -54,7 +55,7 @@ static void _visualize_matches(match_node_t *firstmatch, int depth, const char *
         if (RIGHT_TYPE(m)) {
             //if (m->m->op->op != VM_REF) {
                 for (match_t *c = m->m->child; c; c = c->nextsibling) {
-                    *nextchild = calloc(1, sizeof(match_node_t));
+                    *nextchild = new(match_node_t);
                     (*nextchild)->m = c;
                     nextchild = &((*nextchild)->next);
                 }
@@ -70,7 +71,7 @@ static void _visualize_matches(match_node_t *firstmatch, int depth, const char *
             }
             printf("\033[0;2m%s\033[0m", V);
         } else {
-            *nextchild = calloc(1, sizeof(match_node_t));
+            *nextchild = new(match_node_t);
             (*nextchild)->m = m->m;
             nextchild = &((*nextchild)->next);
             printf("\033[%ldG\033[0;2m%s", 1+2*(m->m->start - text), V);

@@ -12,15 +12,15 @@
 
 grammar_t *new_grammar(void)
 {
-    grammar_t *g = calloc(sizeof(grammar_t), 1);
-    g->definitions = calloc(sizeof(def_t), (g->defcapacity = 128));
+    grammar_t *g = new(grammar_t);
+    g->definitions = xcalloc(sizeof(def_t), (g->defcapacity = 128));
     return g;
 }
 
 void add_def(grammar_t *g, file_t *f, const char *src, const char *name, vm_op_t *op)
 {
     if (g->defcount >= g->defcapacity) {
-        g->definitions = realloc(g->definitions, sizeof(&g->definitions[0])*(g->defcapacity += 32));
+        g->definitions = xrealloc(g->definitions, sizeof(&g->definitions[0])*(g->defcapacity += 32));
     }
     int i = g->defcount;
     g->definitions[i].file = f;
@@ -84,12 +84,12 @@ vm_op_t *lookup(grammar_t *g, const char *name)
 void push_backref(grammar_t *g, const char *name, match_t *capture)
 {
     if (g->backrefcount >= g->backrefcapacity) {
-        g->backrefs = realloc(g->backrefs, sizeof(g->backrefs[0])*(g->backrefcapacity += 32));
+        g->backrefs = xrealloc(g->backrefs, sizeof(g->backrefs[0])*(g->backrefcapacity += 32));
     }
     size_t i = g->backrefcount++;
     g->backrefs[i].name = name;
     g->backrefs[i].capture = capture;
-    vm_op_t *op = calloc(sizeof(vm_op_t), 1);
+    vm_op_t *op = new(vm_op_t);
     op->op = VM_BACKREF;
     op->start = capture->start;
     op->end = capture->end;

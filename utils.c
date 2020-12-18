@@ -172,5 +172,13 @@ size_t unescape_string(char *dest, const char *src, size_t bufsize)
 #undef PUT
 }
 
+void *memcheck(void *p)
+{
+    if (p == NULL) {
+        fprintf(stderr, "memory allocation failure\n");
+        _exit(1);
+    }
+    return p;
+}
 
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1

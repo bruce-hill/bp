@@ -13,18 +13,19 @@
 #include <unistd.h>
 
 #include "file_loader.h"
+#include "utils.h"
 
 static void populate_lines(file_t *f)
 {
     // Calculate line numbers:
     size_t linecap = 10;
-    f->lines = calloc(sizeof(const char*), linecap);
+    f->lines = xcalloc(sizeof(const char*), linecap);
     f->nlines = 0;
     char *p = f->contents;
     for (size_t n = 0; p && p < f->end; ++n) {
         ++f->nlines;
         if (n >= linecap)
-            f->lines = realloc(f->lines, sizeof(const char*)*(linecap *= 2));
+            f->lines = xrealloc(f->lines, sizeof(const char*)*(linecap *= 2));
         f->lines[n] = p;
         p = strchr(p, '\n');
         if (p) ++p;
@@ -39,7 +40,7 @@ file_t *load_file(const char *filename)
     if (filename == NULL) filename = "-";
     int fd = strcmp(filename, "-") != 0 ? open(filename, O_RDONLY) : STDIN_FILENO;
     if (fd < 0) return NULL;
-    file_t *f = calloc(sizeof(file_t), 1);
+    file_t *f = new(file_t);
     f->filename = strdup(filename);
 
     struct stat sb;
@@ -58,12 +59,12 @@ file_t *load_file(const char *filename)
     f->mmapped = 0;
     size_t capacity = 1000;
     f->length = 0;
-    f->contents = calloc(sizeof(char), capacity);
+    f->contents = xcalloc(sizeof(char), capacity);
     ssize_t just_read;
     while ((just_read=read(fd, &f->contents[f->length], capacity - f->length)) > 0) {
         f->length += (size_t)just_read;
         if (f->length >= capacity)
-            f->contents = realloc(f->contents, sizeof(char)*(capacity *= 2) + 1);
+            f->contents = xrealloc(f->contents, sizeof(char)*(capacity *= 2) + 1);
     }
     close(fd);
 
@@ -79,7 +80,7 @@ file_t *load_file(const char *filename)
 file_t *spoof_file(const char *filename, char *text)
 {
     if (filename == NULL) filename = "";
-    file_t *f = calloc(sizeof(file_t), 1);
+    file_t *f = new(file_t);
     f->filename = strdup(filename);
     f->contents = text;
     f->length = strlen(text);

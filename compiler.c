@@ -69,7 +69,7 @@ static vm_op_t *expand_choices(file_t *f, vm_op_t *first)
     if (!second)
         file_err(f, str, str, "There should be a pattern here after a '/'");
     second = expand_choices(f, second);
-    vm_op_t *choice = calloc(sizeof(vm_op_t), 1);
+    vm_op_t *choice = new(vm_op_t);
     choice->op = VM_OTHERWISE;
     choice->start = first->start;
     if (first->len == second->len)
@@ -85,7 +85,7 @@ static vm_op_t *chain_together(vm_op_t *first, vm_op_t *second)
 {
     if (first == NULL) return second;
     if (second == NULL) return first;
-    vm_op_t *chain = calloc(sizeof(vm_op_t), 1);
+    vm_op_t *chain = new(vm_op_t);
     chain->op = VM_CHAIN;
     chain->start = first->start;
     if (first->len >= 0 && second->len >= 0)
@@ -104,7 +104,7 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
 {
     str = after_spaces(str);
     if (!*str) return NULL;
-    vm_op_t *op = calloc(sizeof(vm_op_t), 1);
+    vm_op_t *op = new(vm_op_t);
     op->start = str;
     op->len = -1;
     char c = *str;
@@ -464,7 +464,7 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
                   "These two patterns cannot possibly give the same result (different lengths: %ld != %ld)",
                   first->len, second->len);
         }
-        op = calloc(sizeof(vm_op_t), 1);
+        op = new(vm_op_t);
         op->op = equal ? VM_EQUAL : VM_NOT_EQUAL;
         op->start = str;
         op->end = second->end;
@@ -485,7 +485,7 @@ vm_op_t *bpeg_stringpattern(file_t *f, const char *str)
 {
     vm_op_t *ret = NULL;
     while (*str) {
-        vm_op_t *strop = calloc(sizeof(vm_op_t), 1);
+        vm_op_t *strop = new(vm_op_t);
         strop->start = str;
         strop->len = 0;
         strop->op = VM_STRING;
@@ -497,7 +497,7 @@ vm_op_t *bpeg_stringpattern(file_t *f, const char *str)
                     file_err(f, str, str, "There should be an escape sequence or pattern here after this backslash.");
                 
                 if (matchchar(&str, 'N')) { // \N (nodent)
-                    interp = calloc(sizeof(vm_op_t), 1);
+                    interp = new(vm_op_t);
                     interp->op = VM_NODENT;
                     break;
                 }
@@ -548,7 +548,7 @@ vm_op_t *bpeg_stringpattern(file_t *f, const char *str)
  */
 vm_op_t *bpeg_replacement(file_t *f, vm_op_t *pat, const char *replacement)
 {
-    vm_op_t *op = calloc(sizeof(vm_op_t), 1);
+    vm_op_t *op = new(vm_op_t);
     op->op = VM_REPLACE;
     op->start = pat->start;
     op->len = pat->len;

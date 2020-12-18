@@ -107,7 +107,7 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
         case VM_ANYCHAR: {
             if (str >= f->end || (!op->multiline && *str == '\n'))
                 return NULL;
-            match_t *m = calloc(sizeof(match_t), 1);
+            match_t *m = new(match_t);
             m->op = op;
             m->start = str;
             m->end = next_char(f, str);
@@ -118,7 +118,7 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
             if ((flags & BPEG_IGNORECASE) ? strncasecmp(str, op->args.s, (size_t)op->len) != 0
                                           : strncmp(str, op->args.s, (size_t)op->len) != 0)
                 return NULL;
-            match_t *m = calloc(sizeof(match_t), 1);
+            match_t *m = new(match_t);
             m->op = op;
             m->start = str;
             m->end = str + op->len;
@@ -127,7 +127,7 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
         case VM_RANGE: {
             if ((unsigned char)*str < op->args.range.low || (unsigned char)*str > op->args.range.high)
                 return NULL;
-            match_t *m = calloc(sizeof(match_t), 1);
+            match_t *m = new(match_t);
             m->op = op;
             m->start = str;
             m->end = str + 1;
@@ -139,14 +139,14 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
                 destroy_match(&m);
                 return NULL;
             }
-            m = calloc(sizeof(match_t), 1);
+            m = new(match_t);
             m->op = op;
             m->start = str;
             m->end = str;
             return m;
         }
         case VM_UPTO_AND: {
-            match_t *m = calloc(sizeof(match_t), 1);
+            match_t *m = new(match_t);
             m->start = str;
             m->op = op;
             if (!op->args.multiple.first && !op->args.multiple.second) {
@@ -189,7 +189,7 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
             return m;
         }
         case VM_REPEAT: {
-            match_t *m = calloc(sizeof(match_t), 1);
+            match_t *m = new(match_t);
             m->start = str;
             m->end = str;
             m->op = op;
@@ -248,7 +248,7 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
             if (str - backtrack < f->contents) return NULL;
             match_t *before = _match(g, f, str - backtrack, op->args.pat, flags, rec);
             if (before == NULL) return NULL;
-            match_t *m = calloc(sizeof(match_t), 1);
+            match_t *m = new(match_t);
             m->start = str;
             m->end = str;
             m->op = op;
@@ -258,7 +258,7 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
         case VM_BEFORE: {
             match_t *after = _match(g, f, str, op->args.pat, flags, rec);
             if (after == NULL) return NULL;
-            match_t *m = calloc(sizeof(match_t), 1);
+            match_t *m = new(match_t);
             m->start = str;
             m->end = str;
             m->op = op;
@@ -268,7 +268,7 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
         case VM_CAPTURE: {
             match_t *p = _match(g, f, str, op->args.pat, flags, rec);
             if (p == NULL) return NULL;
-            match_t *m = calloc(sizeof(match_t), 1);
+            match_t *m = new(match_t);
             m->start = str;
             m->end = p->end;
             m->op = op;
@@ -280,7 +280,7 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
         case VM_HIDE: {
             match_t *p = _match(g, f, str, op->args.pat, flags, rec);
             if (p == NULL) return NULL;
-            match_t *m = calloc(sizeof(match_t), 1);
+            match_t *m = new(match_t);
             m->start = str;
             m->end = p->end;
             m->op = op;
@@ -303,7 +303,7 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
                 destroy_match(&m1);
                 return NULL;
             }
-            match_t *m = calloc(sizeof(match_t), 1);
+            match_t *m = new(match_t);
             m->start = str;
             m->end = m2->end;
             m->op = op;
@@ -331,7 +331,7 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
                 destroy_match(&m2);
                 return NULL;
             }
-            match_t *m = calloc(sizeof(match_t), 1);
+            match_t *m = new(match_t);
             m->start = m1->start;
             m->end = m1->end;
             m->op = op;
@@ -349,7 +349,7 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
                 p = _match(g, f, str, op->args.replace.replace_pat, flags, rec);
                 if (p == NULL) return NULL;
             }
-            match_t *m = calloc(sizeof(match_t), 1);
+            match_t *m = new(match_t);
             m->start = str;
             m->op = op;
             if (p) {
@@ -392,7 +392,7 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
             } else if (best == NULL) {
                 best = p;
             }
-            match_t *m = calloc(sizeof(match_t), 1);
+            match_t *m = new(match_t);
             m->start = best->start;
             m->end = best->end;
             m->op = op;
@@ -424,7 +424,7 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
                 if (str[i] != denter || &str[i] >= f->end) return NULL;
             }
 
-            match_t *m = calloc(sizeof(match_t), 1);
+            match_t *m = new(match_t);
             m->start = start;
             m->end = &str[dents];
             m->op = op;
@@ -600,7 +600,7 @@ void print_match(file_t *f, match_t *m, print_options_t options)
 static match_t *match_backref(const char *str, vm_op_t *op, match_t *cap, unsigned int flags)
 {
     check(op->op == VM_BACKREF, "Attempt to match backref against something that's not a backref");
-    match_t *ret = calloc(sizeof(match_t), 1);
+    match_t *ret = new(match_t);
     ret->start = str;
     ret->op = op;
     match_t **dest = &ret->child;
