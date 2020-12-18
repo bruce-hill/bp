@@ -178,7 +178,7 @@ int main(int argc, char *argv[])
             check(eq, "Rule definitions must include an ':'\n\n%s", usage);
             *eq = '\0';
             char *src = ++eq;
-            file_t *def_file = spoof_file(def, flag);
+            file_t *def_file = spoof_file(def, src);
             vm_op_t *pat = bpeg_pattern(def_file, src);
             check(pat, "Failed to compile pattern: %s", flag);
             add_def(g, def_file, src, def, pat);
