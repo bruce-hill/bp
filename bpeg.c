@@ -29,6 +29,7 @@ static const char *usage = (
     " -e --explain                     explain the matches\n"
     " -j --json                        print matches as a list of JSON objects\n"
     " -i --ignore-case                 preform matching case-insensitively\n"
+    " -l --list-files                  list filenames only\n"
     " -d --define <name>:<def>         define a grammar rule\n"
     " -D --define-string <name>:<def>  define a grammar rule (string-pattern)\n"
     " -p --pattern <pat>               provide a pattern (equivalent to bp '\\(<pat>)')\n"
@@ -85,9 +86,11 @@ static int run_match(grammar_t *g, const char *filename, vm_op_t *pattern, unsig
             if (filename)
                 printf("\033[1;4m%s\033[0m\n", filename);
             visualize_match(m);
+        } else if (flags & BPEG_LISTFILES) {
+            printf("%s\n", filename);
         } else if (flags & BPEG_JSON) {
             if (printed_matches > 1)
-                fprintf(stdout, ",\n");
+                printf(",\n");
             printf("{\"filename\":\"%s\",", filename ? filename : "-");
             printf("\"tree\":{\"rule\":\"text\",\"start\":%d,\"end\":%ld,\"children\":[",
                    0, f->end - f->contents);
@@ -148,6 +151,8 @@ int main(int argc, char *argv[])
             flags |= BPEG_JSON;
         } else if (streq(argv[i], "--ignore-case")) {
             flags |= BPEG_IGNORECASE;
+        } else if (streq(argv[i], "--list-files")) {
+            flags |= BPEG_LISTFILES;
         } else if (FLAG("--replace") || FLAG("-r")) {
             file_t *replace_file = spoof_file("<replace argument>", flag);
             vm_op_t *patref = bpeg_pattern(replace_file, "pattern");
@@ -205,11 +210,12 @@ int main(int argc, char *argv[])
         } else if (argv[i][0] == '-' && argv[i][1] && argv[i][1] != '-') { // single-char flags
             for (char *c = &argv[i][1]; *c; ++c) {
                 switch (*c) {
-                    case 'h': goto flag_help;
-                    case 'v': flags |= BPEG_VERBOSE; break;
-                    case 'e': flags |= BPEG_EXPLAIN; break;
-                    case 'j': flags |= BPEG_JSON; break;
-                    case 'i': flags |= BPEG_IGNORECASE; break;
+                    case 'h': goto flag_help; // -h
+                    case 'v': flags |= BPEG_VERBOSE; break; // -v
+                    case 'e': flags |= BPEG_EXPLAIN; break; // -e
+                    case 'j': flags |= BPEG_JSON; break; // -j
+                    case 'i': flags |= BPEG_IGNORECASE; break; // -i
+                    case 'l': flags |= BPEG_LISTFILES; break; // -l
                     default:
                         printf("Unrecognized flag: -%c\n\n%s\n", *c, usage);
                         return 1;
@@ -226,6 +232,12 @@ int main(int argc, char *argv[])
             printf("Unrecognized flag: %s\n\n%s\n", argv[i], usage);
             return 1;
         }
+    }
+
+    if (((flags & BPEG_JSON) != 0) + ((flags & BPEG_EXPLAIN) != 0) + ((flags & BPEG_LISTFILES) != 0) > 1) {
+        printf("Please choose no more than one of the flags: -j/--json, -e/--explain, and -l/--list-files.\n"
+               "They are mutually contradictory.\n");
+        return 1;
     }
 
     if (isatty(STDOUT_FILENO)) {
