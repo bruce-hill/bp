@@ -125,6 +125,7 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
             return m;
         }
         case VM_RANGE: {
+            if (str >= f->end) return NULL;
             if ((unsigned char)*str < op->args.range.low || (unsigned char)*str > op->args.range.high)
                 return NULL;
             match_t *m = new(match_t);
