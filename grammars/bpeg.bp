@@ -10,7 +10,7 @@ Def: @name=id _ `: __ (
 String-pattern: ... % (Nodent / Escape / `\ pat [`;])
 
 pat: simple-pat !(__("!="/"==")) / suffixed-pat
-simple-pat: Upto-and / Dot / String / Char-range / Char / Nodent / Escape-range
+simple-pat: Upto-and / Dot / String / Chars / Nodent / Escape-range
     / Escape / Repeat / Optional / After / Before / Capture / Replace
     / Ref / parens
 
@@ -27,17 +27,18 @@ String: (
         `" @s=*(Escape / !`".) (`" / @!={=> "Expected closing quote here"})
       / `' @s=*(Escape / !`'.) (`' / @!={=> "Expected closing quote here"})
     )
-Char-range: `` @low=. `- (@high=. / @!={=> "Expected a second character to form a character range"})
-Char: `` (@s=. / @!={=> "Expected a character following the '`'"})
+Chars: `` @+(Char/Char-range) % `,
+Char-range: @low=. `- (@high=. / @!={=> "Expected a second character to form a character range"})
+Char: (@s=. / @!={=> "Expected a character following the '`'"})
 Escape-range: `\ @low=escape-sequence `- @high=escape-sequence
 Escape: `\ (@s=escape-sequence
     / $ @!={=>"Backslashes are used for escape sequences, not splitting lines"}
     / @!={. *(Abc/`0-9) => "Invalid escape sequence: '@0'"}
 )
 escape-sequence: (
-       `n/`t/`r/`e/`b/`a/`v
+       `n,t,r,e,b,a,v
       / 1-3 `0-7
-      / `x 2 (`0-9/`a-f/`A-F)
+      / `x 2 `0-9,a-f,A-F
     )
 No: `! (_@pat / @!={=>"Expected a pattern after the exclamation mark"})
 Nodent: `\ `N
@@ -71,7 +72,7 @@ $:  !.
 ^^: !<$.
 ^:  !<.
 
-id: "^^" / "^" / "__" / "_" / "$$" / "$" / "|" / (`a-z/`A-Z) *(`a-z/`A-Z/`0-9/`-)
+id: "^^" / "^" / "__" / "_" / "$$" / "$" / "|" / `a-z,A-Z *`a-z,A-Z,0-9,-
 
 line-comment: `# .. $
 block-comment: "#("..")#" % block-comment

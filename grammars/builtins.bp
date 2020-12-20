@@ -35,8 +35,8 @@ url-path: +(`/ *url-char) [`? +(+url-char`=+url-char)%`&]
 ipv4: 4 int % `.
 ipv6: 8 (4 Hex) % `:
 domain: +(+(Abc/digit/`-))%`.
-url-char: Abc/digit/`$/`-/`_/`./`+/`!/`*/`'/`(/`)/`,/`%
-email: +(Abc/digit/`./`-/`+) `@ domain
+url-char: Abc/digit/`$,-,_,.,+,!,*,',(,),,,%
+email: +(Abc/digit/`.,-,+) `@ domain
 
 nodent: \N !(\t/` )
 indent: \N (` /\t)
@@ -54,17 +54,17 @@ brackets: `[...`] % (brackets/string)
 braces: `{...`} % (braces/string)
 parens: `(...`) % (parens/string)
 string: `"..`" % (`\.) / `'..`' % (`\.)
-id: !<(`a-z/`A-Z/`_/`0-9) (`a-z/`A-Z/`_) *(`a-z/`A-Z/`_/`0-9)
-id-char: `a-z/`A-Z/`_/`0-9
-word: !<(`a-z/`A-Z/`_/`0-9) +(`a-z/`A-Z) !>(`0-9/`_)
-|: !<(`a-z/`A-Z/`_/`0-9) / !>(`0-9/`_)
-HEX: `0-9/`A-F
-Hex: `0-9/`a-f/`A-F
-hex: `0-9/`a-f
+id: !<`a-z,A-Z,_,0-9 `a-z,A-Z,_ *`a-z,A-Z,_,0-9
+id-char: `a-z,A-Z,_,0-9
+word: !<`a-z,A-Z,_,0-9 +`a-z,A-Z !>`0-9,_
+|: !<`a-z,A-Z,_,0-9 / !>`a-z,A-Z,_,0-9
+HEX: `0-9,A-F
+Hex: `0-9,a-f,A-F
+hex: `0-9,a-f
 number: +`0-9 [`. *`0-9] / `. +`0-9
 int: +`0-9
 digit: `0-9
-Abc: `a-z/`A-Z
+Abc: `a-z,A-Z
 ABC: `A-Z
 abc: `a-z
 esc: \e
