@@ -142,27 +142,56 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
         }
         // Char literals
         case '`': {
-            char c = *str;
-            ++str;
-            if (!c || c == '\n')
-                file_err(f, str, str, "There should be a character here after the '`'");
-            op->len = 1;
-            if (matchchar(&str, '-')) { // Range
-                char c2 = *str;
-                if (!c2 || c2 == '\n')
-                    file_err(f, str, str, "There should be a character here to complete the character range.");
-                if (c2 < c)
-                    file_err(f, origin, str+1, "Character ranges must be low-to-high, but this is high-to-low.");
-                op->op = VM_RANGE;
-                op->args.range.low = (unsigned char)c;
-                op->args.range.high = (unsigned char)c2;
+            vm_op_t *all = NULL;
+            do {
+                char c = *str;
+                if (!c || c == '\n')
+                    file_err(f, str, str, "There should be a character here after the '`'");
+
+                if (op == NULL)
+                    op = new(vm_op_t);
+
+                op->start = str-1;
+                op->len = 1;
                 ++str;
-            } else {
-                op->op = VM_STRING;
-                char *s = xcalloc(sizeof(char), 2);
-                s[0] = c;
-                op->args.s = s;
-            }
+                if (matchchar(&str, '-')) { // Range
+                    char c2 = *str;
+                    if (!c2 || c2 == '\n')
+                        file_err(f, str, str, "There should be a character here to complete the character range.");
+                    op->op = VM_RANGE;
+                    if (c < c2) {
+                        op->args.range.low = (unsigned char)c;
+                        op->args.range.high = (unsigned char)c2;
+                    } else {
+                        op->args.range.low = (unsigned char)c2;
+                        op->args.range.high = (unsigned char)c;
+                    }
+                    ++str;
+                } else {
+                    op->op = VM_STRING;
+                    char *s = xcalloc(sizeof(char), 2);
+                    s[0] = c;
+                    op->args.s = s;
+                }
+
+                op->end = str;
+
+                if (all == NULL) {
+                    all = op;
+                } else {
+                    vm_op_t *either = new(vm_op_t);
+                    either->op = VM_OTHERWISE;
+                    either->start = all->start;
+                    either->end = op->end;
+                    either->args.multiple.first = all;
+                    either->args.multiple.second = op;
+                    either->len = 1;
+                    all = either;
+                }
+                op = NULL;
+            } while (matchchar(&str, ','));
+
+            op = all;
             break;
         }
         // Escapes

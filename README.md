@@ -44,6 +44,7 @@ Pattern            | Meaning
 `_`                | Zero or more whitespace characters (excluding newlines)
 `` `c ``           | The literal character `c`
 `` `a-z ``         | The character range `a` through `z`
+`` `a,b ``         | The character `a` or the character `b`
 `\n`, `\033`, `\x0A`, etc. | An escape sequence character
 `\x00-xFF`         | An escape sequence range (byte `0x00` through `0xFF` here)
 `!pat`             | `pat` does not match at the current position
