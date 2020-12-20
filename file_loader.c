@@ -135,6 +135,10 @@ const char *get_line(file_t *f, size_t line_number)
 
 void fprint_line(FILE *dest, file_t *f, const char *start, const char *end, const char *fmt, ...)
 {
+    if (start < f->contents) start = f->contents;
+    if (start > f->end) start = f->end;
+    if (end < f->contents) end = f->contents;
+    if (end > f->end) end = f->end;
     size_t linenum = get_line_number(f, start);
     const char *line = get_line(f, linenum);
     size_t charnum = get_char_number(f, start);
