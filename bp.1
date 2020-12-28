@@ -11,6 +11,7 @@ bp \- Bruce's Parsing Expression Grammar tool
 [\fI-j\fR|\fI--json\fR]
 [\fI-l\fR|\fI--list-files\fR]
 [\fI-i\fR|\fI--ignore-case\fR \fI<pattern>\fR]
+[\fI-I\fR|\fI--inplace\fR]
 [\fI-p\fR|\fI--pattern\fR \fI<pattern>\fR]
 [\fI-P\fR|\fI--pattern-string\fR \fI<string-pattern>\fR]
 [\fI-d\fR|\fI--define\fR \fI<name>\fR:\fI<pattern>\fR]
@@ -37,6 +38,9 @@ Print only the names of files containing matches instead of the matches themselv
 
 .B \-i\fR, \fB--ignore-case
 Perform pattern matching case-insensitively.
+
+.B \-I\fR, \fB--inplace
+Perform filtering or replacement in-place (i.e. overwrite files with new content).
 
 .B \-d\fR, \fB--define \fI<name>\fR:\fI<pattern>\fR
 Define a grammar rule using a bp pattern.

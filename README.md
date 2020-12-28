@@ -10,6 +10,7 @@ It's written in pure C with no dependencies.
 * `-h` `--help` print the usage and quit
 * `-v` `--verbose` print verbose debugging info
 * `-i` `--ignore-case` perform a case-insensitive match
+* `-I` `--inplace` perform replacements or filtering in-place on files
 * `-e` `--explain` print an explanation of the matches
 * `-j` `--json` print matches as JSON objects
 * `-l` `--list-files` print only filenames containing matches

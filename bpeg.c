@@ -28,6 +28,7 @@ static const char *usage = (
     " -v --verbose                     print verbose debugging info\n"
     " -e --explain                     explain the matches\n"
     " -j --json                        print matches as a list of JSON objects\n"
+    " -I --inplace                     modify a file in-place\n"
     " -i --ignore-case                 preform matching case-insensitively\n"
     " -l --list-files                  list filenames only\n"
     " -d --define <name>:<def>         define a grammar rule\n"
@@ -61,7 +62,7 @@ static int print_errors(file_t *f, match_t *m)
     int ret = 0;
     if (m->op->op == VM_CAPTURE && m->op->args.capture.name && streq(m->op->args.capture.name, "!")) {
         printf("\033[31;1m");
-        print_match(f, m, print_options);
+        print_match(stdout, f, m, print_options);
         printf("\033[0m\n");
         fprint_line(stdout, f, m->start, m->end, " ");
         return 1;
@@ -76,6 +77,8 @@ static int run_match(grammar_t *g, const char *filename, vm_op_t *pattern, unsig
     static int printed_matches = 0;
     file_t *f = load_file(filename);
     check(f, "Could not open file: %s", filename);
+    if (flags & BPEG_INPLACE) // Need to do this before matching
+        intern_file(f);
     match_t *m = match(g, f, f->contents, pattern, flags);
     if (m && print_errors(f, m) > 0)
         _exit(1);
@@ -96,6 +99,10 @@ static int run_match(grammar_t *g, const char *filename, vm_op_t *pattern, unsig
                    0, f->end - f->contents);
             json_match(f->contents, m, (flags & BPEG_VERBOSE) ? 1 : 0);
             printf("]}}\n");
+        } else if (flags & BPEG_INPLACE) {
+            FILE *out = fopen(filename, "w");
+            print_match(out, f, m, 0);
+            fclose(out);
         } else {
             if (printed_matches > 1)
                 fputc('\n', stdout);
@@ -105,7 +112,7 @@ static int run_match(grammar_t *g, const char *filename, vm_op_t *pattern, unsig
                 else
                     printf("%s:\n", filename);
             }
-            print_match(f, m, print_options);
+            print_match(stdout, f, m, print_options);
         }
         destroy_file(&f);
         return 0;
@@ -149,6 +156,8 @@ int main(int argc, char *argv[])
             flags |= BPEG_EXPLAIN;
         } else if (streq(argv[i], "--json")) {
             flags |= BPEG_JSON;
+        } else if (streq(argv[i], "--inplace")) {
+            flags |= BPEG_INPLACE;
         } else if (streq(argv[i], "--ignore-case")) {
             flags |= BPEG_IGNORECASE;
         } else if (streq(argv[i], "--list-files")) {
@@ -215,6 +224,7 @@ int main(int argc, char *argv[])
                     case 'v': flags |= BPEG_VERBOSE; break; // -v
                     case 'e': flags |= BPEG_EXPLAIN; break; // -e
                     case 'j': flags |= BPEG_JSON; break; // -j
+                    case 'I': flags |= BPEG_INPLACE; break; // -I
                     case 'i': flags |= BPEG_IGNORECASE; break; // -i
                     case 'l': flags |= BPEG_LISTFILES; break; // -l
                     default:

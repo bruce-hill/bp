@@ -3,6 +3,7 @@
  */
 
 #include <ctype.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -489,20 +490,20 @@ typedef struct {
     const char *color;
 } print_state_t;
 
-static void print_line_number(print_state_t *state, print_options_t options)
+static void print_line_number(FILE *out, print_state_t *state, print_options_t options)
 {
     state->printed_line = state->line;
     if (!(options & PRINT_LINE_NUMBERS)) return;
     if (options & PRINT_COLOR)
-        printf("\033[0;2m% 5ld\033(0\x78\033(B%s", state->line, state->color);
+        fprintf(out, "\033[0;2m% 5ld\033(0\x78\033(B%s", state->line, state->color);
     else
-        printf("% 5ld|", state->line);
+        fprintf(out, "% 5ld|", state->line);
 }
 
 /*
  * Print a match with replacements and highlighting.
  */
-static void _print_match(file_t *f, match_t *m, print_state_t *state, print_options_t options)
+static void _print_match(FILE *out, file_t *f, match_t *m, print_state_t *state, print_options_t options)
 {
     static const char *hl = "\033[0;31;1m";
     const char *old_color = state->color;
@@ -514,7 +515,7 @@ static void _print_match(file_t *f, match_t *m, print_state_t *state, print_opti
     } else if (m->op->op == VM_REPLACE) {
         if (options & PRINT_COLOR && state->color != hl) {
             state->color = hl;
-            printf("%s", state->color);
+            fprintf(out, "%s", state->color);
         }
         const char *text = m->op->args.replace.text;
         const char *end = &text[m->op->args.replace.len];
@@ -523,7 +524,7 @@ static void _print_match(file_t *f, match_t *m, print_state_t *state, print_opti
                 ++r;
                 match_t *cap = get_cap(m, &r);
                 if (cap != NULL) {
-                    _print_match(f, cap, state, options);
+                    _print_match(out, f, cap, state, options);
                     continue;
                 } else {
                     --r;
@@ -531,21 +532,21 @@ static void _print_match(file_t *f, match_t *m, print_state_t *state, print_opti
             }
 
             if (state->printed_line != state->line)
-                print_line_number(state, options);
+                print_line_number(out, state, options);
 
             if (*r == '\\') {
                 ++r;
                 unsigned char c = unescapechar(r, &r);
-                fputc(c, stdout);
+                fputc(c, out);
                 if (c == '\n') ++state->line;
                 continue;
             } else if (*r == '\n') {
-                fputc('\n', stdout);
+                fputc('\n', out);
                 ++state->line;
                 ++r;
                 continue;
             } else {
-                fputc(*r, stdout);
+                fputc(*r, out);
                 ++r;
                 continue;
             }
@@ -554,7 +555,7 @@ static void _print_match(file_t *f, match_t *m, print_state_t *state, print_opti
         if (m->op->op == VM_CAPTURE) {
             if (options & PRINT_COLOR && state->color != hl) {
                 state->color = hl;
-                printf("%s", state->color);
+                fprintf(out, "%s", state->color);
             }
         }
 
@@ -567,33 +568,33 @@ static void _print_match(file_t *f, match_t *m, print_state_t *state, print_opti
             if (child->start > prev) {
                 for (const char *p = prev; p < child->start; ++p) {
                     if (state->printed_line != state->line)
-                        print_line_number(state, options);
-                    fputc(*p, stdout);
+                        print_line_number(out, state, options);
+                    fputc(*p, out);
                     if (*p == '\n') ++state->line;
                 }
             }
-            _print_match(f, child, state, options);
+            _print_match(out, f, child, state, options);
             prev = child->end;
         }
         if (m->end > prev) {
             for (const char *p = prev; p < m->end; ++p) {
                 if (state->printed_line != state->line)
-                    print_line_number(state, options);
-                fputc(*p, stdout);
+                    print_line_number(out, state, options);
+                fputc(*p, out);
                 if (*p == '\n') ++state->line;
             }
         }
     }
     if (options & PRINT_COLOR && old_color != state->color) {
-        printf("%s", old_color);
+        fprintf(out, "%s", old_color);
         state->color = old_color;
     }
 }
 
-void print_match(file_t *f, match_t *m, print_options_t options)
+void print_match(FILE *out, file_t *f, match_t *m, print_options_t options)
 {
     print_state_t state = {.line = 1, .color = "\033[0m"};
-    _print_match(f, m, &state, options);
+    _print_match(out, f, m, &state, options);
 }
 
 static match_t *match_backref(const char *str, vm_op_t *op, match_t *cap, unsigned int flags)

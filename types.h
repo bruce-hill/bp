@@ -14,6 +14,7 @@ enum BPEGFlag {
     BPEG_EXPLAIN    = 1 << 2,
     BPEG_JSON       = 1 << 3,
     BPEG_LISTFILES  = 1 << 4,
+    BPEG_INPLACE    = 1 << 5,
 };
 
 /*

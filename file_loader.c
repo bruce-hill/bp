@@ -89,6 +89,24 @@ file_t *spoof_file(const char *filename, char *text)
     return f;
 }
 
+/*
+ * Ensure that the file's contents are held in memory, rather than being memory
+ * mapped IO.
+ */
+void intern_file(file_t *f)
+{
+    if (!f->mmapped) return;
+    size_t size = (size_t)(f->end - f->contents);
+    char *buf = xcalloc(sizeof(char), size + 1);
+    memcpy(buf, f->contents, size);
+    munmap(f->contents, size);
+    f->contents = buf;
+    f->end = buf + size;
+    f->mmapped = 0;
+    free(f->lines);
+    populate_lines(f);
+}
+
 void destroy_file(file_t **f)
 {
     if ((*f)->filename) {
