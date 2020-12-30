@@ -75,6 +75,20 @@ int matchchar(const char **str, char c)
 }
 
 /*
+ * Check if a string is found and if so, move past it.
+ */
+int matchstr(const char **str, const char *target)
+{
+    const char *next = after_spaces(*str);
+    if (strncmp(next, target, strlen(target)) == 0) {
+        *str = &next[strlen(target)];
+        return 1;
+    } else {
+        return 0;
+    }
+}
+
+/*
  * Process a string escape sequence for a character and return the
  * character that was escaped.
  * Set *end = the first character past the end of the escape sequence.

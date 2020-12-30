@@ -322,7 +322,8 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
             break;
         }
         // Parentheses
-        case '(': {
+        case '(': case '{': {
+            char closing = c == '(' ? ')' : '}';
             free(op);
             op = bpeg_simplepattern(f, str);
             if (!op)
@@ -330,7 +331,7 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
             op = expand_choices(f, op);
             str = op->end;
             str = after_spaces(str);
-            if (!matchchar(&str, ')'))
+            if (!matchchar(&str, closing))
                 file_err(f, origin, str, "This parenthesis group isn't properly closed.");
             op->start = origin;
             op->end = str;
@@ -394,57 +395,6 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
             op->args.pat = pat;
             break;
         }
-        // Replacement
-        case '{': {
-            str = after_spaces(str);
-            vm_op_t *pat = NULL;
-            if (strncmp(str, "=>", 2) == 0) {
-                str += strlen("=>");
-            } else {
-                pat = bpeg_simplepattern(f, str);
-                if (!pat)
-                    file_err(f, str, str, "There should be a valid pattern inside this replacement.");
-                pat = expand_choices(f, pat);
-                str = pat->end;
-                str = after_spaces(str);
-                if (!(matchchar(&str, '=') && matchchar(&str, '>')))
-                    file_err(f, str, str, "There should be a '=>' after a pattern inside a replacement.");
-            }
-            str = after_spaces(str);
-
-            char quote = *str;
-            const char *replacement;
-            size_t replace_len;
-            if (matchchar(&str, '}')) {
-                replacement = strdup("");
-                replace_len = 0;
-            } else {
-                if (!(matchchar(&str, '"') || matchchar(&str, '\'')))
-                    file_err(f, str, str, "There should be a string literal as a replacement here.");
-                const char *repstr = str;
-                for (; *str && *str != quote; str++) {
-                    if (*str == '\\') {
-                        if (!str[1] || str[1] == '\n')
-                            file_err(f, str, str+1,
-                                     "There should be an escape sequence after this backslash.");
-                        ++str;
-                    }
-                }
-                replace_len = (size_t)(str-repstr);
-                replacement = xcalloc(sizeof(char), replace_len+1);
-                memcpy((void*)replacement, repstr, (size_t)(str-repstr));
-                if (!matchchar(&str, quote))
-                    file_err(f, &repstr[-1], str, "This string doesn't have a closing quote.");
-                if (!matchchar(&str, '}'))
-                    file_err(f, origin, str, "This replacement doesn't have a closing '}'");
-            }
-            op->op = VM_REPLACE;
-            op->args.replace.pat = pat;
-            op->args.replace.text = replacement;
-            op->args.replace.len = replace_len;
-            if (pat != NULL) op->len = pat->len;
-            break;
-        }
         // Special rules:
         case '_': case '^': case '$': case '|': {
             if (matchchar(&str, c)) { // double __, ^^, $$
@@ -487,11 +437,41 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
 
     // Postfix operators:
   postfix:
-    if (str >= f->end) return op;
     str = after_spaces(str);
-    if ((str[0] == '=' || str[0] == '!') && str[1] == '=') { // Equality <pat1>==<pat2> and inequality <pat1>!=<pat2>
-        int equal = str[0] == '=';
-        str = after_spaces(str+2);
+    if (str+2 < f->end && matchstr(&str, "=>")) { // Replacement <pat> => <pat>
+        str = after_spaces(str);
+        char quote = *str;
+        if (!(matchchar(&str, '"') || matchchar(&str, '\'')))
+            file_err(f, str, str, "There should be a string literal as a replacement here.");
+        const char *repstr = str;
+        for (; *str && *str != quote; str++) {
+            if (*str == '\\') {
+                if (!str[1] || str[1] == '\n')
+                    file_err(f, str, str+1,
+                             "There should be an escape sequence after this backslash.");
+                ++str;
+            }
+        }
+        if (!matchchar(&str, quote))
+            file_err(f, &repstr[-1], str, "This string doesn't have a closing quote.");
+
+        size_t replace_len = (size_t)(str-repstr-1);
+        const char *replacement = xcalloc(sizeof(char), replace_len+1);
+        memcpy((void*)replacement, repstr, replace_len);
+        
+        vm_op_t *pat = op;
+        op = new(vm_op_t);
+        op->op = VM_REPLACE;
+        op->args.replace.pat = pat;
+        op->args.replace.text = replacement;
+        op->args.replace.len = replace_len;
+        op->len = pat->len;
+        op->start = pat->start;
+        op->end = str;
+        goto postfix;
+
+    } else if (str+2 < f->end && (matchstr(&str, "!=") || matchstr(&str, "=="))) { // Equality <pat1>==<pat2> and inequality <pat1>!=<pat2>
+        int equal = str[-2] == '=';
         vm_op_t *first = op;
         vm_op_t *second = bpeg_simplepattern(f, str);
         if (!second)

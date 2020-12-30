@@ -1,22 +1,23 @@
 # This is a file defining the BPEG grammar using BPEG syntax
 
-Grammar: __ *(Def [__`;])%__ __ ($$ / @!={... => "Could not parse this code"})
+Grammar: __ *(Def [__`;])%__ __ ($$ / @!=(... => "Could not parse this code"))
 Def: @name=id _ `: __ (
       @definition=extended-pat
-    / $$ @!={=>"No definition for rule"}
-    / @!={...>(`;/id_`:/$) => "Invalid definition: @0"})
+    / $$ @!=(''=>"No definition for rule")
+    / @!=(...>(`;/id_`:/$) => "Invalid definition: @0"))
 
 # This is used for command line arguments:
 String-pattern: ... % (Nodent / Escape / `\ pat [`;])
 
-pat: simple-pat !(__("!="/"==")) / suffixed-pat
+pat: simple-pat !(__("!="/"=="/"=>")) / suffixed-pat
 simple-pat: Upto-and / Dot / String / Chars / Nodent / Escape-range
-    / Escape / Repeat / Optional / After / Before / Capture / Replace
+    / Escape / Repeat / Optional / After / Before / Capture
     / Ref / parens
 
 suffixed-pat: (
       Eq-pat
     / Not-eq-pat
+    / Replace
 )
 
 Eq-pat: @first=pat__"=="__@second=pat
@@ -24,23 +25,23 @@ Not-eq-pat: @first=pat__"!="__@second=pat
 
 Dot: `. !`.
 String: (
-        `" @s=*(Escape / !`".) (`" / @!={=> "Expected closing quote here"})
-      / `' @s=*(Escape / !`'.) (`' / @!={=> "Expected closing quote here"})
+        `" @s=*(Escape / !`".) (`" / @!=(''=> "Expected closing quote here"))
+      / `' @s=*(Escape / !`'.) (`' / @!=(''=> "Expected closing quote here"))
     )
 Chars: `` @+(Char/Char-range) % `,
-Char-range: @low=. `- (@high=. / @!={=> "Expected a second character to form a character range"})
-Char: (@s=. / @!={=> "Expected a character following the '`'"})
+Char-range: @low=. `- (@high=. / @!=(''=> "Expected a second character to form a character range"))
+Char: (@s=. / @!=(''=> "Expected a character following the '`'"))
 Escape-range: `\ @low=escape-sequence `- @high=escape-sequence
 Escape: `\ (@s=escape-sequence
-    / $ @!={=>"Backslashes are used for escape sequences, not splitting lines"}
-    / @!={. *(Abc/`0-9) => "Invalid escape sequence: '@0'"}
+    / $ @!=(''=>"Backslashes are used for escape sequences, not splitting lines")
+    / @!=((. *(Abc/`0-9)) => "Invalid escape sequence: '@0'")
 )
 escape-sequence: (
        `n,t,r,e,b,a,v
       / 1-3 `0-7
       / `x 2 `0-9,a-f,A-F
     )
-No: `! (_@pat / @!={=>"Expected a pattern after the exclamation mark"})
+No: `! (_@pat / @!=(''=>"Expected a pattern after the exclamation mark"))
 Nodent: `\ `N
 Upto-and: 2-3`. [_@first=simple-pat] [__`%__@second=simple-pat]
 Repeat: (
@@ -49,16 +50,16 @@ Repeat: (
       / @min=int _ `+   @max=''
       / @min=@max=int
     ) __ @repeat-pat=pat [__`%__@sep=pat]
-Optional: `[ __ extended-pat (__`] / @!={=> "Expected closing square bracket here"})
+Optional: `[ __ extended-pat (__`] / @!=(''=> "Expected closing square bracket here"))
 After: `< _ pat
 Before: `> _ pat
-Capture: `@ [_ @capture-name=(id/`!) __ !"=>" `=] __ (@capture=pat / @!={=> "Expected pattern to capture"})
-Replace: `{ __ (
-      [@replace-pat=extended-pat __] "=>" [__ @replacement=String]
-    ) __ (`} / @!={=> "Expected closing brace here"})
+Capture: `@ [_ @capture-name=(id/`!) __ !"=>" `=] __ (@capture=pat / @!=(''=> "Expected pattern to capture"))
+Replace: (
+      @replace-pat=pat __ "=>" (__ @replacement=String / @!=(''=> "Expected replacement string"))
+    )
 Ref: @name=id !(_`:)
 
-parens: `( __ extended-pat (__ `) / @!={=> "Expected closing parenthesis here"})
+parens: `( __ extended-pat (__ `) / @!=(''=> "Expected closing parenthesis here"))
 
 Chain: 2+@pat%__
 Otherwise: 2+@(Chain/pat)%(__`/__)

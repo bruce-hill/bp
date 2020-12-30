@@ -17,11 +17,11 @@ find-all: (
     (include-binary-files / is-text-file)
     *(!..pattern ~(..\n))
     +(+(..@pattern) ..(\n/$$) / ~(..\n))
-    [{!<\n => "\n"}]
+    [!<\n => "\n"]
 )
 only-matches: (
     (include-binary-files / is-text-file)
-    +{...@pattern =>'@1\n'}
+    +(...@pattern =>'@1\n')
 )
 
 # Helper definitions (commonly used)

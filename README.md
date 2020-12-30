@@ -60,9 +60,8 @@ Pattern            | Meaning
 `>pat`             | `pat` matches just in front of the current position (lookahead)
 `@pat`             | Capture `pat` (used for text replacement and backreferences)
 `@foo=pat`         | Let `foo` be the text of `pat` (used for text replacement and backreferences)
-`{pat => "replacement"}` | Match `pat` and replace it with `replacement`
-`{pat @other => "@1"}` | Match `pat` followed by `other` and replace it with the text of `other`
-`{pat @keep=other => "@keep"}` | Match `pat` followed by `other` and replace it with the text of `other`
+`pat => "replacement"` | Match `pat` and replace it with `replacement`
+`(pat1 @keep=pat2) => "@keep"` | Match `pat1` followed by `pat2` and replace it with the text of `pat2`
 `pat1==pat2`       | `pat1`, assuming `pat2` also matches with the same length
 `pat1!=pat2`       | `pat1`, unless `pat2` also matches with the same length
 `#( block comment )#` | A block comment
