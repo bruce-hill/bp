@@ -29,7 +29,7 @@ install: $(NAME)
 	fi; \
 	[ ! "$$prefix" ] && prefix="/usr/local"; \
 	[ ! "$$sysconfdir" ] && sysconfdir=/etc; \
-	mkdir -pv -m 755 "$$prefix/share/man/man1" "$$prefix/bin" "$$sysconfdir/xdg/bp" \
+	mkdir -p -m 755 "$$prefix/share/man/man1" "$$prefix/bin" "$$sysconfdir/xdg/bp" \
 	&& cp -rv grammars/* "$$sysconfdir/xdg/bp/" \
 	&& cp -v $(NAME).1 "$$prefix/share/man/man1/" \
 	&& rm -f "$$prefix/bin/$(NAME)" \
