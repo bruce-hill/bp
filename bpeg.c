@@ -112,7 +112,8 @@ static int run_match(grammar_t *g, const char *filename, vm_op_t *pattern, unsig
                 else
                     printf("%s:\n", filename);
             }
-            print_match(stdout, f, m, print_options);
+            print_match(stdout, f, m,
+                filename ? print_options : print_options & (print_options_t)~PRINT_LINE_NUMBERS);
         }
         destroy_file(&f);
         return 0;
