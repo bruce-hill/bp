@@ -43,7 +43,7 @@ const char *after_spaces(const char *str)
 }
 
 /*
- * Return the first character after a valid BPEG name, or NULL if none is
+ * Return the first character after a valid BP name, or NULL if none is
  * found.
  */
 const char *after_name(const char *str)

@@ -1,5 +1,5 @@
 *.o
 tags
-bpeg
+bp
 .*
 !.gitignore

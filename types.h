@@ -1,5 +1,5 @@
 /*
- * types.h - Datatypes used by BPEG
+ * types.h - Datatypes used by BP
  */
 #ifndef TYPES__H
 #define TYPES__H
@@ -8,17 +8,17 @@
 
 #include "file_loader.h"
 
-enum BPEGFlag {
-    BPEG_VERBOSE    = 1 << 0,
-    BPEG_IGNORECASE = 1 << 1,
-    BPEG_EXPLAIN    = 1 << 2,
-    BPEG_JSON       = 1 << 3,
-    BPEG_LISTFILES  = 1 << 4,
-    BPEG_INPLACE    = 1 << 5,
+enum BPFlag {
+    BP_VERBOSE    = 1 << 0,
+    BP_IGNORECASE = 1 << 1,
+    BP_EXPLAIN    = 1 << 2,
+    BP_JSON       = 1 << 3,
+    BP_LISTFILES  = 1 << 4,
+    BP_INPLACE    = 1 << 5,
 };
 
 /*
- * BPEG virtual machine opcodes (these must be kept in sync with the names in vm.c)
+ * BP virtual machine opcodes (these must be kept in sync with the names in vm.c)
  */
 enum VMOpcode {
     VM_ANYCHAR = 1,
@@ -42,7 +42,7 @@ enum VMOpcode {
 };
 
 /*
- * A struct reperesenting a BPEG virtual machine operation
+ * A struct reperesenting a BP virtual machine operation
  */
 typedef struct vm_op_s {
     enum VMOpcode op;

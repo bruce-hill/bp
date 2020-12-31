@@ -1,6 +1,6 @@
-# BPEG
+# BP - Bruce's PEG Tool
 
-BPEG is a parsing expression grammar tool for the command line.
+BP is a parsing expression grammar (PEG) tool for the command line.
 It's written in pure C with no dependencies.
 
 ## Usage
@@ -24,8 +24,8 @@ It's written in pure C with no dependencies.
 
 See `man ./bp.1` for more details.
 
-## BPEG Patterns
-BPEG patterns are a mixture of Parsing Expression Grammar and Regular
+## BP Patterns
+BP patterns are a mixture of Parsing Expression Grammar and Regular
 Expression syntax, with a preference for prefix operators instead of
 suffix operators.
 
@@ -70,7 +70,7 @@ Pattern            | Meaning
 See `man ./bp.1` for more details.
 
 ## License
-BPEG is provided under the MIT license with the [Commons Clause](https://commonsclause.com/)
+BP is provided under the MIT license with the [Commons Clause](https://commonsclause.com/)
 (you can't sell this software without the developer's permission, but you're
 otherwise free to use, modify, and redistribute it free of charge).
 See [LICENSE](LICENSE) for details.

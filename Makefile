@@ -15,7 +15,7 @@ all: $(NAME)
 .c.o:
 	$(CC) -c $(CFLAGS) $(CWARN) $(G) $(O) -o $@ $<
 
-$(NAME): $(OBJFILES) bpeg.c
+$(NAME): $(OBJFILES) bp.c
 	$(CC) $(CFLAGS) $(CWARN) $(G) $(O) -o $@ $^
 
 clean:

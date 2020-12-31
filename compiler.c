@@ -1,5 +1,5 @@
 /*
- * compiler.c - Compile strings into BPEG virtual machine code.
+ * compiler.c - Compile strings into BP virtual machine code.
  */
 
 #include <ctype.h>
@@ -46,7 +46,7 @@ static void set_range(vm_op_t *op, ssize_t min, ssize_t max, vm_op_t *pat, vm_op
  */
 static vm_op_t *expand_chain(file_t *f, vm_op_t *first)
 {
-    vm_op_t *second = bpeg_simplepattern(f, first->end);
+    vm_op_t *second = bp_simplepattern(f, first->end);
     if (second == NULL) return first;
     second = expand_chain(f, second);
     if (second->end <= first->end)
@@ -65,7 +65,7 @@ static vm_op_t *expand_choices(file_t *f, vm_op_t *first)
     first = expand_chain(f, first);
     const char *str = first->end;
     if (!matchchar(&str, '/')) return first;
-    vm_op_t *second = bpeg_simplepattern(f, str);
+    vm_op_t *second = bp_simplepattern(f, str);
     if (!second)
         file_err(f, str, str, "There should be a pattern here after a '/'");
     second = expand_choices(f, second);
@@ -98,9 +98,9 @@ static vm_op_t *chain_together(vm_op_t *first, vm_op_t *second)
 }
 
 /*
- * Compile a string of BPEG code into virtual machine opcodes
+ * Compile a string of BP code into virtual machine opcodes
  */
-vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
+vm_op_t *bp_simplepattern(file_t *f, const char *str)
 {
     str = after_spaces(str);
     if (!*str) return NULL;
@@ -119,14 +119,14 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
                     ++str;
                     op->multiline = 1;
                 }
-                vm_op_t *till = bpeg_simplepattern(f, str);
+                vm_op_t *till = bp_simplepattern(f, str);
                 op->op = VM_UPTO_AND;
                 op->len = -1;
                 op->args.multiple.first = till;
                 if (till)
                     str = till->end;
                 if (matchchar(&str, '%')) {
-                    vm_op_t *skip = bpeg_simplepattern(f, str);
+                    vm_op_t *skip = bp_simplepattern(f, str);
                     if (!skip)
                         file_err(f, str, str, "There should be a pattern to skip here after the '%%'");
                     op->args.multiple.second = skip;
@@ -252,7 +252,7 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
         }
         // Not <pat>
         case '!': {
-            vm_op_t *p = bpeg_simplepattern(f, str);
+            vm_op_t *p = bp_simplepattern(f, str);
             if (!p) file_err(f, str, str, "There should be a pattern after this '!'");
             str = p->end;
             op->op = VM_NOT;
@@ -277,14 +277,14 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
             } else {
                 min = n1, max = n1;
             }
-            vm_op_t *pat = bpeg_simplepattern(f, str);
+            vm_op_t *pat = bp_simplepattern(f, str);
             if (!pat)
                 file_err(f, str, str, "There should be a pattern after this repetition count.");
             str = pat->end;
             str = after_spaces(str);
             vm_op_t *sep = NULL;
             if (matchchar(&str, '%')) {
-                sep = bpeg_simplepattern(f, str);
+                sep = bp_simplepattern(f, str);
                 if (!sep)
                     file_err(f, str, str, "There should be a separator pattern after this '%%'");
                 str = sep->end;
@@ -296,7 +296,7 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
         }
         // Lookbehind
         case '<': {
-            vm_op_t *pat = bpeg_simplepattern(f, str);
+            vm_op_t *pat = bp_simplepattern(f, str);
             if (!pat)
                 file_err(f, str, str, "There should be a pattern after this '<'");
             str = pat->end;
@@ -312,7 +312,7 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
         }
         // Lookahead
         case '>': {
-            vm_op_t *pat = bpeg_simplepattern(f, str);
+            vm_op_t *pat = bp_simplepattern(f, str);
             if (!pat)
                 file_err(f, str, str, "There should be a pattern after this '>'");
             str = pat->end;
@@ -325,7 +325,7 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
         case '(': case '{': {
             char closing = c == '(' ? ')' : '}';
             free(op);
-            op = bpeg_simplepattern(f, str);
+            op = bp_simplepattern(f, str);
             if (!op)
                 file_err(f, str, str, "There should be a valid pattern after this parenthesis.");
             op = expand_choices(f, op);
@@ -339,7 +339,7 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
         }
         // Square brackets
         case '[': {
-            vm_op_t *pat = bpeg_simplepattern(f, str);
+            vm_op_t *pat = bp_simplepattern(f, str);
             if (!pat)
                 file_err(f, str, str, "There should be a valid pattern after this square bracket.");
             pat = expand_choices(f, pat);
@@ -353,14 +353,14 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
         // Repeating
         case '*': case '+': {
             ssize_t min = c == '*' ? 0 : 1;
-            vm_op_t *pat = bpeg_simplepattern(f, str);
+            vm_op_t *pat = bp_simplepattern(f, str);
             if (!pat)
                 file_err(f, str, str, "There should be a valid pattern here after the '%c'", c);
             str = pat->end;
             str = after_spaces(str);
             vm_op_t *sep = NULL;
             if (matchchar(&str, '%')) {
-                sep = bpeg_simplepattern(f, str);
+                sep = bp_simplepattern(f, str);
                 if (!sep)
                     file_err(f, str, str, "There should be a separator pattern after the '%%' here.");
                 str = sep->end;
@@ -376,7 +376,7 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
                 op->args.capture.name = strndup(str, (size_t)(a-str));
                 str = after_spaces(a) + 1;
             }
-            vm_op_t *pat = bpeg_simplepattern(f, str);
+            vm_op_t *pat = bp_simplepattern(f, str);
             if (!pat)
                 file_err(f, str, str, "There should be a valid pattern here to capture after the '@'");
             str = pat->end;
@@ -386,7 +386,7 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
         }
         // Hide
         case '~': {
-            vm_op_t *pat = bpeg_simplepattern(f, str);
+            vm_op_t *pat = bp_simplepattern(f, str);
             if (!pat)
                 file_err(f, str, str, "There should be a pattern after this '~'");
             str = pat->end;
@@ -473,7 +473,7 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
     } else if (str+2 < f->end && (matchstr(&str, "!=") || matchstr(&str, "=="))) { // Equality <pat1>==<pat2> and inequality <pat1>!=<pat2>
         int equal = str[-2] == '=';
         vm_op_t *first = op;
-        vm_op_t *second = bpeg_simplepattern(f, str);
+        vm_op_t *second = bp_simplepattern(f, str);
         if (!second)
             file_err(f, str, str, "The '%c=' operator expects a pattern before and after.", equal?'=':'!');
         if (equal) {
@@ -497,9 +497,9 @@ vm_op_t *bpeg_simplepattern(file_t *f, const char *str)
 }
 
 /*
- * Similar to bpeg_simplepattern, except that the pattern begins with an implicit, unclosable quote.
+ * Similar to bp_simplepattern, except that the pattern begins with an implicit, unclosable quote.
  */
-vm_op_t *bpeg_stringpattern(file_t *f, const char *str)
+vm_op_t *bp_stringpattern(file_t *f, const char *str)
 {
     vm_op_t *ret = NULL;
     while (*str) {
@@ -530,7 +530,7 @@ vm_op_t *bpeg_stringpattern(file_t *f, const char *str)
                     ++str;
                     continue;
                 }
-                interp = bpeg_simplepattern(f, str + 1);
+                interp = bp_simplepattern(f, str + 1);
                 if (interp == NULL)
                     file_err(f, str, str+1, "This isn't a valid escape sequence or pattern.");
                 break;
@@ -565,7 +565,7 @@ vm_op_t *bpeg_stringpattern(file_t *f, const char *str)
  * Given a pattern and a replacement string, compile the two into a replacement
  * VM opcode.
  */
-vm_op_t *bpeg_replacement(file_t *f, vm_op_t *pat, const char *replacement)
+vm_op_t *bp_replacement(file_t *f, vm_op_t *pat, const char *replacement)
 {
     vm_op_t *op = new(vm_op_t);
     op->op = VM_REPLACE;
@@ -588,9 +588,9 @@ vm_op_t *bpeg_replacement(file_t *f, vm_op_t *pat, const char *replacement)
     return op;
 }
 
-vm_op_t *bpeg_pattern(file_t *f, const char *str)
+vm_op_t *bp_pattern(file_t *f, const char *str)
 {
-    vm_op_t *op = bpeg_simplepattern(f, str);
+    vm_op_t *op = bp_simplepattern(f, str);
     if (op != NULL) op = expand_choices(f, op);
     return op;
 }

@@ -1,5 +1,5 @@
 /*
- * bpeg.c - Source code for the bpeg parser
+ * bp.c - Source code for the bp parser
  *
  * See `man ./bp.1` for more details
  */
@@ -77,7 +77,7 @@ static int run_match(grammar_t *g, const char *filename, vm_op_t *pattern, unsig
     static int printed_matches = 0;
     file_t *f = load_file(filename);
     check(f, "Could not open file: %s", filename);
-    if (flags & BPEG_INPLACE) // Need to do this before matching
+    if (flags & BP_INPLACE) // Need to do this before matching
         intern_file(f);
     match_t *m = match(g, f, f->contents, pattern, flags);
     if (m && print_errors(f, m) > 0)
@@ -85,21 +85,21 @@ static int run_match(grammar_t *g, const char *filename, vm_op_t *pattern, unsig
     if (m != NULL && m->end > m->start + 1) {
         ++printed_matches;
 
-        if (flags & BPEG_EXPLAIN) {
+        if (flags & BP_EXPLAIN) {
             if (filename)
                 printf("\033[1;4m%s\033[0m\n", filename);
             visualize_match(m);
-        } else if (flags & BPEG_LISTFILES) {
+        } else if (flags & BP_LISTFILES) {
             printf("%s\n", filename);
-        } else if (flags & BPEG_JSON) {
+        } else if (flags & BP_JSON) {
             if (printed_matches > 1)
                 printf(",\n");
             printf("{\"filename\":\"%s\",", filename ? filename : "-");
             printf("\"tree\":{\"rule\":\"text\",\"start\":%d,\"end\":%ld,\"children\":[",
                    0, f->end - f->contents);
-            json_match(f->contents, m, (flags & BPEG_VERBOSE) ? 1 : 0);
+            json_match(f->contents, m, (flags & BP_VERBOSE) ? 1 : 0);
             printf("]}}\n");
-        } else if (flags & BPEG_INPLACE && filename) {
+        } else if (flags & BP_INPLACE && filename) {
             FILE *out = fopen(filename, "w");
             print_match(out, f, m, 0);
             fclose(out);
@@ -153,22 +153,22 @@ int main(int argc, char *argv[])
             printf("%s\n", usage);
             return 0;
         } else if (streq(argv[i], "--verbose")) {
-            flags |= BPEG_VERBOSE;
+            flags |= BP_VERBOSE;
         } else if (streq(argv[i], "--explain")) {
-            flags |= BPEG_EXPLAIN;
+            flags |= BP_EXPLAIN;
         } else if (streq(argv[i], "--json")) {
-            flags |= BPEG_JSON;
+            flags |= BP_JSON;
         } else if (streq(argv[i], "--inplace")) {
-            flags |= BPEG_INPLACE;
+            flags |= BP_INPLACE;
         } else if (streq(argv[i], "--ignore-case")) {
-            flags |= BPEG_IGNORECASE;
+            flags |= BP_IGNORECASE;
         } else if (streq(argv[i], "--list-files")) {
-            flags |= BPEG_LISTFILES;
+            flags |= BP_LISTFILES;
         } else if (FLAG("--replace") || FLAG("-r")) {
             file_t *pat_file = spoof_file("<pattern>", "pattern");
-            vm_op_t *patref = bpeg_pattern(pat_file, pat_file->contents);
+            vm_op_t *patref = bp_pattern(pat_file, pat_file->contents);
             file_t *replace_file = spoof_file("<replace argument>", flag);
-            vm_op_t *rep = bpeg_replacement(replace_file, patref, replace_file->contents);
+            vm_op_t *rep = bp_replacement(replace_file, patref, replace_file->contents);
             check(rep, "Replacement failed to compile: %s", flag);
             add_def(g, replace_file, replace_file->contents, "replacement", rep);
             rule = "replace-all";
@@ -191,7 +191,7 @@ int main(int argc, char *argv[])
             *eq = '\0';
             char *src = ++eq;
             file_t *def_file = spoof_file(def, src);
-            vm_op_t *pat = bpeg_pattern(def_file, def_file->contents);
+            vm_op_t *pat = bp_pattern(def_file, def_file->contents);
             check(pat, "Failed to compile pattern: %s", flag);
             add_def(g, def_file, src, def, pat);
         } else if (FLAG("--define-string") || FLAG("-D")) {
@@ -201,19 +201,19 @@ int main(int argc, char *argv[])
             *eq = '\0';
             char *src = ++eq;
             file_t *def_file = spoof_file(def, flag);
-            vm_op_t *pat = bpeg_stringpattern(def_file, def_file->contents);
+            vm_op_t *pat = bp_stringpattern(def_file, def_file->contents);
             check(pat, "Failed to compile pattern: %s", flag);
             add_def(g, def_file, src, def, pat);
         } else if (FLAG("--pattern") || FLAG("-p")) {
             check(npatterns == 0, "Cannot define multiple patterns");
             file_t *arg_file = spoof_file("<pattern argument>", flag);
-            vm_op_t *p = bpeg_pattern(arg_file, arg_file->contents);
+            vm_op_t *p = bp_pattern(arg_file, arg_file->contents);
             check(p, "Pattern failed to compile: %s", flag);
             add_def(g, arg_file, flag, "pattern", p);
             ++npatterns;
         } else if (FLAG("--pattern-string") || FLAG("-P")) {
             file_t *arg_file = spoof_file("<pattern argument>", flag);
-            vm_op_t *p = bpeg_stringpattern(arg_file, arg_file->contents);
+            vm_op_t *p = bp_stringpattern(arg_file, arg_file->contents);
             check(p, "Pattern failed to compile: %s", flag);
             add_def(g, arg_file, flag, "pattern", p);
             ++npatterns;
@@ -223,12 +223,12 @@ int main(int argc, char *argv[])
             for (char *c = &argv[i][1]; *c; ++c) {
                 switch (*c) {
                     case 'h': goto flag_help; // -h
-                    case 'v': flags |= BPEG_VERBOSE; break; // -v
-                    case 'e': flags |= BPEG_EXPLAIN; break; // -e
-                    case 'j': flags |= BPEG_JSON; break; // -j
-                    case 'I': flags |= BPEG_INPLACE; break; // -I
-                    case 'i': flags |= BPEG_IGNORECASE; break; // -i
-                    case 'l': flags |= BPEG_LISTFILES; break; // -l
+                    case 'v': flags |= BP_VERBOSE; break; // -v
+                    case 'e': flags |= BP_EXPLAIN; break; // -e
+                    case 'j': flags |= BP_JSON; break; // -j
+                    case 'I': flags |= BP_INPLACE; break; // -I
+                    case 'i': flags |= BP_IGNORECASE; break; // -i
+                    case 'l': flags |= BP_LISTFILES; break; // -l
                     default:
                         printf("Unrecognized flag: -%c\n\n%s\n", *c, usage);
                         return 1;
@@ -237,7 +237,7 @@ int main(int argc, char *argv[])
         } else if (argv[i][0] != '-') {
             if (npatterns > 0) break;
             file_t *arg_file = spoof_file("<pattern argument>", argv[i]);
-            vm_op_t *p = bpeg_stringpattern(arg_file, arg_file->contents);
+            vm_op_t *p = bp_stringpattern(arg_file, arg_file->contents);
             check(p, "Pattern failed to compile: %s", argv[i]);
             add_def(g, arg_file, argv[i], "pattern", p);
             ++npatterns;
@@ -247,7 +247,7 @@ int main(int argc, char *argv[])
         }
     }
 
-    if (((flags & BPEG_JSON) != 0) + ((flags & BPEG_EXPLAIN) != 0) + ((flags & BPEG_LISTFILES) != 0) > 1) {
+    if (((flags & BP_JSON) != 0) + ((flags & BP_EXPLAIN) != 0) + ((flags & BP_LISTFILES) != 0) > 1) {
         printf("Please choose no more than one of the flags: -j/--json, -e/--explain, and -l/--list-files.\n"
                "They are mutually contradictory.\n");
         return 1;
@@ -261,7 +261,7 @@ int main(int argc, char *argv[])
     check(pattern != NULL, "No such rule: '%s'", rule);
 
     int ret = 1;
-    if (flags & BPEG_JSON) printf("[");
+    if (flags & BP_JSON) printf("[");
     if (i < argc) {
         // Files pass in as command line args:
         for (int nfiles = 0; i < argc; nfiles++, i++) {
@@ -280,7 +280,7 @@ int main(int argc, char *argv[])
         // Piped in input:
         ret &= run_match(g, NULL, pattern, flags);
     }
-    if (flags & BPEG_JSON) printf("]\n");
+    if (flags & BP_JSON) printf("]\n");
 
     return ret;
 }

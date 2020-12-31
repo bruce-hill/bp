@@ -1,5 +1,5 @@
 /*
- * vm.c - Code for the BPEG virtual machine that performs the matching.
+ * vm.c - Code for the BP virtual machine that performs the matching.
  */
 
 #include <ctype.h>
@@ -116,7 +116,7 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
         }
         case VM_STRING: {
             if (&str[op->len] > f->end) return NULL;
-            if ((flags & BPEG_IGNORECASE) ? memicmp(str, op->args.s, (size_t)op->len) != 0
+            if ((flags & BP_IGNORECASE) ? memicmp(str, op->args.s, (size_t)op->len) != 0
                                           : memcmp(str, op->args.s, (size_t)op->len) != 0)
                 return NULL;
             match_t *m = new(match_t);
@@ -215,7 +215,7 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
                 }
                 if (p->end == start && reps > 0) {
                     // Since no forward progress was made on either `pat` or
-                    // `sep` and BPEG does not have mutable state, it's
+                    // `sep` and BP does not have mutable state, it's
                     // guaranteed that no progress will be made on the next
                     // loop either. We know that this will continue to loop
                     // until reps==max, so let's just cut to the chase instead
@@ -662,7 +662,7 @@ static match_t *match_backref(const char *str, vm_op_t *op, match_t *cap, unsign
         for (match_t *child = cap->child; child; child = child->nextsibling) {
             if (child->start > prev) {
                 size_t len = (size_t)(child->start - prev);
-                if ((flags & BPEG_IGNORECASE) ? memicmp(str, prev, len) != 0
+                if ((flags & BP_IGNORECASE) ? memicmp(str, prev, len) != 0
                                               : memcmp(str, prev, len) != 0) {
                     destroy_match(&ret);
                     return NULL;
@@ -682,7 +682,7 @@ static match_t *match_backref(const char *str, vm_op_t *op, match_t *cap, unsign
         }
         if (cap->end > prev) {
             size_t len = (size_t)(cap->end - prev);
-            if ((flags & BPEG_IGNORECASE) ? memicmp(str, prev, len) != 0
+            if ((flags & BP_IGNORECASE) ? memicmp(str, prev, len) != 0
                                           : memcmp(str, prev, len) != 0) {
                 destroy_match(&ret);
                 return NULL;

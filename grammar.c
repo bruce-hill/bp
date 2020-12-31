@@ -46,7 +46,7 @@ vm_op_t *load_grammar(grammar_t *g, file_t *f)
         name = strndup(name, (size_t)(name_end-name));
         src = after_spaces(name_end);
         check(matchchar(&src, ':'), "Expected ':' in definition");
-        vm_op_t *op = bpeg_pattern(f, src);
+        vm_op_t *op = bp_pattern(f, src);
         if (op == NULL) break;
         //check(op, "Couldn't load definition");
         add_def(g, f, src, name, op);
@@ -59,7 +59,7 @@ vm_op_t *load_grammar(grammar_t *g, file_t *f)
             src = after_spaces(src);
     }
     if (src < f->end) {
-        fprint_line(stderr, f, src, NULL, "Invalid BPEG pattern");
+        fprint_line(stderr, f, src, NULL, "Invalid BP pattern");
         _exit(1);
     }
     return ret;

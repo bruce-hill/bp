@@ -1,4 +1,4 @@
-# This is a file defining the BPEG grammar using BPEG syntax
+# This is a file defining the BP grammar using BP syntax
 
 Grammar: __ *(Def [__`;])%__ __ ($$ / @!=(... => "Could not parse this code"))
 Def: @name=id _ `: __ (
@@ -78,5 +78,5 @@ id: "^^" / "^" / "__" / "_" / "$$" / "$" / "|" / `a-z,A-Z *`a-z,A-Z,0-9,-
 line-comment: `# .. $
 block-comment: "#("..")#" % block-comment
 
-# Note: comments are undefined by default in regular BPEG
+# Note: comments are undefined by default in regular BP
 comment: block-comment / line-comment
