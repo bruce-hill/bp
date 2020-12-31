@@ -20,7 +20,7 @@
 
 __attribute__((nonnull))
 unsigned char unescapechar(const char *escaped, const char **end);
-__attribute__((pure, nonnull, returns_nonnull))
+__attribute__((pure, nonnull))
 const char *after_name(const char *str);
 __attribute__((pure, nonnull, returns_nonnull))
 const char *after_spaces(const char *str);
