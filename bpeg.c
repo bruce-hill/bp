@@ -99,10 +99,11 @@ static int run_match(grammar_t *g, const char *filename, vm_op_t *pattern, unsig
                    0, f->end - f->contents);
             json_match(f->contents, m, (flags & BPEG_VERBOSE) ? 1 : 0);
             printf("]}}\n");
-        } else if (flags & BPEG_INPLACE) {
+        } else if (flags & BPEG_INPLACE && filename) {
             FILE *out = fopen(filename, "w");
             print_match(out, f, m, 0);
             fclose(out);
+            printf("%s\n", filename);
         } else {
             if (printed_matches > 1)
                 fputc('\n', stdout);
