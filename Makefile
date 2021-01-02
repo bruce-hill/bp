@@ -1,11 +1,10 @@
 NAME=bp
-CC ?= gcc
+CC=cc
 PREFIX=/usr/local
-CFLAGS=-std=c99 -D_XOPEN_SOURCE=700 -D_GNU_SOURCE -D_POSIX_C_SOURCE=200809L
-CWARN=-Wall -Wpedantic -Wextra -Wno-unknown-pragmas -Wno-missing-field-initializers\
-	  -Wno-padded -Wsign-conversion -Wno-missing-noreturn -Wno-cast-qual -Wtype-limits
-G ?=
-O ?= -O3
+CFLAGS=-std=c99 -Werror -D_XOPEN_SOURCE=700 -D_GNU_SOURCE -D_POSIX_C_SOURCE=200809L
+CWARN=-Wall -Wpedantic -Wextra -Wsign-conversion -Wtype-limits -Wunused-result
+G=
+O=-O3
 
 CFILES=compiler.c grammar.c utils.c vm.c file_loader.c viz.c json.c
 OBJFILES=$(CFILES:.c=.o)
@@ -15,8 +14,8 @@ all: $(NAME)
 .c.o:
 	$(CC) -c $(CFLAGS) $(CWARN) $(G) $(O) -o $@ $<
 
-$(NAME): $(OBJFILES) bp.c
-	$(CC) $(CFLAGS) $(CWARN) $(G) $(O) -o $@ $^
+$(NAME): $(OBJFILES) $(NAME).c
+	$(CC) $(CFLAGS) $(CWARN) $(G) $(O) -o $@ $(OBJFILES) $(NAME).c
 
 clean:
 	rm -f $(NAME) $(OBJFILES)
