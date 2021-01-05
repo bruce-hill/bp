@@ -19,6 +19,12 @@ find-all: (
     +(+(..@pattern) ..(\n/$$) / ~(..\n))
     [!<\n => "\n"]
 )
+find-lines: (
+    (include-binary-files / is-text-file)
+    *(!(pattern$) ~(..\n))
+    +(@pattern (\n/$$) / ~(..\n))
+    [!<\n => "\n"]
+)
 only-matches: (
     (include-binary-files / is-text-file)
     +(..@pattern%\n =>'@1\n')
