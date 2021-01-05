@@ -33,10 +33,9 @@ Pattern            | Meaning
 -------------------|---------------------
 `pat1 pat2`        | `pat1` followed by `pat2`
 `pat1 / pat2`      | `pat1` if it matches, otherwise `pat2`
-`...pat`           | Any text up to and including `pat` (including newlines)
 `..pat`            | Any text up to and including `pat` (except newlines)
+`..pat1 % pat2`    | Any text up to and including `pat1` (except newlines), skipping over instances of `pat2`
 `.`                | Any single character (except newline)
-`$.`               | Any single character (including newline)
 `^^`               | The start of the input
 `^`                | The start of a line
 `$$`               | The end of the input

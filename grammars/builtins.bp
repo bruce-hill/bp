@@ -11,7 +11,7 @@ pattern: !'' # Not defined by default
 replacement: !'' # Not defined by default
 replace-all: (
     (include-binary-files / is-text-file)
-    +(...(>pattern replacement)) ...
+    +(..(>pattern replacement)%\n) ..%\n
 )
 find-all: (
     (include-binary-files / is-text-file)
@@ -21,7 +21,7 @@ find-all: (
 )
 only-matches: (
     (include-binary-files / is-text-file)
-    +(...@pattern =>'@1\n')
+    +(..@pattern%\n =>'@1\n')
 )
 
 # Helper definitions (commonly used)
@@ -49,10 +49,10 @@ utf8-codepoint: (
 )
 crlf: \r\n
 cr: \r
-anglebraces: `<...`> % (anglebraces/string)
-brackets: `[...`] % (brackets/string)
-braces: `{...`} % (braces/string)
-parens: `(...`) % (parens/string)
+anglebraces: `<..`> % (\n/anglebraces/string)
+brackets: `[..`] % (\n/brackets/string)
+braces: `{..`} % (\n/braces/string)
+parens: `(..`) % (\n/parens/string)
 string: `"..`" % (`\.) / `'..`' % (`\.)
 id: !<`a-z,A-Z,_,0-9 `a-z,A-Z,_ *`a-z,A-Z,_,0-9
 id-char: `a-z,A-Z,_,0-9
@@ -70,16 +70,16 @@ abc: `a-z
 esc: \e
 tab: \t
 nl: \n; lf: \n
-c-block-comment: '/*' ... '*/'
-c-line-comment: '//' ..$
+c-block-comment: '/*'..'*/'%\n
+c-line-comment: '//'..$
 c-comment: c-line-comment / c-block-comment
 hash-comment: `# ..$
 comment: !''; # No default definition, can be overridden
 WS: ` /\t/\n/\r/comment
 ws: ` /\t
-$$: !$.
+$$: !(./\n)
 $:  !.
-^^: !<$.
+^^: !<(./\n)
 ^:  !<.
 __: *(` /\t/\n/\r/comment)
 _:  *(` /\t)

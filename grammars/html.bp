@@ -7,13 +7,13 @@ html-element: void-element / raw-element / template-element / normal-element
 
 void-element: `< ("area"/"base"/"br"/"col"/"embed"/"hr"/"img"/"input"/"link"/"meta"/"param"/"source"/"track"/"wbr") __attributes__ [`/] __ `>
 
-template-element: "<template>"...("</template>") % (comment / html-element)
+template-element: "<template>".."</template>" % (\n / comment / html-element)
 
-raw-element: `< @tag=("script"/"style"/"textarea"/"title") __attributes__ `>...("</"tag__`>)
+raw-element: `< @tag=("script"/"style"/"textarea"/"title") __attributes__ `>..("</"tag__`>)%\n
 
-normal-element: `< @tag=id __attributes__ `>...("</"tag`>) % (comment / html-element)
+normal-element: `< @tag=id __attributes__ `>..("</"tag`>) % (\n / comment / html-element)
 
-comment: "<!--" ..."-->"
+comment: "<!--" .."-->" % \n
 
 attributes: *attribute%__
 attribute: (+id%`:)__`=__ (id / `" ..`" / `' ..`')

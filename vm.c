@@ -106,7 +106,7 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
 {
     switch (op->op) {
         case VM_ANYCHAR: {
-            if (str >= f->end || (!op->multiline && *str == '\n'))
+            if (str >= f->end || *str == '\n')
                 return NULL;
             match_t *m = new(match_t);
             m->op = op;
@@ -152,11 +152,7 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
             m->start = str;
             m->op = op;
             if (!op->args.multiple.first && !op->args.multiple.second) {
-                if (op->multiline) {
-                    str = f->end;
-                } else {
-                    while (str < f->end && *str != '\n') ++str;
-                }
+                while (str < f->end && *str != '\n') ++str;
             } else {
                 match_t **dest = &m->child;
                 for (const char *prev = NULL; prev < str; ) {
@@ -181,7 +177,7 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
                     // This isn't in the for() structure because there needs to
                     // be at least once chance to match the pattern, even if
                     // we're at the end of the string already (e.g. "..$").
-                    if (str < f->end && (op->multiline || *str != '\n'))
+                    if (str < f->end && *str != '\n')
                         str = next_char(f, str);
                 }
                 destroy_match(&m);

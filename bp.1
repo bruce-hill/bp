@@ -89,7 +89,7 @@ A series of ordered choices (if one pattern matches, the following patterns
 will not be attempted), pronounced \fI<pat1>\fB-or-\fI<pat2>\fR
 
 .B .
-\fBAny\fR character (multiline: $.)
+\fBAny\fR character (excluding newline)
 
 .B ^
 \fBStart-of-a-line\fR
@@ -150,7 +150,7 @@ The \fBescape-sequence-range-\fI<esc1>\fB-to-\fI<esc2>\fR
 \fB0+(\fI<sep><pat>\fB)\fR)
 
 .B .. \fI<pat>\fR
-Any text \fBup-to-and-including\fR \fI<pat>\fR (multiline: \fB...\fR)
+Any text \fBup-to-and-including\fR \fI<pat>\fR (excluding newline)
 
 .B .. \fI<pat>\fB % \fI<skip>\fR
 Any text \fBup-to-and-including\fR \fI<pat>\fR, but skipping over instances of \fI<skip>\fR.

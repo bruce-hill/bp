@@ -111,14 +111,10 @@ vm_op_t *bp_simplepattern(file_t *f, const char *str)
     const char *origin = str;
     ++str;
     switch (c) {
-        // Any char (dot) ($. is multiline anychar)
+        // Any char (dot)
         case '.': {
             if (*str == '.') { // ".."
                 ++str;
-                if (*str == '.') { // "..."
-                    ++str;
-                    op->multiline = 1;
-                }
                 vm_op_t *till = bp_simplepattern(f, str);
                 op->op = VM_UPTO_AND;
                 op->len = -1;
@@ -134,7 +130,6 @@ vm_op_t *bp_simplepattern(file_t *f, const char *str)
                 }
                 break;
             } else {
-              anychar:
                 op->op = VM_ANYCHAR;
                 op->len = 1;
                 break;
@@ -400,9 +395,6 @@ vm_op_t *bp_simplepattern(file_t *f, const char *str)
             if (matchchar(&str, c)) { // double __, ^^, $$
                 char tmp[3] = {c, c, '\0'};
                 op->args.s = strdup(tmp);
-            } else if (c == '$' && matchchar(&str, '.')) { // $. (multi-line anychar)
-                op->multiline = 1;
-                goto anychar;
             } else {
                 op->args.s = strndup(&c, 1);
             }

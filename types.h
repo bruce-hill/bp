@@ -46,7 +46,6 @@ enum VMOpcode {
  */
 typedef struct vm_op_s {
     enum VMOpcode op;
-    unsigned int multiline:1, negate:1;
     const char *start, *end;
     // Length of the match, if constant, otherwise -1
     ssize_t len;
