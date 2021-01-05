@@ -1,6 +1,7 @@
 NAME=bp
 CC=cc
 PREFIX=/usr/local
+SYSCONFDIR=/etc
 CFLAGS=-std=c99 -Werror -D_XOPEN_SOURCE=700 -D_GNU_SOURCE -D_POSIX_C_SOURCE=200809L
 CWARN=-Wall -Wpedantic -Wextra -Wsign-conversion -Wtype-limits -Wunused-result
 G=
@@ -21,29 +22,18 @@ clean:
 	rm -f $(NAME) $(OBJFILES)
 
 install: $(NAME)
-	@prefix="$(PREFIX)"; \
-	if [ ! "$$prefix" ]; then \
-		printf '\033[1mWhere do you want to install? (default: /usr/local) \033[0m'; \
-		read prefix; \
-	fi; \
-	[ ! "$$prefix" ] && prefix="/usr/local"; \
-	[ ! "$$sysconfdir" ] && sysconfdir=/etc; \
-	mkdir -p -m 755 "$$prefix/share/man/man1" "$$prefix/bin" "$$sysconfdir/xdg/bp" \
-	&& cp -rv grammars/* "$$sysconfdir/xdg/bp/" \
-	&& cp -v $(NAME).1 "$$prefix/share/man/man1/" \
-	&& rm -f "$$prefix/bin/$(NAME)" \
-	&& cp -v $(NAME) "$$prefix/bin/"
+	mkdir -p -m 755 "$(PREFIX)/share/man/man1" "$(PREFIX)/bin" "$(SYSCONFDIR)/xdg/bp"
+	cp -rv grammars/* "$(SYSCONFDIR)/xdg/bp/"
+	cp -v $(NAME).1 "$(PREFIX)/share/man/man1/"
+	rm -f "$(PREFIX)/bin/$(NAME)"
+	cp -v $(NAME) "$(PREFIX)/bin/"
 
 uninstall:
-	@prefix="$(PREFIX)"; \
-	if [ ! "$$prefix" ]; then \
-		printf '\033[1mWhere do you want to uninstall from? (default: /usr/local) \033[0m'; \
-		read prefix; \
-	fi; \
-	[ ! "$$prefix" ] && prefix="/usr/local"; \
-	[ ! "$$sysconfdir" ] && sysconfdir=/etc; \
-	echo "Deleting..."; \
-	rm -rvf "$$prefix/bin/$(NAME)" "$$prefix/share/man/man1/$(NAME).1" "$$sysconfdir/xdg/bp"; \
-	printf "\033[1mIf you created any config files in ~/.config/$(NAME), you may want to delete them manually.\033[0m\n"
+	rm -rvf "$(PREFIX)/bin/$(NAME)" "$(PREFIX)/share/man/man1/$(NAME).1" "$(SYSCONFDIR)/xdg/bp";
+	@if [ -d ~/.config/$(NAME) ]; then \
+	  printf 'Config files exist in ~/.config/$(NAME) Do you want to delete them? [Y/n] '; \
+	  read confirm; \
+	  [ "$$confirm" != n ] && rm -rf ~/.config/$(NAME); \
+	fi
 
-.PHONY: all, clean, install, uninstall
+.PHONY: all clean install uninstall
