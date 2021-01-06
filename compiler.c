@@ -56,14 +56,47 @@ static vm_op_t *expand_chain(file_t *f, vm_op_t *first)
 }
 
 /*
- * Take an opcode and expand it into a chain of choices if it's
- * followed by any "/"-separated patterns (e.g. "`x/`y"), otherwise
- * return the original input.
+ * Take an opcode and parse any "=>" replacements and then expand it into a
+ * chain of choices if it's followed by any "/"-separated patterns (e.g.
+ * "`x/`y"), otherwise return the original input.
  */
 static vm_op_t *expand_choices(file_t *f, vm_op_t *first)
 {
     first = expand_chain(f, first);
     const char *str = first->end;
+    
+    while (str+2 < f->end && matchstr(&str, "=>")) { // Replacement <pat> => <pat>
+        str = after_spaces(str);
+        char quote = *str;
+        if (!(matchchar(&str, '"') || matchchar(&str, '\'')))
+            file_err(f, str, str, "There should be a string literal as a replacement here.");
+        const char *repstr = str;
+        for (; *str && *str != quote; str++) {
+            if (*str == '\\') {
+                if (!str[1] || str[1] == '\n')
+                    file_err(f, str, str+1,
+                             "There should be an escape sequence after this backslash.");
+                ++str;
+            }
+        }
+        if (!matchchar(&str, quote))
+            file_err(f, &repstr[-1], str, "This string doesn't have a closing quote.");
+
+        size_t replace_len = (size_t)(str-repstr-1);
+        const char *replacement = xcalloc(sizeof(char), replace_len+1);
+        memcpy((void*)replacement, repstr, replace_len);
+        
+        vm_op_t *pat = first;
+        first = new(vm_op_t);
+        first->op = VM_REPLACE;
+        first->args.replace.pat = pat;
+        first->args.replace.text = replacement;
+        first->args.replace.len = replace_len;
+        first->len = pat->len;
+        first->start = pat->start;
+        first->end = str;
+    }
+
     if (!matchchar(&str, '/')) return first;
     vm_op_t *second = bp_simplepattern(f, str);
     if (!second)
@@ -430,39 +463,7 @@ vm_op_t *bp_simplepattern(file_t *f, const char *str)
     // Postfix operators:
   postfix:
     str = after_spaces(str);
-    if (str+2 < f->end && matchstr(&str, "=>")) { // Replacement <pat> => <pat>
-        str = after_spaces(str);
-        char quote = *str;
-        if (!(matchchar(&str, '"') || matchchar(&str, '\'')))
-            file_err(f, str, str, "There should be a string literal as a replacement here.");
-        const char *repstr = str;
-        for (; *str && *str != quote; str++) {
-            if (*str == '\\') {
-                if (!str[1] || str[1] == '\n')
-                    file_err(f, str, str+1,
-                             "There should be an escape sequence after this backslash.");
-                ++str;
-            }
-        }
-        if (!matchchar(&str, quote))
-            file_err(f, &repstr[-1], str, "This string doesn't have a closing quote.");
-
-        size_t replace_len = (size_t)(str-repstr-1);
-        const char *replacement = xcalloc(sizeof(char), replace_len+1);
-        memcpy((void*)replacement, repstr, replace_len);
-        
-        vm_op_t *pat = op;
-        op = new(vm_op_t);
-        op->op = VM_REPLACE;
-        op->args.replace.pat = pat;
-        op->args.replace.text = replacement;
-        op->args.replace.len = replace_len;
-        op->len = pat->len;
-        op->start = pat->start;
-        op->end = str;
-        goto postfix;
-
-    } else if (str+2 < f->end && (matchstr(&str, "!=") || matchstr(&str, "=="))) { // Equality <pat1>==<pat2> and inequality <pat1>!=<pat2>
+    if (str+2 < f->end && (matchstr(&str, "!=") || matchstr(&str, "=="))) { // Equality <pat1>==<pat2> and inequality <pat1>!=<pat2>
         int equal = str[-2] == '=';
         vm_op_t *first = op;
         vm_op_t *second = bp_simplepattern(f, str);

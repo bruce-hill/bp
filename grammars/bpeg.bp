@@ -34,7 +34,7 @@ Char: (@s=. / @!=(''=> "Expected a character following the '`'"))
 Escape-range: `\ @low=escape-sequence `- @high=escape-sequence
 Escape: `\ (@s=escape-sequence
     / $ @!=(''=>"Backslashes are used for escape sequences, not splitting lines")
-    / @!=((. *(Abc/`0-9)) => "Invalid escape sequence: '@0'")
+    / @!=(. *(Abc/`0-9) => "Invalid escape sequence: '@0'")
 )
 escape-sequence: (
        `n,t,r,e,b,a,v
