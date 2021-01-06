@@ -309,7 +309,6 @@ vm_op_t *bp_simplepattern(file_t *f, const char *str)
             if (!pat)
                 file_err(f, str, str, "There should be a pattern after this repetition count.");
             str = pat->end;
-            str = after_spaces(str);
             vm_op_t *sep = NULL;
             if (matchchar(&str, '%')) {
                 sep = bp_simplepattern(f, str);
@@ -358,7 +357,6 @@ vm_op_t *bp_simplepattern(file_t *f, const char *str)
                 file_err(f, str, str, "There should be a valid pattern after this parenthesis.");
             op = expand_choices(f, op);
             str = op->end;
-            str = after_spaces(str);
             if (!matchchar(&str, closing))
                 file_err(f, origin, str, "This parenthesis group isn't properly closed.");
             op->start = origin;
@@ -372,7 +370,6 @@ vm_op_t *bp_simplepattern(file_t *f, const char *str)
                 file_err(f, str, str, "There should be a valid pattern after this square bracket.");
             pat = expand_choices(f, pat);
             str = pat->end;
-            str = after_spaces(str);
             if (!matchchar(&str, ']'))
                 file_err(f, origin, str, "This square bracket group isn't properly closed.");
             set_range(op, 0, 1, pat, NULL);
@@ -385,7 +382,6 @@ vm_op_t *bp_simplepattern(file_t *f, const char *str)
             if (!pat)
                 file_err(f, str, str, "There should be a valid pattern here after the '%c'", c);
             str = pat->end;
-            str = after_spaces(str);
             vm_op_t *sep = NULL;
             if (matchchar(&str, '%')) {
                 sep = bp_simplepattern(f, str);
@@ -431,7 +427,7 @@ vm_op_t *bp_simplepattern(file_t *f, const char *str)
             } else {
                 op->args.s = strndup(&c, 1);
             }
-            if (*after_spaces(str) == ':') {
+            if (matchchar(&str, ':')) { // Don't match definitions
                 free((char*)op->args.s);
                 free(op);
                 return NULL;
@@ -445,7 +441,7 @@ vm_op_t *bp_simplepattern(file_t *f, const char *str)
                 --str;
                 const char *refname = str;
                 str = after_name(str);
-                if (*after_spaces(str) == ':') {
+                if (matchchar(&str, ':')) { // Don't match definitions
                     free(op);
                     return NULL;
                 }
