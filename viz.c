@@ -9,7 +9,12 @@
 #include "types.h"
 #include "utils.h"
 #include "viz.h"
+#include "vm.h"
 
+typedef struct {
+    size_t line, printed_line;
+    const char *color;
+} print_state_t;
 
 static int match_height(match_t *m)
 {
@@ -145,6 +150,113 @@ void visualize_match(match_t *m)
     //_visualize_matches(&first, 0, m->start, (m->end - m->start));
     _visualize_patterns(m);
     printf("\033[?7h");
+}
+
+static void print_line_number(FILE *out, print_state_t *state, print_options_t options)
+{
+    state->printed_line = state->line;
+    if (!(options & PRINT_LINE_NUMBERS)) return;
+    if (options & PRINT_COLOR)
+        fprintf(out, "\033[0;2m% 5ld\033(0\x78\033(B%s", state->line, state->color);
+    else
+        fprintf(out, "% 5ld|", state->line);
+}
+
+/*
+ * Print a match with replacements and highlighting.
+ */
+static void _print_match(FILE *out, file_t *f, match_t *m, print_state_t *state, print_options_t options)
+{
+    static const char *hl = "\033[0;31;1m";
+    const char *old_color = state->color;
+    if (m->op->op == VM_HIDE) {
+        // TODO: handle replacements?
+        for (const char *p = m->start; p < m->end; p++) {
+            if (*p == '\n') ++state->line;
+        }
+    } else if (m->op->op == VM_REPLACE) {
+        if (options & PRINT_COLOR && state->color != hl) {
+            state->color = hl;
+            fprintf(out, "%s", state->color);
+        }
+        const char *text = m->op->args.replace.text;
+        const char *end = &text[m->op->args.replace.len];
+        for (const char *r = text; r < end; ) {
+            if (*r == '@' && r[1] && r[1] != '@') {
+                ++r;
+                match_t *cap = get_capture(m, &r);
+                if (cap != NULL) {
+                    _print_match(out, f, cap, state, options);
+                    continue;
+                } else {
+                    --r;
+                }
+            }
+
+            if (state->printed_line != state->line)
+                print_line_number(out, state, options);
+
+            if (*r == '\\') {
+                ++r;
+                unsigned char c = unescapechar(r, &r);
+                fputc(c, out);
+                if (c == '\n') ++state->line;
+                continue;
+            } else if (*r == '\n') {
+                fputc('\n', out);
+                ++state->line;
+                ++r;
+                continue;
+            } else {
+                fputc(*r, out);
+                ++r;
+                continue;
+            }
+        }
+    } else {
+        if (m->op->op == VM_CAPTURE) {
+            if (options & PRINT_COLOR && state->color != hl) {
+                state->color = hl;
+                fprintf(out, "%s", state->color);
+            }
+        }
+
+        const char *prev = m->start;
+        for (match_t *child = m->child; child; child = child->nextsibling) {
+            // Skip children from e.g. zero-width matches like >@foo
+            if (!(prev <= child->start && child->start <= m->end &&
+                  prev <= child->end && child->end <= m->end))
+                continue;
+            if (child->start > prev) {
+                for (const char *p = prev; p < child->start; ++p) {
+                    if (state->printed_line != state->line)
+                        print_line_number(out, state, options);
+                    fputc(*p, out);
+                    if (*p == '\n') ++state->line;
+                }
+            }
+            _print_match(out, f, child, state, options);
+            prev = child->end;
+        }
+        if (m->end > prev) {
+            for (const char *p = prev; p < m->end; ++p) {
+                if (state->printed_line != state->line)
+                    print_line_number(out, state, options);
+                fputc(*p, out);
+                if (*p == '\n') ++state->line;
+            }
+        }
+    }
+    if (options & PRINT_COLOR && old_color != state->color) {
+        fprintf(out, "%s", old_color);
+        state->color = old_color;
+    }
+}
+
+void print_match(FILE *out, file_t *f, match_t *m, print_options_t options)
+{
+    print_state_t state = {.line = 1, .color = "\033[0m"};
+    _print_match(out, f, m, &state, options);
 }
 
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1

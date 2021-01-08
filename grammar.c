@@ -98,6 +98,19 @@ void push_backref(grammar_t *g, const char *name, match_t *capture)
     g->backrefs[i].op = op;
 }
 
+size_t push_backrefs(grammar_t *g, match_t *m)
+{
+    if (m->op->op == VM_REF) return 0;
+    size_t count = 0;
+    if (m->op->op == VM_CAPTURE && m->op->args.capture.name) {
+        ++count;
+        push_backref(g, m->op->args.capture.name, m->child);
+    }
+    if (m->child) count += push_backrefs(g, m->child);
+    if (m->nextsibling) count += push_backrefs(g, m->nextsibling);
+    return count;
+}
+
 void pop_backrefs(grammar_t *g, size_t count)
 {
     check(count <= g->backrefcount, "Attempt to pop %ld backrefs when there are only %ld", count, g->backrefcount);

@@ -12,10 +12,6 @@
 #include "utils.h"
 #include "vm.h"
 
-static match_t *match_backref(const char *str, vm_op_t *op, match_t *m, unsigned int flags);
-static size_t push_backrefs(grammar_t *g, match_t *m);
-static match_t *get_capture_n(match_t *m, int *n);
-static match_t *get_capture_named(match_t *m, const char *name);
 
 /*
  * The names of the opcodes (keep in sync with the enum definition above)
@@ -74,20 +70,6 @@ void destroy_match(match_t **m)
     *m = NULL;
 }
 
-static size_t push_backrefs(grammar_t *g, match_t *m)
-{
-    if (m == NULL) return 0;
-    if (m->op->op == VM_REF) return 0;
-    size_t count = 0;
-    if (m->op->op == VM_CAPTURE && m->op->args.capture.name) {
-        ++count;
-        push_backref(g, m->op->args.capture.name, m->child);
-    }
-    if (m->child) count += push_backrefs(g, m->child);
-    if (m->nextsibling) count += push_backrefs(g, m->nextsibling);
-    return count;
-}
-
 typedef struct recursive_ref_s {
     const vm_op_t *op;
     const char *pos;
@@ -95,6 +77,85 @@ typedef struct recursive_ref_s {
     int hit;
     match_t *result;
 } recursive_ref_t;
+
+/*
+ * Attempt to match text against a previously captured value.
+ */
+static match_t *match_backref(const char *str, vm_op_t *op, match_t *cap, unsigned int flags)
+{
+    check(op->op == VM_BACKREF, "Attempt to match backref against something that's not a backref");
+    match_t *ret = new(match_t);
+    ret->start = str;
+    ret->op = op;
+    match_t **dest = &ret->child;
+
+    if (cap->op->op == VM_REPLACE) {
+        const char *text = cap->op->args.replace.text;
+        const char *end = &text[cap->op->args.replace.len];
+        for (const char *r = text; r < end; ) {
+            if (*r == '\\') {
+                ++r;
+                if (*(str++) != unescapechar(r, &r)) {
+                    destroy_match(&ret);
+                    return NULL;
+                }
+            } else if (*r != '@') {
+                if (*(str++) != *r) {
+                    destroy_match(&ret);
+                    return NULL;
+                }
+                ++r;
+                continue;
+            }
+
+            ++r;
+            match_t *value = get_capture(cap, &r);
+            if (value != NULL) {
+                *dest = match_backref(str, op, value, flags);
+                if (*dest == NULL) {
+                    destroy_match(&ret);
+                    return NULL;
+                }
+                str = (*dest)->end;
+                dest = &(*dest)->nextsibling;
+            }
+        }
+    } else {
+        const char *prev = cap->start;
+        for (match_t *child = cap->child; child; child = child->nextsibling) {
+            if (child->start > prev) {
+                size_t len = (size_t)(child->start - prev);
+                if ((flags & BP_IGNORECASE) ? memicmp(str, prev, len) != 0
+                                              : memcmp(str, prev, len) != 0) {
+                    destroy_match(&ret);
+                    return NULL;
+                }
+                str += len;
+                prev = child->start;
+            }
+            if (child->start < prev) continue;
+            *dest = match_backref(str, op, child, flags);
+            if (*dest == NULL) {
+                destroy_match(&ret);
+                return NULL;
+            }
+            str = (*dest)->end;
+            dest = &(*dest)->nextsibling;
+            prev = child->end;
+        }
+        if (cap->end > prev) {
+            size_t len = (size_t)(cap->end - prev);
+            if ((flags & BP_IGNORECASE) ? memicmp(str, prev, len) != 0
+                                          : memcmp(str, prev, len) != 0) {
+                destroy_match(&ret);
+                return NULL;
+            }
+            str += len;
+        }
+    }
+    ret->end = str;
+    return ret;
+}
 
 
 /*
@@ -434,263 +495,55 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
     }
 }
 
-
 /*
  * Get a specific numbered pattern capture.
  */
-static match_t *get_capture_n(match_t *m, int *n)
+static match_t *get_capture_by_num(match_t *m, int *n)
 {
-    if (!m) return NULL;
     if (*n == 0) return m;
     if (m->op->op == VM_CAPTURE && *n == 1) return m;
     if (m->op->op == VM_CAPTURE) --(*n);
     for (match_t *c = m->child; c; c = c->nextsibling) {
-        match_t *cap = get_capture_n(c, n);
+        match_t *cap = get_capture_by_num(c, n);
         if (cap) return cap;
     }
     return NULL;
 }
 
 /*
- * Get a named capture.
+ * Get a capture with a specific name.
  */
-static match_t *get_capture_named(match_t *m, const char *name)
+static match_t *get_capture_by_name(match_t *m, const char *name)
 {
     if (m->op->op == VM_CAPTURE && m->op->args.capture.name
         && streq(m->op->args.capture.name, name))
         return m;
     for (match_t *c = m->child; c; c = c->nextsibling) {
-        match_t *cap = get_capture_named(c, name);
+        match_t *cap = get_capture_by_name(c, name);
         if (cap) return cap;
     }
     return NULL;
 }
 
-static match_t *get_cap(match_t *m, const char **r)
+/*
+ * Get a capture by name.
+ */
+match_t *get_capture(match_t *m, const char **r)
 {
     if (isdigit(**r)) {
         int n = (int)strtol(*r, (char**)r, 10);
-        return get_capture_n(m->child, &n);
+        return get_capture_by_num(m->child, &n);
     } else {
         const char *end = after_name(*r);
         if (end == *r) return NULL;
         char *name = strndup(*r, (size_t)(end-*r));
-        match_t *cap = get_capture_named(m, name);
+        match_t *cap = get_capture_by_name(m, name);
         free(name);
         *r = end;
         if (**r == ';') ++(*r);
         return cap;
     }
     return NULL;
-}
-
-typedef struct {
-    size_t line, printed_line;
-    const char *color;
-} print_state_t;
-
-static void print_line_number(FILE *out, print_state_t *state, print_options_t options)
-{
-    state->printed_line = state->line;
-    if (!(options & PRINT_LINE_NUMBERS)) return;
-    if (options & PRINT_COLOR)
-        fprintf(out, "\033[0;2m% 5ld\033(0\x78\033(B%s", state->line, state->color);
-    else
-        fprintf(out, "% 5ld|", state->line);
-}
-
-/*
- * Print a match with replacements and highlighting.
- */
-static void _print_match(FILE *out, file_t *f, match_t *m, print_state_t *state, print_options_t options)
-{
-    static const char *hl = "\033[0;31;1m";
-    const char *old_color = state->color;
-    if (m->op->op == VM_HIDE) {
-        // TODO: handle replacements?
-        for (const char *p = m->start; p < m->end; p++) {
-            if (*p == '\n') ++state->line;
-        }
-    } else if (m->op->op == VM_REPLACE) {
-        if (options & PRINT_COLOR && state->color != hl) {
-            state->color = hl;
-            fprintf(out, "%s", state->color);
-        }
-        const char *text = m->op->args.replace.text;
-        const char *end = &text[m->op->args.replace.len];
-        for (const char *r = text; r < end; ) {
-            if (*r == '@' && r[1] && r[1] != '@') {
-                ++r;
-                match_t *cap = get_cap(m, &r);
-                if (cap != NULL) {
-                    _print_match(out, f, cap, state, options);
-                    continue;
-                } else {
-                    --r;
-                }
-            }
-
-            if (state->printed_line != state->line)
-                print_line_number(out, state, options);
-
-            if (*r == '\\') {
-                ++r;
-                unsigned char c = unescapechar(r, &r);
-                fputc(c, out);
-                if (c == '\n') ++state->line;
-                continue;
-            } else if (*r == '\n') {
-                fputc('\n', out);
-                ++state->line;
-                ++r;
-                continue;
-            } else {
-                fputc(*r, out);
-                ++r;
-                continue;
-            }
-        }
-    } else {
-        if (m->op->op == VM_CAPTURE) {
-            if (options & PRINT_COLOR && state->color != hl) {
-                state->color = hl;
-                fprintf(out, "%s", state->color);
-            }
-        }
-
-        const char *prev = m->start;
-        for (match_t *child = m->child; child; child = child->nextsibling) {
-            // Skip children from e.g. zero-width matches like >@foo
-            if (!(prev <= child->start && child->start <= m->end &&
-                  prev <= child->end && child->end <= m->end))
-                continue;
-            if (child->start > prev) {
-                for (const char *p = prev; p < child->start; ++p) {
-                    if (state->printed_line != state->line)
-                        print_line_number(out, state, options);
-                    fputc(*p, out);
-                    if (*p == '\n') ++state->line;
-                }
-            }
-            _print_match(out, f, child, state, options);
-            prev = child->end;
-        }
-        if (m->end > prev) {
-            for (const char *p = prev; p < m->end; ++p) {
-                if (state->printed_line != state->line)
-                    print_line_number(out, state, options);
-                fputc(*p, out);
-                if (*p == '\n') ++state->line;
-            }
-        }
-    }
-    if (options & PRINT_COLOR && old_color != state->color) {
-        fprintf(out, "%s", old_color);
-        state->color = old_color;
-    }
-}
-
-void print_match(FILE *out, file_t *f, match_t *m, print_options_t options)
-{
-    print_state_t state = {.line = 1, .color = "\033[0m"};
-    _print_match(out, f, m, &state, options);
-}
-
-static match_t *match_backref(const char *str, vm_op_t *op, match_t *cap, unsigned int flags)
-{
-    check(op->op == VM_BACKREF, "Attempt to match backref against something that's not a backref");
-    match_t *ret = new(match_t);
-    ret->start = str;
-    ret->op = op;
-    match_t **dest = &ret->child;
-
-    if (cap->op->op == VM_REPLACE) {
-        const char *text = cap->op->args.replace.text;
-        const char *end = &text[cap->op->args.replace.len];
-        for (const char *r = text; r < end; ) {
-            if (*r == '\\') {
-                ++r;
-                if (*(str++) != unescapechar(r, &r)) {
-                    destroy_match(&ret);
-                    return NULL;
-                }
-            } else if (*r != '@') {
-                if (*(str++) != *r) {
-                    destroy_match(&ret);
-                    return NULL;
-                }
-                ++r;
-                continue;
-            }
-
-            ++r;
-            match_t *cap = NULL;
-            switch (*r) {
-                case '0': case '1': case '2': case '3': case '4':
-                case '5': case '6': case '7': case '8': case '9': {
-                    int n = (int)strtol(r, (char**)&r, 10);
-                    cap = get_capture_n(cap->child, &n);
-                    break;
-                }
-                default: {
-                    const char *end = after_name(r);
-                    if (end == r) {
-                        destroy_match(&ret);
-                        return NULL;
-                    }
-                    char *name = strndup(r, (size_t)(end-r));
-                    cap = get_capture_named(cap, name);
-                    free(name);
-                    r = end;
-                    if (*r == ';') ++r;
-                    break;
-                }
-            }
-            if (cap != NULL) {
-                *dest = match_backref(str, op, cap, flags);
-                if (*dest == NULL) {
-                    destroy_match(&ret);
-                    return NULL;
-                }
-                str = (*dest)->end;
-                dest = &(*dest)->nextsibling;
-            }
-        }
-    } else {
-        const char *prev = cap->start;
-        for (match_t *child = cap->child; child; child = child->nextsibling) {
-            if (child->start > prev) {
-                size_t len = (size_t)(child->start - prev);
-                if ((flags & BP_IGNORECASE) ? memicmp(str, prev, len) != 0
-                                              : memcmp(str, prev, len) != 0) {
-                    destroy_match(&ret);
-                    return NULL;
-                }
-                str += len;
-                prev = child->start;
-            }
-            if (child->start < prev) continue;
-            *dest = match_backref(str, op, child, flags);
-            if (*dest == NULL) {
-                destroy_match(&ret);
-                return NULL;
-            }
-            str = (*dest)->end;
-            dest = &(*dest)->nextsibling;
-            prev = child->end;
-        }
-        if (cap->end > prev) {
-            size_t len = (size_t)(cap->end - prev);
-            if ((flags & BP_IGNORECASE) ? memicmp(str, prev, len) != 0
-                                          : memcmp(str, prev, len) != 0) {
-                destroy_match(&ret);
-                return NULL;
-            }
-            str += len;
-        }
-    }
-    ret->end = str;
-    return ret;
 }
 
 match_t *match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, unsigned int flags)

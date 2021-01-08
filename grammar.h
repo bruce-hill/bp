@@ -13,6 +13,8 @@ void add_def(grammar_t *g, file_t *f, const char *src, const char *name, vm_op_t
 __attribute__((nonnull))
 void push_backref(grammar_t *g, const char *name, match_t *capture);
 __attribute__((nonnull))
+size_t push_backrefs(grammar_t *g, match_t *m);
+__attribute__((nonnull))
 void pop_backrefs(grammar_t *g, size_t count);
 __attribute__((nonnull))
 vm_op_t *load_grammar(grammar_t *g, file_t *f);
