@@ -559,6 +559,7 @@ vm_op_t *bp_replacement(file_t *f, vm_op_t *pat, const char *replacement)
     vm_op_t *op = new(vm_op_t);
     op->op = VM_REPLACE;
     op->start = pat->start;
+    op->end = pat->end;
     op->len = pat->len;
     op->args.replace.pat = pat;
     const char *p = replacement;
