@@ -15,8 +15,8 @@
 #include "file_loader.h"
 #include "grammar.h"
 #include "json.h"
+#include "printing.h"
 #include "utils.h"
-#include "viz.h"
 #include "vm.h"
 
 static const char *usage = (

@@ -1,15 +1,20 @@
 /*
- * viz.c - Visualize matches.
+ * printing.c - Code for printing and visualizing matches.
  */
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
+#include "printing.h"
 #include "types.h"
 #include "utils.h"
-#include "viz.h"
 #include "vm.h"
+
+typedef struct match_node_s {
+    match_t *m;
+    struct match_node_s *next;
+} match_node_t;
 
 typedef struct {
     size_t line, printed_line;

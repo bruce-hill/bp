@@ -1,13 +1,15 @@
 /*
- * Header file for viz.c (visualizing matches)
+ * Header file for printing.c (printing/visualizing matches)
  */
-#ifndef VIZ__H
-#define VIZ__H
+#ifndef PRINTING__H
+#define PRINTING__H
 
-typedef struct match_node_s {
-    match_t *m;
-    struct match_node_s *next;
-} match_node_t;
+#include "types.h"
+
+typedef enum {
+    PRINT_COLOR = 1<<0,
+    PRINT_LINE_NUMBERS = 1<<1,
+} print_options_t;
 
 __attribute__((nonnull))
 void visualize_match(match_t *m);

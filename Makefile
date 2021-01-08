@@ -7,7 +7,7 @@ CWARN=-Wall -Wpedantic -Wextra -Wsign-conversion -Wtype-limits -Wunused-result
 G=
 O=-O3
 
-CFILES=compiler.c grammar.c utils.c vm.c file_loader.c viz.c json.c
+CFILES=compiler.c grammar.c utils.c vm.c file_loader.c printing.c json.c
 OBJFILES=$(CFILES:.c=.o)
 
 all: $(NAME)

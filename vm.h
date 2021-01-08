@@ -8,11 +8,6 @@
 
 #include "types.h"
 
-typedef enum {
-    PRINT_COLOR = 1<<0,
-    PRINT_LINE_NUMBERS = 1<<1,
-} print_options_t;
-
 const char *opcode_name(enum VMOpcode o);
 __attribute__((hot, nonnull))
 match_t *match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, unsigned int flags);
