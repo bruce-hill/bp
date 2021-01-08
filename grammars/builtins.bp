@@ -11,7 +11,7 @@ pattern: !'' # Not defined by default
 replacement: !'' # Not defined by default
 replace-all: (
     (include-binary-files / is-text-file)
-    +(..(>pattern replacement)%\n) ..%\n
+    +(..replacement%\n) ..%\n
 )
 find-all: (
     (include-binary-files / is-text-file)

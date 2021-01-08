@@ -164,6 +164,9 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
                             m->end = p->end;
                             return m;
                         }
+                    } else if (str == f->end) {
+                        m->end = str;
+                        return m;
                     }
                     if (op->args.multiple.second) {
                         match_t *p = _match(g, f, str, op->args.multiple.second, flags, rec);
