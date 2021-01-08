@@ -165,6 +165,8 @@ int main(int argc, char *argv[])
         } else if (streq(argv[i], "--list-files")) {
             flags |= BP_LISTFILES;
         } else if (FLAG("--replace") || FLAG("-r")) {
+            // TODO: spoof file as sprintf("pattern => '%s'", flag)
+            // except that would require handling edge cases like quotation marks etc.
             file_t *pat_file = spoof_file("<pattern>", "pattern");
             vm_op_t *patref = bp_pattern(pat_file, pat_file->contents);
             file_t *replace_file = spoof_file("<replace argument>", flag);
@@ -236,6 +238,7 @@ int main(int argc, char *argv[])
             }
         } else if (argv[i][0] != '-') {
             if (npatterns > 0) break;
+            // TODO: spoof file with quotation marks for better debugging
             file_t *arg_file = spoof_file("<pattern argument>", argv[i]);
             vm_op_t *p = bp_stringpattern(arg_file, arg_file->contents);
             check(p, "Pattern failed to compile: %s", argv[i]);
