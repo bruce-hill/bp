@@ -172,7 +172,7 @@ int main(int argc, char *argv[])
             file_t *replace_file = spoof_file("<replace argument>", flag);
             vm_op_t *rep = bp_replacement(replace_file, patref, replace_file->contents);
             check(rep, "Replacement failed to compile: %s", flag);
-            add_def(g, replace_file, replace_file->contents, "replacement", rep);
+            add_def(g, replace_file, "replacement", rep);
             rule = "replace-all";
         } else if (FLAG("--grammar") || FLAG("-g")) {
             file_t *f = load_file(flag);
@@ -195,29 +195,29 @@ int main(int argc, char *argv[])
             file_t *def_file = spoof_file(def, src);
             vm_op_t *pat = bp_pattern(def_file, def_file->contents);
             check(pat, "Failed to compile pattern: %s", flag);
-            add_def(g, def_file, src, def, pat);
+            add_def(g, def_file, def, pat);
         } else if (FLAG("--define-string") || FLAG("-D")) {
             char *def = flag;
             char *eq = strchr(def, ':');
             check(eq, "Rule definitions must include an ':'\n\n%s", usage);
             *eq = '\0';
             char *src = ++eq;
-            file_t *def_file = spoof_file(def, flag);
+            file_t *def_file = spoof_file(def, src);
             vm_op_t *pat = bp_stringpattern(def_file, def_file->contents);
-            check(pat, "Failed to compile pattern: %s", flag);
-            add_def(g, def_file, src, def, pat);
+            check(pat, "Failed to compile pattern: %s", src);
+            add_def(g, def_file, def, pat);
         } else if (FLAG("--pattern") || FLAG("-p")) {
             check(npatterns == 0, "Cannot define multiple patterns");
             file_t *arg_file = spoof_file("<pattern argument>", flag);
             vm_op_t *p = bp_pattern(arg_file, arg_file->contents);
             check(p, "Pattern failed to compile: %s", flag);
-            add_def(g, arg_file, flag, "pattern", p);
+            add_def(g, arg_file, "pattern", p);
             ++npatterns;
         } else if (FLAG("--pattern-string") || FLAG("-P")) {
             file_t *arg_file = spoof_file("<pattern argument>", flag);
             vm_op_t *p = bp_stringpattern(arg_file, arg_file->contents);
             check(p, "Pattern failed to compile: %s", flag);
-            add_def(g, arg_file, flag, "pattern", p);
+            add_def(g, arg_file, "pattern", p);
             ++npatterns;
         } else if (FLAG("--mode") || FLAG("-m")) {
             rule = flag;
@@ -242,7 +242,7 @@ int main(int argc, char *argv[])
             file_t *arg_file = spoof_file("<pattern argument>", argv[i]);
             vm_op_t *p = bp_stringpattern(arg_file, arg_file->contents);
             check(p, "Pattern failed to compile: %s", argv[i]);
-            add_def(g, arg_file, argv[i], "pattern", p);
+            add_def(g, arg_file, "pattern", p);
             ++npatterns;
         } else {
             printf("Unrecognized flag: %s\n\n%s\n", argv[i], usage);

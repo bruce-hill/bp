@@ -7,8 +7,8 @@
 #include "file_loader.h"
 #include "types.h"
 
-__attribute__((nonnull(1,3,4,5)))
-void add_def(grammar_t *g, file_t *f, const char *src, const char *name, vm_op_t *op);
+__attribute__((nonnull(1,3,4)))
+void add_def(grammar_t *g, file_t *f, const char *name, vm_op_t *op);
 __attribute__((nonnull))
 void push_backref(grammar_t *g, const char *name, match_t *capture);
 __attribute__((nonnull))

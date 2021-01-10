@@ -13,12 +13,11 @@
 /*
  * Add a definition to the grammar
  */
-void add_def(grammar_t *g, file_t *f, const char *src, const char *name, vm_op_t *op)
+void add_def(grammar_t *g, file_t *f, const char *name, vm_op_t *op)
 {
     def_t *def = new(def_t);
     def->next = g->firstdef;
     def->file = f;
-    def->source = src;
     def->name = name;
     def->op = op;
     g->firstdef = def;
@@ -35,21 +34,20 @@ vm_op_t *load_grammar(grammar_t *g, file_t *f)
     src = after_spaces(src);
     while (*src) {
         const char *name = src;
-        const char *name_end = after_name(name);
-        check(name_end > name, "Invalid name for definition: %s", name);
-        name = strndup(name, (size_t)(name_end-name));
-        src = after_spaces(name_end);
+        src = after_name(name);
+        check(src > name, "Invalid name for definition: %s", name);
+        name = strndup(name, (size_t)(src-name));
         check(matchchar(&src, ':'), "Expected ':' in definition");
         vm_op_t *op = bp_pattern(f, src);
         if (op == NULL) break;
         //check(op, "Couldn't load definition");
-        add_def(g, f, src, name, op);
+        add_def(g, f, name, op);
         if (ret == NULL) {
             ret = op;
         }
         src = op->end;
         src = after_spaces(src);
-        if (*src && matchchar(&src, ';'))
+        if (matchchar(&src, ';'))
             src = after_spaces(src);
     }
     if (src < f->end) {
@@ -82,7 +80,6 @@ void push_backref(grammar_t *g, const char *name, match_t *capture)
 {
     backref_t *backref = new(backref_t);
     backref->name = name;
-    backref->capture = capture;
     vm_op_t *op = new(vm_op_t);
     op->op = VM_BACKREF;
     op->start = capture->start;

@@ -93,7 +93,6 @@ typedef struct match_s {
  */
 typedef struct def_s {
     const char *name;
-    const char *source;
     file_t *file;
     vm_op_t *op;
     struct def_s *next;
@@ -104,7 +103,6 @@ typedef struct def_s {
  */
 typedef struct backref_s {
     const char *name;
-    match_t *capture;
     vm_op_t *op;
     struct backref_s *next;
 } backref_t;
