@@ -41,6 +41,8 @@ enum VMOpcode {
     VM_NODENT,
 };
 
+struct match_s; // forward declared to resolve circular struct defs
+
 /*
  * A struct reperesenting a BP virtual machine operation
  */
@@ -71,7 +73,7 @@ typedef struct vm_op_s {
             struct vm_op_s *capture_pat;
             char *name;
         } capture;
-        void *backref;
+        struct match_s *backref;
         struct vm_op_s *pat;
     } args;
 } vm_op_t;

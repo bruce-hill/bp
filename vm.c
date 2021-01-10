@@ -458,7 +458,7 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
             return m;
         }
         case VM_BACKREF: {
-            return match_backref(str, op, (match_t*)op->args.backref, flags);
+            return match_backref(str, op, op->args.backref, flags);
         }
         case VM_NODENT: {
             if (*str != '\n') return NULL;

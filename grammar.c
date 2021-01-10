@@ -94,7 +94,7 @@ void push_backref(grammar_t *g, const char *name, match_t *capture)
     op->start = capture->start;
     op->end = capture->end;
     op->len = -1; // TODO: maybe calculate this?
-    op->args.backref = (void*)capture;
+    op->args.backref = capture;
     g->backrefs[i].op = op;
 }
 
