@@ -9,8 +9,8 @@
 #include "types.h"
 
 const char *opcode_name(enum VMOpcode o);
-__attribute__((hot, nonnull))
-match_t *match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, unsigned int flags);
+__attribute__((hot, nonnull(2,3,4)))
+match_t *match(def_t *defs, file_t *f, const char *str, vm_op_t *op, unsigned int flags);
 __attribute__((nonnull))
 void destroy_match(match_t **m);
 __attribute__((nonnull))

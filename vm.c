@@ -163,7 +163,7 @@ static match_t *match_backref(const char *str, vm_op_t *op, match_t *cap, unsign
  * a match struct, or NULL if no match is found.
  * The returned value should be free()'d to avoid memory leaking.
  */
-static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, unsigned int flags, recursive_ref_t *rec)
+static match_t *_match(def_t *defs, file_t *f, const char *str, vm_op_t *op, unsigned int flags, recursive_ref_t *rec)
 {
     switch (op->op) {
         case VM_ANYCHAR: {
@@ -197,7 +197,7 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
             return m;
         }
         case VM_NOT: {
-            match_t *m = _match(g, f, str, op->args.pat, flags, rec);
+            match_t *m = _match(defs, f, str, op->args.pat, flags, rec);
             if (m != NULL) {
                 destroy_match(&m);
                 return NULL;
@@ -219,7 +219,7 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
                 for (const char *prev = NULL; prev < str; ) {
                     prev = str;
                     if (op->args.multiple.first) {
-                        match_t *p = _match(g, f, str, op->args.multiple.first, flags, rec);
+                        match_t *p = _match(defs, f, str, op->args.multiple.first, flags, rec);
                         if (p) {
                             *dest = p;
                             m->end = p->end;
@@ -230,7 +230,7 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
                         return m;
                     }
                     if (op->args.multiple.second) {
-                        match_t *p = _match(g, f, str, op->args.multiple.second, flags, rec);
+                        match_t *p = _match(defs, f, str, op->args.multiple.second, flags, rec);
                         if (p) {
                             *dest = p;
                             dest = &p->nextsibling;
@@ -264,11 +264,11 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
                 // Separator
                 match_t *sep = NULL;
                 if (op->args.repetitions.sep != NULL && reps > 0) {
-                    sep = _match(g, f, str, op->args.repetitions.sep, flags, rec);
+                    sep = _match(defs, f, str, op->args.repetitions.sep, flags, rec);
                     if (sep == NULL) break;
                     str = sep->end;
                 }
-                match_t *p = _match(g, f, str, op->args.repetitions.repeat_pat, flags, rec);
+                match_t *p = _match(defs, f, str, op->args.repetitions.repeat_pat, flags, rec);
                 if (p == NULL) {
                     destroy_match(&sep);
                     break;
@@ -308,7 +308,7 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
             ssize_t backtrack = op->args.pat->len;
             check(backtrack != -1, "'<' is only allowed for fixed-length operations");
             if (str - backtrack < f->contents) return NULL;
-            match_t *before = _match(g, f, str - backtrack, op->args.pat, flags, rec);
+            match_t *before = _match(defs, f, str - backtrack, op->args.pat, flags, rec);
             if (before == NULL) return NULL;
             match_t *m = new(match_t);
             m->start = str;
@@ -318,7 +318,7 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
             return m;
         }
         case VM_BEFORE: {
-            match_t *after = _match(g, f, str, op->args.pat, flags, rec);
+            match_t *after = _match(defs, f, str, op->args.pat, flags, rec);
             if (after == NULL) return NULL;
             match_t *m = new(match_t);
             m->start = str;
@@ -328,7 +328,7 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
             return m;
         }
         case VM_CAPTURE: {
-            match_t *p = _match(g, f, str, op->args.pat, flags, rec);
+            match_t *p = _match(defs, f, str, op->args.pat, flags, rec);
             if (p == NULL) return NULL;
             match_t *m = new(match_t);
             m->start = str;
@@ -338,7 +338,7 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
             return m;
         }
         case VM_HIDE: {
-            match_t *p = _match(g, f, str, op->args.pat, flags, rec);
+            match_t *p = _match(defs, f, str, op->args.pat, flags, rec);
             if (p == NULL) return NULL;
             match_t *m = new(match_t);
             m->start = str;
@@ -348,17 +348,26 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
             return m;
         }
         case VM_OTHERWISE: {
-            match_t *m = _match(g, f, str, op->args.multiple.first, flags, rec);
-            if (m == NULL) m = _match(g, f, str, op->args.multiple.second, flags, rec);
+            match_t *m = _match(defs, f, str, op->args.multiple.first, flags, rec);
+            if (m == NULL) m = _match(defs, f, str, op->args.multiple.second, flags, rec);
             return m;
         }
         case VM_CHAIN: {
-            match_t *m1 = _match(g, f, str, op->args.multiple.first, flags, rec);
+            match_t *m1 = _match(defs, f, str, op->args.multiple.first, flags, rec);
             if (m1 == NULL) return NULL;
 
-            size_t nbackrefs = push_backrefs(g, m1);
-            match_t *m2 = _match(g, f, m1->end, op->args.multiple.second, flags, rec);
-            pop_backrefs(g, nbackrefs);
+            match_t *m2;
+            { // Push backrefs and run matching, then cleanup
+                def_t *defs2 = with_backrefs(defs, f, m1);
+                m2 = _match(defs2, f, m1->end, op->args.multiple.second, flags, rec);
+                while (defs2 != defs) {
+                    def_t *next = defs2->next;
+                    defs2->next = NULL;
+                    xfree(&defs2);
+                    defs2 = next;
+                }
+            }
+
             if (m2 == NULL) {
                 destroy_match(&m1);
                 return NULL;
@@ -372,7 +381,7 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
             return m;
         }
         case VM_EQUAL: case VM_NOT_EQUAL: {
-            match_t *m1 = _match(g, f, str, op->args.multiple.first, flags, rec);
+            match_t *m1 = _match(defs, f, str, op->args.multiple.first, flags, rec);
             if (m1 == NULL) return NULL;
 
             // <p1>==<p2> matches iff the text of <p1> matches <p2>
@@ -384,7 +393,7 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
                 .nlines=1 + get_line_number(f, m1->end)-get_line_number(f, m1->start),
                 .mmapped=f->mmapped,
             };
-            match_t *m2 = _match(g, &inner, str, op->args.multiple.second, flags, rec);
+            match_t *m2 = _match(defs, &inner, str, op->args.multiple.second, flags, rec);
             if ((m2 == NULL) == (op->op == VM_EQUAL)) {
                 destroy_match(&m1);
                 destroy_match(&m2);
@@ -405,7 +414,7 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
         case VM_REPLACE: {
             match_t *p = NULL;
             if (op->args.replace.pat) {
-                p = _match(g, f, str, op->args.replace.pat, flags, rec);
+                p = _match(defs, f, str, op->args.replace.pat, flags, rec);
                 if (p == NULL) return NULL;
             }
             match_t *m = new(match_t);
@@ -420,7 +429,7 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
             return m;
         }
         case VM_REF: {
-            vm_op_t *r = lookup(g, op->args.s);
+            vm_op_t *r = lookup(defs, op->args.s);
             check(r != NULL, "Unknown identifier: '%s'", op->args.s);
 
             // Prevent infinite left recursion:
@@ -440,7 +449,7 @@ static match_t *_match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, un
             };
             match_t *best = NULL;
           left_recursive:;
-            match_t *p = _match(g, f, str, r, flags, &wrap);
+            match_t *p = _match(defs, f, str, r, flags, &wrap);
             if (p == NULL) return best;
             if (wrap.hit && (best == NULL || p->end > best->end)) {
                 best = p;
@@ -546,9 +555,9 @@ match_t *get_capture(match_t *m, const char **r)
     return NULL;
 }
 
-match_t *match(grammar_t *g, file_t *f, const char *str, vm_op_t *op, unsigned int flags)
+match_t *match(def_t *defs, file_t *f, const char *str, vm_op_t *op, unsigned int flags)
 {
-    return _match(g, f, str, op, flags, NULL);
+    return _match(defs, f, str, op, flags, NULL);
 }
 
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1

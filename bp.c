@@ -72,14 +72,14 @@ static int print_errors(file_t *f, match_t *m)
     return ret;
 }
 
-static int run_match(grammar_t *g, const char *filename, vm_op_t *pattern, unsigned int flags)
+static int run_match(def_t *defs, const char *filename, vm_op_t *pattern, unsigned int flags)
 {
     static int printed_matches = 0;
     file_t *f = load_file(filename);
     check(f, "Could not open file: %s", filename);
     if (flags & BP_INPLACE) // Need to do this before matching
         intern_file(f);
-    match_t *m = match(g, f, f->contents, pattern, flags);
+    match_t *m = match(defs, f, f->contents, pattern, flags);
     if (m && print_errors(f, m) > 0)
         _exit(1);
     if (m != NULL && m->end > m->start + 1) {
@@ -133,14 +133,14 @@ int main(int argc, char *argv[])
     char path[PATH_MAX] = {0};
     const char *rule = "find-all";
 
-    grammar_t *g = new(grammar_t);
+    def_t *defs = NULL;
 
     // Load builtins:
     if (access("/etc/xdg/bp/builtins.bp", R_OK) != -1)
-        load_grammar(g, load_file("/etc/xdg/bp/builtins.bp")); // Keep in memory for debugging output
+        defs = load_grammar(defs, load_file("/etc/xdg/bp/builtins.bp")); // Keep in memory for debugging output
     sprintf(path, "%s/.config/bp/builtins.bp", getenv("HOME"));
     if (access(path, R_OK) != -1)
-        load_grammar(g, load_file(path)); // Keep in memory for debugging output
+        defs = load_grammar(defs, load_file(path)); // Keep in memory for debugging output
 
     int i, npatterns = 0;
     check(argc > 1, "%s", usage);
@@ -172,7 +172,7 @@ int main(int argc, char *argv[])
             file_t *replace_file = spoof_file("<replace argument>", flag);
             vm_op_t *rep = bp_replacement(replace_file, patref, replace_file->contents);
             check(rep, "Replacement failed to compile: %s", flag);
-            add_def(g, replace_file, "replacement", rep);
+            defs = with_def(defs, replace_file, "replacement", rep);
             rule = "replace-all";
         } else if (FLAG("--grammar") || FLAG("-g")) {
             file_t *f = load_file(flag);
@@ -185,7 +185,7 @@ int main(int argc, char *argv[])
                 f = load_file(path);
             }
             check(f != NULL, "Couldn't find grammar: %s", flag);
-            load_grammar(g, f); // Keep in memory for debug output
+            defs = load_grammar(defs, f); // Keep in memory for debug output
         } else if (FLAG("--define") || FLAG("-d")) {
             char *def = flag;
             char *eq = strchr(def, ':');
@@ -195,7 +195,7 @@ int main(int argc, char *argv[])
             file_t *def_file = spoof_file(def, src);
             vm_op_t *pat = bp_pattern(def_file, def_file->contents);
             check(pat, "Failed to compile pattern: %s", flag);
-            add_def(g, def_file, def, pat);
+            defs = with_def(defs, def_file, def, pat);
         } else if (FLAG("--define-string") || FLAG("-D")) {
             char *def = flag;
             char *eq = strchr(def, ':');
@@ -205,19 +205,19 @@ int main(int argc, char *argv[])
             file_t *def_file = spoof_file(def, src);
             vm_op_t *pat = bp_stringpattern(def_file, def_file->contents);
             check(pat, "Failed to compile pattern: %s", src);
-            add_def(g, def_file, def, pat);
+            defs = with_def(defs, def_file, def, pat);
         } else if (FLAG("--pattern") || FLAG("-p")) {
             check(npatterns == 0, "Cannot define multiple patterns");
             file_t *arg_file = spoof_file("<pattern argument>", flag);
             vm_op_t *p = bp_pattern(arg_file, arg_file->contents);
             check(p, "Pattern failed to compile: %s", flag);
-            add_def(g, arg_file, "pattern", p);
+            defs = with_def(defs, arg_file, "pattern", p);
             ++npatterns;
         } else if (FLAG("--pattern-string") || FLAG("-P")) {
             file_t *arg_file = spoof_file("<pattern argument>", flag);
             vm_op_t *p = bp_stringpattern(arg_file, arg_file->contents);
             check(p, "Pattern failed to compile: %s", flag);
-            add_def(g, arg_file, "pattern", p);
+            defs = with_def(defs, arg_file, "pattern", p);
             ++npatterns;
         } else if (FLAG("--mode") || FLAG("-m")) {
             rule = flag;
@@ -242,7 +242,7 @@ int main(int argc, char *argv[])
             file_t *arg_file = spoof_file("<pattern argument>", argv[i]);
             vm_op_t *p = bp_stringpattern(arg_file, arg_file->contents);
             check(p, "Pattern failed to compile: %s", argv[i]);
-            add_def(g, arg_file, "pattern", p);
+            defs = with_def(defs, arg_file, "pattern", p);
             ++npatterns;
         } else {
             printf("Unrecognized flag: %s\n\n%s\n", argv[i], usage);
@@ -260,7 +260,7 @@ int main(int argc, char *argv[])
         print_options |= PRINT_COLOR | PRINT_LINE_NUMBERS;
     }
 
-    vm_op_t *pattern = lookup(g, rule);
+    vm_op_t *pattern = lookup(defs, rule);
     check(pattern != NULL, "No such rule: '%s'", rule);
 
     int ret = 1;
@@ -268,7 +268,7 @@ int main(int argc, char *argv[])
     if (i < argc) {
         // Files pass in as command line args:
         for (int nfiles = 0; i < argc; nfiles++, i++) {
-            ret &= run_match(g, argv[i], pattern, flags);
+            ret &= run_match(defs, argv[i], pattern, flags);
         }
     } else if (isatty(STDIN_FILENO)) {
         // No files, no piped in input, so use * **/*:
@@ -276,12 +276,12 @@ int main(int argc, char *argv[])
         glob("*", 0, NULL, &globbuf);
         glob("**/*", GLOB_APPEND, NULL, &globbuf);
         for (size_t i = 0; i < globbuf.gl_pathc; i++) {
-            ret &= run_match(g, globbuf.gl_pathv[i], pattern, flags);
+            ret &= run_match(defs, globbuf.gl_pathv[i], pattern, flags);
         }
         globfree(&globbuf);
     } else {
         // Piped in input:
-        ret &= run_match(g, NULL, pattern, flags);
+        ret &= run_match(defs, NULL, pattern, flags);
     }
     if (flags & BP_JSON) printf("]\n");
 

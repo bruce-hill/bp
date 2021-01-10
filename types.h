@@ -89,7 +89,7 @@ typedef struct match_s {
 } match_t;
 
 /*
- * Pattern matching rule definition
+ * Pattern matching rule definition(s)
  */
 typedef struct def_s {
     const char *name;
@@ -97,23 +97,6 @@ typedef struct def_s {
     vm_op_t *op;
     struct def_s *next;
 } def_t;
-
-/*
- * Backreference (look up previous capture by name)
- */
-typedef struct backref_s {
-    const char *name;
-    vm_op_t *op;
-    struct backref_s *next;
-} backref_t;
-
-/*
- * Grammar (a collection of definitions)
- */
-typedef struct {
-    def_t *firstdef;
-    backref_t *firstbackref;
-} grammar_t;
 
 #endif
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1
