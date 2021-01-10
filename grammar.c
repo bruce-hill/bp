@@ -10,24 +10,18 @@
 #include "grammar.h"
 #include "utils.h"
 
-grammar_t *new_grammar(void)
-{
-    grammar_t *g = new(grammar_t);
-    g->definitions = xcalloc(sizeof(def_t), (g->defcapacity = 128));
-    return g;
-}
-
+/*
+ * Add a definition to the grammar
+ */
 void add_def(grammar_t *g, file_t *f, const char *src, const char *name, vm_op_t *op)
 {
-    if (g->defcount >= g->defcapacity) {
-        g->definitions = xrealloc(g->definitions, sizeof(&g->definitions[0])*(g->defcapacity += 32));
-    }
-    int i = g->defcount;
-    g->definitions[i].file = f;
-    g->definitions[i].source = src;
-    g->definitions[i].name = name;
-    g->definitions[i].op = op;
-    ++g->defcount;
+    def_t *def = new(def_t);
+    def->next = g->firstdef;
+    def->file = f;
+    def->source = src;
+    def->name = name;
+    def->op = op;
+    g->firstdef = def;
 }
 
 /*
@@ -65,39 +59,44 @@ vm_op_t *load_grammar(grammar_t *g, file_t *f)
     return ret;
 }
 
+/*
+ * Look up a backreference or grammar definition by name
+ */
 vm_op_t *lookup(grammar_t *g, const char *name)
 {
-    // Search backwards so newer backrefs/defs take precedence
-    for (int i = (int)g->backrefcount-1; i >= 0; i--) {
-        if (streq(g->backrefs[i].name, name)) {
-            return g->backrefs[i].op;
-        }
+    for (backref_t *b = g->firstbackref; b; b = b->next) {
+        if (streq(b->name, name))
+            return b->op;
     }
-    for (int i = g->defcount-1; i >= 0; i--) {
-        if (streq(g->definitions[i].name, name)) {
-            return g->definitions[i].op;
-        }
+    for (def_t *d = g->firstdef; d; d = d->next) {
+        if (streq(d->name, name))
+            return d->op;
     }
     return NULL;
 }
 
+/*
+ * Push a backreference onto the backreference stack
+ */
 void push_backref(grammar_t *g, const char *name, match_t *capture)
 {
-    if (g->backrefcount >= g->backrefcapacity) {
-        g->backrefs = xrealloc(g->backrefs, sizeof(g->backrefs[0])*(g->backrefcapacity += 32));
-    }
-    size_t i = g->backrefcount++;
-    g->backrefs[i].name = name;
-    g->backrefs[i].capture = capture;
+    backref_t *backref = new(backref_t);
+    backref->name = name;
+    backref->capture = capture;
     vm_op_t *op = new(vm_op_t);
     op->op = VM_BACKREF;
     op->start = capture->start;
     op->end = capture->end;
-    op->len = -1; // TODO: maybe calculate this?
+    op->len = -1; // TODO: maybe calculate this? (nontrivial because of replacements)
     op->args.backref = capture;
-    g->backrefs[i].op = op;
+    backref->op = op;
+    backref->next = g->firstbackref;
+    g->firstbackref = backref;
 }
 
+/*
+ * Push all the backreferences contained in a match onto the backreference stack
+ */
 size_t push_backrefs(grammar_t *g, match_t *m)
 {
     if (m->op->op == VM_REF) return 0;
@@ -111,14 +110,17 @@ size_t push_backrefs(grammar_t *g, match_t *m)
     return count;
 }
 
+/*
+ * Pop a number of backreferences off the backreference stack
+ */
 void pop_backrefs(grammar_t *g, size_t count)
 {
-    check(count <= g->backrefcount, "Attempt to pop %ld backrefs when there are only %ld", count, g->backrefcount);
     for ( ; count > 0; count--) {
-        //free(g->backrefs[i].op); // TODO: memory leak problem??
-        int i = (int)g->backrefcount - 1;
-        memset(&g->backrefs[i], 0, sizeof(g->backrefs[i]));
-        --g->backrefcount;
+        backref_t *b = g->firstbackref;
+        g->firstbackref = b->next;
+        check(b, "Attempt to pop %ld more backrefs than there are", count);
+        xfree((void**)&b->op);
+        xfree((void**)&b);
     }
 }
 

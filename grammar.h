@@ -7,7 +7,6 @@
 #include "file_loader.h"
 #include "types.h"
 
-grammar_t *new_grammar(void);
 __attribute__((nonnull(1,3,4,5)))
 void add_def(grammar_t *g, file_t *f, const char *src, const char *name, vm_op_t *op);
 __attribute__((nonnull))

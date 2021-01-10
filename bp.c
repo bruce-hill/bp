@@ -133,7 +133,7 @@ int main(int argc, char *argv[])
     char path[PATH_MAX] = {0};
     const char *rule = "find-all";
 
-    grammar_t *g = new_grammar();
+    grammar_t *g = new(grammar_t);
 
     // Load builtins:
     if (access("/etc/xdg/bp/builtins.bp", R_OK) != -1)

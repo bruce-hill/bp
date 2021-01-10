@@ -88,24 +88,33 @@ typedef struct match_s {
     vm_op_t *op;
 } match_t;
 
-
-typedef struct {
+/*
+ * Pattern matching rule definition
+ */
+typedef struct def_s {
     const char *name;
     const char *source;
     file_t *file;
     vm_op_t *op;
+    struct def_s *next;
 } def_t;
 
-typedef struct {
-    size_t defcount, defcapacity;
-    def_t *definitions;
+/*
+ * Backreference (look up previous capture by name)
+ */
+typedef struct backref_s {
+    const char *name;
+    match_t *capture;
+    vm_op_t *op;
+    struct backref_s *next;
+} backref_t;
 
-    size_t backrefcount, backrefcapacity;
-    struct {
-        const char *name;
-        match_t *capture;
-        vm_op_t *op;
-    } *backrefs;
+/*
+ * Grammar (a collection of definitions)
+ */
+typedef struct {
+    def_t *firstdef;
+    backref_t *firstbackref;
 } grammar_t;
 
 #endif

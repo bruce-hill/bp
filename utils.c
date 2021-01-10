@@ -3,6 +3,7 @@
  */
 
 #include <ctype.h>
+#include <stdlib.h>
 #include <unistd.h>
 
 #include "utils.h"
@@ -186,6 +187,9 @@ size_t unescape_string(char *dest, const char *src, size_t bufsize)
 #undef PUT
 }
 
+/*
+ * Fail and exit if a memory value is NULL
+ */
 void *memcheck(void *p)
 {
     if (p == NULL) {
@@ -195,7 +199,9 @@ void *memcheck(void *p)
     return p;
 }
 
-
+/*
+ * Case-insensitive memory comparison
+ */
 int memicmp(const void *v1, const void *v2, size_t n)
 {
     int result = 0;
@@ -203,6 +209,15 @@ int memicmp(const void *v1, const void *v2, size_t n)
     while (n-- > 0 && (result = tolower(*(s1++)) - tolower(*(s2++))) == 0)
         ;
     return result;
+}
+
+/*
+ * Free memory, but also set the pointer to NULL for safety
+ */
+void xfree(void **p)
+{
+    free(*p);
+    p = NULL;
 }
 
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1
