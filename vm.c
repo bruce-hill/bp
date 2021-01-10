@@ -538,7 +538,7 @@ match_t *get_capture(match_t *m, const char **r)
         if (end == *r) return NULL;
         char *name = strndup(*r, (size_t)(end-*r));
         match_t *cap = get_capture_by_name(m, name);
-        free(name);
+        xfree(&name);
         *r = end;
         if (**r == ';') ++(*r);
         return cap;

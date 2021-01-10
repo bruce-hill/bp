@@ -34,7 +34,7 @@ void *memcheck(void *p);
 __attribute__((nonnull))
 int memicmp(const void *s1, const void *s2, size_t n);
 __attribute__((nonnull))
-void xfree(void **p);
+void xfree(void *p);
 
 #endif
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1

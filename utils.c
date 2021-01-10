@@ -214,9 +214,13 @@ int memicmp(const void *v1, const void *v2, size_t n)
 /*
  * Free memory, but also set the pointer to NULL for safety
  */
-void xfree(void **p)
+void xfree(void *p)
 {
-    free(*p);
+    if (*(void**)p == NULL) {
+        fprintf(stderr, "Attempt to free(NULL)\n");
+        _exit(1);
+    }
+    free(*(void**)p);
     p = NULL;
 }
 

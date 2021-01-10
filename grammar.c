@@ -119,8 +119,8 @@ void pop_backrefs(grammar_t *g, size_t count)
         backref_t *b = g->firstbackref;
         g->firstbackref = b->next;
         check(b, "Attempt to pop %ld more backrefs than there are", count);
-        xfree((void**)&b->op);
-        xfree((void**)&b);
+        xfree(&b->op);
+        xfree(&b);
     }
 }
 

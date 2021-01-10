@@ -132,7 +132,7 @@ static void _visualize_matches(match_node_t *firstmatch, int depth, const char *
 
     for (match_node_t *c = children, *next = NULL; c; c = next) {
         next = c->next;
-        free(c);
+        xfree(&c);
     }
 }
 

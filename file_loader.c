@@ -103,30 +103,29 @@ void intern_file(file_t *f)
     f->contents = buf;
     f->end = buf + size;
     f->mmapped = 0;
-    free(f->lines);
+    xfree(&f->lines);
     populate_lines(f);
 }
 
 void destroy_file(file_t **f)
 {
     if ((*f)->filename) {
-        free((char*)(*f)->filename);
+        xfree(&((*f)->filename));
         (*f)->filename = NULL;
     }
     if ((*f)->lines) {
-        free((*f)->lines);
+        xfree(&((*f)->lines));
         (*f)->lines = NULL;
     }
     if ((*f)->contents) {
         if ((*f)->mmapped) {
             munmap((*f)->contents, (size_t)((*f)->end - (*f)->contents));
         } else {
-            free((*f)->contents);
+            xfree(&((*f)->contents));
         }
         (*f)->contents = NULL;
     }
-    free(*f);
-    *f = NULL;
+    xfree(f);
 }
 
 size_t get_line_number(file_t *f, const char *p)

@@ -351,7 +351,7 @@ vm_op_t *bp_simplepattern(file_t *f, const char *str)
         // Parentheses
         case '(': case '{': {
             char closing = c == '(' ? ')' : '}';
-            free(op);
+            xfree(&op);
             op = bp_simplepattern(f, str);
             if (!op)
                 file_err(f, str, str, "There should be a valid pattern after this parenthesis.");
@@ -428,8 +428,8 @@ vm_op_t *bp_simplepattern(file_t *f, const char *str)
                 op->args.s = strndup(&c, 1);
             }
             if (matchchar(&str, ':')) { // Don't match definitions
-                free((char*)op->args.s);
-                free(op);
+                xfree(&op->args.s);
+                xfree(&op);
                 return NULL;
             }
             op->op = VM_REF;
@@ -442,14 +442,14 @@ vm_op_t *bp_simplepattern(file_t *f, const char *str)
                 const char *refname = str;
                 str = after_name(str);
                 if (matchchar(&str, ':')) { // Don't match definitions
-                    free(op);
+                    xfree(&op);
                     return NULL;
                 }
                 op->op = VM_REF;
                 op->args.s = strndup(refname, (size_t)(str - refname));
                 break;
             } else {
-                free(op);
+                xfree(&op);
                 return NULL;
             }
         }
@@ -535,8 +535,7 @@ vm_op_t *bp_stringpattern(file_t *f, const char *str)
         strop->end = str;
 
         if (strop->len == 0) {
-            free(strop);
-            strop = NULL;
+            xfree(&strop);
         } else {
             ret = chain_together(ret, strop);
         }
