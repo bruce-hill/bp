@@ -14,7 +14,7 @@
 
 __attribute__((nonnull)) static vm_op_t *expand_chain(file_t *f, vm_op_t *first);
 __attribute__((nonnull)) static vm_op_t *expand_choices(file_t *f, vm_op_t *first);
-__attribute__((nonnull)) static vm_op_t *chain_together(vm_op_t *first, vm_op_t *second);
+static vm_op_t *chain_together(vm_op_t *first, vm_op_t *second);
 __attribute__((nonnull(1,4))) static void set_range(vm_op_t *op, ssize_t min, ssize_t max, vm_op_t *pat, vm_op_t *sep);
 
 /*
@@ -115,6 +115,8 @@ static vm_op_t *expand_choices(file_t *f, vm_op_t *first)
 
 static vm_op_t *chain_together(vm_op_t *first, vm_op_t *second)
 {
+    if (first == NULL) return second;
+    if (second == NULL) return first;
     check(first->op != VM_CHAIN, "A chain should not be the first item in a chain.\n");
     vm_op_t *chain = new(vm_op_t);
     chain->op = VM_CHAIN;
