@@ -8,7 +8,6 @@
 
 #include "types.h"
 
-const char *opcode_name(enum VMOpcode o);
 __attribute__((hot, nonnull(2,3,4)))
 match_t *match(def_t *defs, file_t *f, const char *str, vm_op_t *op, unsigned int flags);
 __attribute__((nonnull))

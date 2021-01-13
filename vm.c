@@ -13,30 +13,6 @@
 #include "vm.h"
 
 
-/*
- * The names of the opcodes (keep in sync with the enum definition above)
- */
-static const char *opcode_names[] = {
-    [VM_ANYCHAR] = "ANYCHAR",
-    [VM_STRING] = "STRING",
-    [VM_RANGE] = "RANGE",
-    [VM_NOT] = "NOT",
-    [VM_UPTO_AND] = "UPTO_AND",
-    [VM_REPEAT] = "REPEAT",
-    [VM_BEFORE] = "BEFORE",
-    [VM_AFTER] = "AFTER",
-    [VM_CAPTURE] = "CAPTURE",
-    [VM_HIDE] = "HIDE",
-    [VM_OTHERWISE] = "OTHERWISE",
-    [VM_CHAIN] = "CHAIN",
-    [VM_REPLACE] = "REPLACE",
-    [VM_EQUAL] = "EQUAL",
-    [VM_NOT_EQUAL] = "NOT_EQUAL",
-    [VM_REF] = "REF",
-    [VM_BACKREF] = "BACKREF",
-    [VM_NODENT] = "NODENT",
-};
-
 // UTF8-compliant char iteration
 static inline const char *next_char(file_t *f, const char *str)
 {
@@ -52,11 +28,6 @@ static inline const char *next_char(file_t *f, const char *str)
     if (c > '\xEF' && __builtin_expect(str < f->end && !!(*str & 0x80), 1))
         ++str;
     return str;
-}
-
-const char *opcode_name(enum VMOpcode o)
-{
-    return opcode_names[o];
 }
 
 /*
