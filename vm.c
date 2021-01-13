@@ -32,7 +32,8 @@ __attribute__((nonnull, pure))
 static match_t *get_capture_by_name(match_t *m, const char *name);
 
 //
-// UTF8-compliant char iteration
+// Return the location of the next character or UTF8 codepoint.
+// (i.e. skip forward one codepoint at a time, not one byte at a time)
 //
 static inline const char *next_char(file_t *f, const char *str)
 {
