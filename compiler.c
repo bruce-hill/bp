@@ -1,6 +1,6 @@
-/*
- * compiler.c - Compile strings into BP virtual machine code.
- */
+//
+// compiler.c - Compile strings into BP virtual machine code.
+//
 
 #include <ctype.h>
 #include <stdlib.h>
@@ -17,9 +17,9 @@ __attribute__((nonnull)) static vm_op_t *expand_choices(file_t *f, vm_op_t *firs
 static vm_op_t *chain_together(vm_op_t *first, vm_op_t *second);
 __attribute__((nonnull(1,4))) static void set_range(vm_op_t *op, ssize_t min, ssize_t max, vm_op_t *pat, vm_op_t *sep);
 
-/*
- * Helper function to initialize a range object.
- */
+//
+// Helper function to initialize a range object.
+//
 static void set_range(vm_op_t *op, ssize_t min, ssize_t max, vm_op_t *pat, vm_op_t *sep)
 {
     op->type = VM_REPEAT;
@@ -39,10 +39,10 @@ static void set_range(vm_op_t *op, ssize_t min, ssize_t max, vm_op_t *pat, vm_op
     }
 }
 
-/*
- * Take an opcode and expand it into a chain of patterns if it's followed by
- * any patterns (e.g. "`x `y"), otherwise return the original input.
- */
+//
+// Take an opcode and expand it into a chain of patterns if it's followed by
+// any patterns (e.g. "`x `y"), otherwise return the original input.
+//
 static vm_op_t *expand_chain(file_t *f, vm_op_t *first)
 {
     vm_op_t *second = bp_simplepattern(f, first->end);
@@ -54,11 +54,11 @@ static vm_op_t *expand_chain(file_t *f, vm_op_t *first)
     return chain_together(first, second);
 }
 
-/*
- * Take an opcode and parse any "=>" replacements and then expand it into a
- * chain of choices if it's followed by any "/"-separated patterns (e.g.
- * "`x/`y"), otherwise return the original input.
- */
+//
+// Take an opcode and parse any "=>" replacements and then expand it into a
+// chain of choices if it's followed by any "/"-separated patterns (e.g.
+// "`x/`y"), otherwise return the original input.
+//
 static vm_op_t *expand_choices(file_t *f, vm_op_t *first)
 {
     first = expand_chain(f, first);
@@ -130,9 +130,9 @@ static vm_op_t *chain_together(vm_op_t *first, vm_op_t *second)
     return chain;
 }
 
-/*
- * Compile a string of BP code into virtual machine opcodes
- */
+//
+// Compile a string of BP code into virtual machine opcodes
+//
 vm_op_t *bp_simplepattern(file_t *f, const char *str)
 {
     str = after_spaces(str);
@@ -487,9 +487,9 @@ vm_op_t *bp_simplepattern(file_t *f, const char *str)
     return op;
 }
 
-/*
- * Similar to bp_simplepattern, except that the pattern begins with an implicit, unclosable quote.
- */
+//
+// Similar to bp_simplepattern, except that the pattern begins with an implicit, unclosable quote.
+//
 vm_op_t *bp_stringpattern(file_t *f, const char *str)
 {
     vm_op_t *ret = NULL;
@@ -553,10 +553,10 @@ vm_op_t *bp_stringpattern(file_t *f, const char *str)
     return ret;
 }
 
-/*
- * Given a pattern and a replacement string, compile the two into a replacement
- * VM opcode.
- */
+//
+// Given a pattern and a replacement string, compile the two into a replacement
+// VM opcode.
+//
 vm_op_t *bp_replacement(file_t *f, vm_op_t *pat, const char *replacement)
 {
     vm_op_t *op = new(vm_op_t);

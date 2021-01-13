@@ -1,6 +1,6 @@
-/*
- * compiler.h - Header file for BP compiler.
- */
+//
+// compiler.h - Header file for BP compiler.
+//
 #ifndef COMPILER__H
 #define COMPILER__H
 

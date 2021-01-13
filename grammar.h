@@ -1,6 +1,6 @@
-/*
- * grammar.h - Header file defining grammars (sets of rule definitions)
- */
+//
+// grammar.h - Header file defining grammars (sets of rule definitions)
+//
 #ifndef GRAMMAR__H
 #define GRAMMAR__H
 

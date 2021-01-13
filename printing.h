@@ -1,6 +1,6 @@
-/*
- * Header file for printing.c (printing/visualizing matches)
- */
+//
+// Header file for printing.c (printing/visualizing matches)
+//
 #ifndef PRINTING__H
 #define PRINTING__H
 

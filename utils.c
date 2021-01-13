@@ -1,6 +1,6 @@
-/*
- * utils.c - Some helper code for debugging and error logging.
- */
+//
+// utils.c - Some helper code for debugging and error logging.
+//
 
 #include <ctype.h>
 #include <stdlib.h>
@@ -8,10 +8,10 @@
 
 #include "utils.h"
 
-/* 
- * Helper function to skip past all spaces (and comments)
- * Returns a pointer to the first non-space character.
- */
+//
+// Helper function to skip past all spaces (and comments)
+// Returns a pointer to the first non-space character.
+//
 const char *after_spaces(const char *str)
 {
     int block_comment_depth = 0;
@@ -43,10 +43,10 @@ const char *after_spaces(const char *str)
     return str;
 }
 
-/*
- * Return the first character after a valid BP name, or NULL if none is
- * found.
- */
+//
+// Return the first character after a valid BP name, or NULL if none is
+// found.
+//
 const char *after_name(const char *str)
 {
     if (*str == '|') return &str[1];
@@ -61,9 +61,9 @@ const char *after_name(const char *str)
     return str;
 }
 
-/*
- * Check if a character is found and if so, move past it.
- */
+//
+// Check if a character is found and if so, move past it.
+//
 int matchchar(const char **str, char c)
 {
     const char *next = after_spaces(*str);
@@ -75,9 +75,9 @@ int matchchar(const char **str, char c)
     }
 }
 
-/*
- * Check if a string is found and if so, move past it.
- */
+//
+// Check if a string is found and if so, move past it.
+//
 int matchstr(const char **str, const char *target)
 {
     const char *next = after_spaces(*str);
@@ -89,11 +89,11 @@ int matchstr(const char **str, const char *target)
     }
 }
 
-/*
- * Process a string escape sequence for a character and return the
- * character that was escaped.
- * Set *end = the first character past the end of the escape sequence.
- */
+//
+// Process a string escape sequence for a character and return the
+// character that was escaped.
+// Set *end = the first character past the end of the escape sequence.
+//
 unsigned char unescapechar(const char *escaped, const char **end)
 {
     size_t len = 1;
@@ -134,10 +134,10 @@ unsigned char unescapechar(const char *escaped, const char **end)
     return ret;
 }
 
-/*
- * Write an unescaped version of `src` to `dest` (at most bufsize-1 chars,
- * terminated by a null byte)
- */
+//
+// Write an unescaped version of `src` to `dest` (at most bufsize-1 chars,
+// terminated by a null byte)
+//
 size_t unescape_string(char *dest, const char *src, size_t bufsize)
 {
     size_t len = 0;
@@ -187,9 +187,9 @@ size_t unescape_string(char *dest, const char *src, size_t bufsize)
 #undef PUT
 }
 
-/*
- * Fail and exit if a memory value is NULL
- */
+//
+// Fail and exit if a memory value is NULL
+//
 void *memcheck(void *p)
 {
     if (p == NULL) {
@@ -199,9 +199,9 @@ void *memcheck(void *p)
     return p;
 }
 
-/*
- * Case-insensitive memory comparison
- */
+//
+// Case-insensitive memory comparison
+//
 int memicmp(const void *v1, const void *v2, size_t n)
 {
     int result = 0;
@@ -211,9 +211,9 @@ int memicmp(const void *v1, const void *v2, size_t n)
     return result;
 }
 
-/*
- * Free memory, but also set the pointer to NULL for safety
- */
+//
+// Free memory, but also set the pointer to NULL for safety
+//
 void xfree(void *p)
 {
     if (*(void**)p == NULL) {

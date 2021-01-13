@@ -1,6 +1,6 @@
-/*
- * grammar.c - Code for defining grammars (sets of rules)
- */
+//
+// grammar.c - Code for defining grammars (sets of rules)
+//
 
 #include <stdlib.h>
 #include <string.h>
@@ -10,9 +10,9 @@
 #include "grammar.h"
 #include "utils.h"
 
-/*
- * Return a new list of definitions with one added to the front
- */
+//
+// Return a new list of definitions with one added to the front
+//
 def_t *with_def(def_t *defs, file_t *f, const char *name, vm_op_t *op)
 {
     def_t *def = new(def_t);
@@ -23,10 +23,10 @@ def_t *with_def(def_t *defs, file_t *f, const char *name, vm_op_t *op)
     return def;
 }
 
-/*
- * Load the given grammar (semicolon-separated definitions)
- * and return the first rule defined.
- */
+//
+// Load the given grammar (semicolon-separated definitions)
+// and return the first rule defined.
+//
 def_t *load_grammar(def_t *defs, file_t *f)
 {
     const char *src = f->contents;
@@ -52,9 +52,9 @@ def_t *load_grammar(def_t *defs, file_t *f)
     return defs;
 }
 
-/*
- * Look up a backreference or grammar definition by name
- */
+//
+// Look up a backreference or grammar definition by name
+//
 vm_op_t *lookup(def_t *defs, const char *name)
 {
     for ( ; defs; defs = defs->next) {
@@ -64,9 +64,9 @@ vm_op_t *lookup(def_t *defs, const char *name)
     return NULL;
 }
 
-/*
- * Push a backreference onto the backreference stack
- */
+//
+// Push a backreference onto the backreference stack
+//
 static def_t *with_backref(def_t *defs, file_t *f, const char *name, match_t *m)
 {
     vm_op_t *op = new(vm_op_t);
@@ -78,9 +78,9 @@ static def_t *with_backref(def_t *defs, file_t *f, const char *name, match_t *m)
     return with_def(defs, f, name, op);
 }
 
-/*
- * Push all the backreferences contained in a match onto the backreference stack
- */
+//
+// Push all the backreferences contained in a match onto the backreference stack
+//
 def_t *with_backrefs(def_t *defs, file_t *f, match_t *m)
 {
     if (m->op->type != VM_REF) {

@@ -1,6 +1,6 @@
-/*
- * types.h - Datatypes used by BP
- */
+//
+// types.h - Datatypes used by BP
+//
 #ifndef TYPES__H
 #define TYPES__H
 
@@ -17,9 +17,9 @@ enum BPFlag {
     BP_INPLACE    = 1 << 5,
 };
 
-/*
- * BP virtual machine opcodes (these must be kept in sync with the names in vm.c)
- */
+//
+// BP virtual machine opcodes (these must be kept in sync with the names in vm.c)
+//
 enum VMOpcode {
     VM_ANYCHAR = 1,
     VM_STRING,
@@ -43,9 +43,9 @@ enum VMOpcode {
 
 struct match_s; // forward declared to resolve circular struct defs
 
-/*
- * A struct reperesenting a BP virtual machine operation
- */
+//
+// A struct reperesenting a BP virtual machine operation
+//
 typedef struct vm_op_s {
     enum VMOpcode type;
     const char *start, *end;
@@ -78,9 +78,9 @@ typedef struct vm_op_s {
     } args;
 } vm_op_t;
 
-/*
- * Pattern matching result object
- */
+//
+// Pattern matching result object
+//
 typedef struct match_s {
     // Where the match starts and ends (end is after the last character)
     const char *start, *end;
@@ -88,9 +88,9 @@ typedef struct match_s {
     vm_op_t *op;
 } match_t;
 
-/*
- * Pattern matching rule definition(s)
- */
+//
+// Pattern matching rule definition(s)
+//
 typedef struct def_s {
     const char *name;
     file_t *file;

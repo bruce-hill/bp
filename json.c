@@ -1,14 +1,14 @@
-/*
- * json.c - Code for printing JSON output of matches.
- */
+//
+// json.c - Code for printing JSON output of matches.
+//
 
 #include <stdio.h>
 
 #include "types.h"
 
-/*
- * Print a match as JSON
- */
+//
+// Print a match as JSON
+//
 static int _json_match(const char *text, match_t *m, int comma, int verbose)
 {
     if (!verbose) {

@@ -1,6 +1,6 @@
-/*
- * printing.c - Code for printing and visualizing matches.
- */
+//
+// printing.c - Code for printing and visualizing matches.
+//
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -184,9 +184,9 @@ static void print_line_number(FILE *out, print_state_t *state, print_options_t o
         fprintf(out, "% 5ld|", state->line);
 }
 
-/*
- * Print a match with replacements and highlighting.
- */
+//
+// Print a match with replacements and highlighting.
+//
 static void _print_match(FILE *out, file_t *f, match_t *m, print_state_t *state, print_options_t options)
 {
     static const char *hl = "\033[0;31;1m";

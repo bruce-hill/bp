@@ -1,6 +1,6 @@
-/*
- * vm.h - Header file for BP virtual machine.
- */
+//
+// vm.h - Header file for BP virtual machine.
+//
 #ifndef VM__H
 #define VM__H
 

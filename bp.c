@@ -1,8 +1,8 @@
-/*
- * bp.c - Source code for the bp parser
- *
- * See `man ./bp.1` for more details
- */
+//
+// bp.c - Source code for the bp parser
+//
+// See `man ./bp.1` for more details
+//
 #include <fcntl.h>
 #include <glob.h>
 #include <limits.h>

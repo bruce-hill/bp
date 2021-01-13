@@ -1,6 +1,6 @@
-/*
- * utils.h - Some utility and printing functions.
- */
+//
+// utils.h - Some utility and printing functions.
+//
 #ifndef UTILS__H
 #define UTILS__H
 

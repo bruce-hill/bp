@@ -1,6 +1,6 @@
-/*
- * vm.c - Code for the BP virtual machine that performs the matching.
- */
+//
+// vm.c - Code for the BP virtual machine that performs the matching.
+//
 
 #include <ctype.h>
 #include <stdio.h>
@@ -13,7 +13,9 @@
 #include "vm.h"
 
 
+//
 // UTF8-compliant char iteration
+//
 static inline const char *next_char(file_t *f, const char *str)
 {
     char c = *str;
@@ -30,9 +32,9 @@ static inline const char *next_char(file_t *f, const char *str)
     return str;
 }
 
-/*
- * Recursively deallocate a match object and set to NULL
- */
+//
+// Recursively deallocate a match object and set to NULL
+//
 void destroy_match(match_t **m)
 {
     if (!*m) return;
@@ -49,10 +51,10 @@ typedef struct recursive_ref_s {
     match_t *result;
 } recursive_ref_t;
 
-/*
- * Attempt to match text against a previously captured value.
- * Return the character position after the backref has matched, or NULL if no match has occurred.
- */
+//
+// Attempt to match text against a previously captured value.
+// Return the character position after the backref has matched, or NULL if no match has occurred.
+//
 static const char *match_backref(const char *str, vm_op_t *op, match_t *cap, unsigned int flags)
 {
     check(op->type == VM_BACKREF, "Attempt to match backref against something that's not a backref");
@@ -108,11 +110,11 @@ static const char *match_backref(const char *str, vm_op_t *op, match_t *cap, uns
 }
 
 
-/*
- * Run virtual machine operation against a string and return
- * a match struct, or NULL if no match is found.
- * The returned value should be free()'d to avoid memory leaking.
- */
+//
+// Run virtual machine operation against a string and return
+// a match struct, or NULL if no match is found.
+// The returned value should be free()'d to avoid memory leaking.
+//
 static match_t *_match(def_t *defs, file_t *f, const char *str, vm_op_t *op, unsigned int flags, recursive_ref_t *rec)
 {
     switch (op->type) {
@@ -469,9 +471,9 @@ static match_t *_match(def_t *defs, file_t *f, const char *str, vm_op_t *op, uns
     }
 }
 
-/*
- * Get a specific numbered pattern capture.
- */
+//
+// Get a specific numbered pattern capture.
+//
 static match_t *get_capture_by_num(match_t *m, int *n)
 {
     if (*n == 0) return m;
@@ -484,9 +486,9 @@ static match_t *get_capture_by_num(match_t *m, int *n)
     return NULL;
 }
 
-/*
- * Get a capture with a specific name.
- */
+//
+// Get a capture with a specific name.
+//
 static match_t *get_capture_by_name(match_t *m, const char *name)
 {
     if (m->op->type == VM_CAPTURE && m->op->args.capture.name
@@ -499,9 +501,9 @@ static match_t *get_capture_by_name(match_t *m, const char *name)
     return NULL;
 }
 
-/*
- * Get a capture by name.
- */
+//
+// Get a capture by name.
+//
 match_t *get_capture(match_t *m, const char **r)
 {
     if (isdigit(**r)) {

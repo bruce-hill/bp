@@ -1,6 +1,6 @@
-/*
- * file_loader.h - Definitions of an API for loading files.
- */
+//
+// file_loader.h - Definitions of an API for loading files.
+//
 #ifndef FILE_LOADER__H
 #define FILE_LOADER__H
 

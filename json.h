@@ -1,6 +1,6 @@
-/*
- * json.h - Header file for JSON output.
- */
+//
+// json.h - Header file for JSON output.
+//
 #ifndef JSON__H
 #define JSON__H
 

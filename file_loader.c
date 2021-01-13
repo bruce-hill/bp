@@ -1,6 +1,6 @@
-/*
- * file_loader.c - Implementation of some file loading functionality.
- */
+//
+// file_loader.c - Implementation of some file loading functionality.
+//
 
 #include <ctype.h>
 #include <fcntl.h>
@@ -32,9 +32,9 @@ static void populate_lines(file_t *f)
     }
 }
 
-/*
- * Read an entire file into memory.
- */
+//
+// Read an entire file into memory.
+//
 file_t *load_file(const char *filename)
 {
     if (filename == NULL) filename = "-";
@@ -75,9 +75,9 @@ file_t *load_file(const char *filename)
     return f;
 }
 
-/*
- * Create a virtual file from a string.
- */
+//
+// Create a virtual file from a string.
+//
 file_t *spoof_file(const char *filename, char *text)
 {
     if (filename == NULL) filename = "";
@@ -89,10 +89,10 @@ file_t *spoof_file(const char *filename, char *text)
     return f;
 }
 
-/*
- * Ensure that the file's contents are held in memory, rather than being memory
- * mapped IO.
- */
+//
+// Ensure that the file's contents are held in memory, rather than being memory
+// mapped IO.
+//
 void intern_file(file_t *f)
 {
     if (!f->mmapped) return;
