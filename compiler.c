@@ -12,10 +12,10 @@
 
 #define file_err(f, ...) do { fprint_line(stderr, f, __VA_ARGS__); _exit(1); } while(0)
 
-static vm_op_t *expand_chain(file_t *f, vm_op_t *first);
-static vm_op_t *expand_choices(file_t *f, vm_op_t *first);
-static vm_op_t *chain_together(vm_op_t *first, vm_op_t *second);
-static void set_range(vm_op_t *op, ssize_t min, ssize_t max, vm_op_t *pat, vm_op_t *sep);
+__attribute__((nonnull)) static vm_op_t *expand_chain(file_t *f, vm_op_t *first);
+__attribute__((nonnull)) static vm_op_t *expand_choices(file_t *f, vm_op_t *first);
+__attribute__((nonnull)) static vm_op_t *chain_together(vm_op_t *first, vm_op_t *second);
+__attribute__((nonnull(1,4))) static void set_range(vm_op_t *op, ssize_t min, ssize_t max, vm_op_t *pat, vm_op_t *sep);
 
 /*
  * Helper function to initialize a range object.
@@ -40,9 +40,8 @@ static void set_range(vm_op_t *op, ssize_t min, ssize_t max, vm_op_t *pat, vm_op
 }
 
 /*
- * Take an opcode and expand it into a chain of patterns if it's
- * followed by any patterns (e.g. "`x `y"), otherwise return
- * the original input.
+ * Take an opcode and expand it into a chain of patterns if it's followed by
+ * any patterns (e.g. "`x `y"), otherwise return the original input.
  */
 static vm_op_t *expand_chain(file_t *f, vm_op_t *first)
 {
@@ -116,8 +115,7 @@ static vm_op_t *expand_choices(file_t *f, vm_op_t *first)
 
 static vm_op_t *chain_together(vm_op_t *first, vm_op_t *second)
 {
-    if (first == NULL) return second;
-    if (second == NULL) return first;
+    check(first->op != VM_CHAIN, "A chain should not be the first item in a chain.\n");
     vm_op_t *chain = new(vm_op_t);
     chain->op = VM_CHAIN;
     chain->start = first->start;
