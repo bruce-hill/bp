@@ -51,30 +51,22 @@ typedef struct recursive_ref_s {
 
 /*
  * Attempt to match text against a previously captured value.
+ * Return the character position after the backref has matched, or NULL if no match has occurred.
  */
-static match_t *match_backref(const char *str, vm_op_t *op, match_t *cap, unsigned int flags)
+static const char *match_backref(const char *str, vm_op_t *op, match_t *cap, unsigned int flags)
 {
     check(op->op == VM_BACKREF, "Attempt to match backref against something that's not a backref");
-    match_t *ret = new(match_t);
-    ret->start = str;
-    ret->op = op;
-    match_t **dest = &ret->child;
-
     if (cap->op->op == VM_REPLACE) {
         const char *text = cap->op->args.replace.text;
         const char *end = &text[cap->op->args.replace.len];
         for (const char *r = text; r < end; ) {
             if (*r == '\\') {
                 ++r;
-                if (*(str++) != unescapechar(r, &r)) {
-                    destroy_match(&ret);
+                if (*(str++) != unescapechar(r, &r))
                     return NULL;
-                }
             } else if (*r != '@') {
-                if (*(str++) != *r) {
-                    destroy_match(&ret);
+                if (*(str++) != *r)
                     return NULL;
-                }
                 ++r;
                 continue;
             }
@@ -82,13 +74,8 @@ static match_t *match_backref(const char *str, vm_op_t *op, match_t *cap, unsign
             ++r;
             match_t *value = get_capture(cap, &r);
             if (value != NULL) {
-                *dest = match_backref(str, op, value, flags);
-                if (*dest == NULL) {
-                    destroy_match(&ret);
-                    return NULL;
-                }
-                str = (*dest)->end;
-                dest = &(*dest)->nextsibling;
+                str = match_backref(str, op, value, flags);
+                if (str == NULL) return NULL;
             }
         }
     } else {
@@ -97,35 +84,27 @@ static match_t *match_backref(const char *str, vm_op_t *op, match_t *cap, unsign
             if (child->start > prev) {
                 size_t len = (size_t)(child->start - prev);
                 if ((flags & BP_IGNORECASE) ? memicmp(str, prev, len) != 0
-                                              : memcmp(str, prev, len) != 0) {
-                    destroy_match(&ret);
+                                            : memcmp(str, prev, len) != 0) {
                     return NULL;
                 }
                 str += len;
                 prev = child->start;
             }
             if (child->start < prev) continue;
-            *dest = match_backref(str, op, child, flags);
-            if (*dest == NULL) {
-                destroy_match(&ret);
-                return NULL;
-            }
-            str = (*dest)->end;
-            dest = &(*dest)->nextsibling;
+            str = match_backref(str, op, child, flags);
+            if (str == NULL) return NULL;
             prev = child->end;
         }
         if (cap->end > prev) {
             size_t len = (size_t)(cap->end - prev);
             if ((flags & BP_IGNORECASE) ? memicmp(str, prev, len) != 0
                                           : memcmp(str, prev, len) != 0) {
-                destroy_match(&ret);
                 return NULL;
             }
             str += len;
         }
     }
-    ret->end = str;
-    return ret;
+    return str;
 }
 
 
@@ -446,7 +425,13 @@ static match_t *_match(def_t *defs, file_t *f, const char *str, vm_op_t *op, uns
             return m;
         }
         case VM_BACKREF: {
-            return match_backref(str, op, op->args.backref, flags);
+            const char *end = match_backref(str, op, op->args.backref, flags);
+            if (end == NULL) return NULL;
+            match_t *m = new(match_t);
+            m->op = op;
+            m->start = str;
+            m->end = end;
+            return m;
         }
         case VM_NODENT: {
             if (*str != '\n') return NULL;

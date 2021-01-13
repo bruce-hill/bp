@@ -40,19 +40,36 @@ static void _visualize_matches(match_node_t *firstmatch, int depth, const char *
     const char *color = (depth % 2 == 0) ? "34" : "33";
 
     match_t *viz = firstmatch->m;
+    // This is a heuristic: print matches first if they have more submatches.
+    // In general, this helps reduce the height of the final output by allowing
+    // for more rows that show the same rule matching in multiple places.
+    // TODO: there may be a better heuristic that optimizes for this factor
+    // while also printing earlier matches first when it doesn't affect overall
+    // output height.
     for (match_node_t *p = firstmatch; p; p = p->next)
         if (match_height(p->m) > match_height(viz))
             viz = p->m;
     const char *viz_type = viz->op->start;
     size_t viz_typelen = (size_t)(viz->op->end - viz->op->start);
 
-    printf("\033[%ldG\033[%s;1m", 2*textlen+3, color);
+    // Backrefs use added dim quote marks to indicate that the pattern is a
+    // literal string being matched. (Backrefs have start/end inside the text
+    // input, instead of something the user typed in)
+    if (viz_type >= text && viz_type <= &text[textlen])
+        printf("\033[%ldG\033[0;2m\"\033[%s;1m", 2*textlen+3, color);
+    else
+        printf("\033[%ldG\033[%s;1m", 2*textlen+3, color);
+
     for (size_t i = 0; i < viz_typelen; i++) {
         switch (viz_type[i]) {
             case '\n': printf("↵"); break;
             default: printf("%c", viz_type[i]); break;
         }
     }
+
+    if (viz_type >= text && viz_type <= &text[textlen])
+        printf("\033[0;2m\"");
+
     printf("\033[0m");
 
     match_node_t *children = NULL;
