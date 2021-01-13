@@ -4,7 +4,7 @@ no: !''
 # Configurable options:
 is-tty: no # Defined as either always-match or always-fail, depending on stdout
 include-binary-files: no;
-is-text-file: ^^ >32(\t/\n/\r/\x20-x7e/!\x00-x7f utf8-codepoint/$$)
+is-text-file: >32(\t/\n/\r/\x20-x7e/!\x00-x7f utf8-codepoint/$$)
 
 # Meta-rules for acting on everything:
 pattern: !'' # Not defined by default
