@@ -7,7 +7,9 @@
 #include "types.h"
 
 //
-// Print a match as JSON
+// Helper function for json_match().
+// `comma` is used to track whether a comma will need to be printed before the
+// next object or not.
 //
 static int _json_match(const char *text, match_t *m, int comma, int verbose)
 {
@@ -41,6 +43,9 @@ static int _json_match(const char *text, match_t *m, int comma, int verbose)
     return 1;
 }
 
+//
+// Print a match object as a JSON object.
+//
 void json_match(const char *text, match_t *m, int verbose)
 {
     _json_match(text, m, 0, verbose);

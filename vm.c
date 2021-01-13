@@ -522,6 +522,9 @@ match_t *get_capture(match_t *m, const char **r)
     return NULL;
 }
 
+//
+// Wrapper function for _match() to kickstart the recursion info.
+//
 match_t *match(def_t *defs, file_t *f, const char *str, vm_op_t *op, unsigned int flags)
 {
     return _match(defs, f, str, op, flags, NULL);

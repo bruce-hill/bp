@@ -581,6 +581,9 @@ vm_op_t *bp_replacement(file_t *f, vm_op_t *pat, const char *replacement)
     return op;
 }
 
+//
+// Compile a string representing a BP pattern into an opcode object.
+//
 vm_op_t *bp_pattern(file_t *f, const char *str)
 {
     vm_op_t *op = bp_simplepattern(f, str);

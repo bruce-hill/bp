@@ -15,6 +15,10 @@
 #include "file_loader.h"
 #include "utils.h"
 
+//
+// In the file object, populate the `lines` array with pointers to the
+// beginning of each line.
+//
 static void populate_lines(file_t *f)
 {
     // Calculate line numbers:
@@ -107,6 +111,10 @@ void intern_file(file_t *f)
     populate_lines(f);
 }
 
+//
+// Free a file and all memory contained inside its members, then set the input
+// pointer to NULL.
+//
 void destroy_file(file_t **f)
 {
     if ((*f)->filename) {
@@ -128,6 +136,9 @@ void destroy_file(file_t **f)
     xfree(f);
 }
 
+//
+// Given a pointer, determine which line number it points to.
+//
 size_t get_line_number(file_t *f, const char *p)
 {
     // TODO: binary search
@@ -138,18 +149,28 @@ size_t get_line_number(file_t *f, const char *p)
     return f->nlines;
 }
 
+//
+// Given a pointer, determine which character offset within the line it points to.
+//
 size_t get_char_number(file_t *f, const char *p)
 {
     size_t linenum = get_line_number(f, p);
     return 1 + (size_t)(p - f->lines[linenum-1]);
 }
 
+//
+// Return a pointer to the line with the specified line number.
+//
 const char *get_line(file_t *f, size_t line_number)
 {
     if (line_number == 0 || line_number > f->nlines) return NULL;
     return f->lines[line_number - 1];
 }
 
+//
+// Print the filename/line number, followed by the given message, followed by
+// the line itself.
+//
 void fprint_line(FILE *dest, file_t *f, const char *start, const char *end, const char *fmt, ...)
 {
     if (start < f->contents) start = f->contents;

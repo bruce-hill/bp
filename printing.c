@@ -21,6 +21,10 @@ typedef struct {
     const char *color;
 } print_state_t;
 
+//
+// Return the height of a match object (i.e. the number of descendents of the
+// structure).
+//
 static int match_height(match_t *m)
 {
     int height = 0;
@@ -31,6 +35,9 @@ static int match_height(match_t *m)
     return 1 + height;
 }
 
+//
+// Print a visual explanation for the as-yet-unprinted matches provided.
+//
 static void _visualize_matches(match_node_t *firstmatch, int depth, const char *text, size_t textlen)
 {
     if (!firstmatch) return;
@@ -153,6 +160,10 @@ static void _visualize_matches(match_node_t *firstmatch, int depth, const char *
     }
 }
 
+//
+// Recursively look for references to a rule called "pattern" and print an
+// explanation for each one.
+//
 static void _visualize_patterns(match_t *m)
 {
     if (m->op->type == VM_REF && streq(m->op->args.s, "pattern")) {
@@ -165,15 +176,20 @@ static void _visualize_patterns(match_t *m)
     }
 }
 
+//
+// For a match object, print a visual explanation for each "pattern" matched
+// inside it.
+//
 void visualize_match(match_t *m)
 {
     printf("\033[?7l");
-    //match_node_t first = {.m = m};
-    //_visualize_matches(&first, 0, m->start, (m->end - m->start));
     _visualize_patterns(m);
     printf("\033[?7h");
 }
 
+//
+// Print a line number.
+//
 static void print_line_number(FILE *out, print_state_t *state, print_options_t options)
 {
     state->printed_line = state->line;
@@ -185,7 +201,7 @@ static void print_line_number(FILE *out, print_state_t *state, print_options_t o
 }
 
 //
-// Print a match with replacements and highlighting.
+// Helper function for print_match(), using a struct to keep track of some state.
 //
 static void _print_match(FILE *out, file_t *f, match_t *m, print_state_t *state, print_options_t options)
 {
@@ -275,6 +291,9 @@ static void _print_match(FILE *out, file_t *f, match_t *m, print_state_t *state,
     }
 }
 
+//
+// Print a match with replacements and highlighting.
+//
 void print_match(FILE *out, file_t *f, match_t *m, print_options_t options)
 {
     print_state_t state = {.line = 1, .color = "\033[0m"};
