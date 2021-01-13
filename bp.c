@@ -41,11 +41,15 @@ static const char *usage = (
 
 static print_options_t print_options = 0;
 
+__attribute__((nonnull))
+static char *getflag(const char *flag, char *argv[], int *i);
+__attribute__((nonnull(3)))
+static int process_file(def_t *defs, const char *filename, vm_op_t *pattern, unsigned int flags);
+
 //
 // Return a pointer to the value part of a flag, if present, otherwise NULL.
 // This works for --foo=value or --foo value
 //
-__attribute__((nonnull))
 static char *getflag(const char *flag, char *argv[], int *i)
 {
     size_t n = strlen(flag);

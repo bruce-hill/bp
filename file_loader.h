@@ -26,7 +26,7 @@ __attribute__((pure, nonnull))
 size_t get_char_number(file_t *f, const char *p);
 __attribute__((pure, nonnull))
 const char *get_line(file_t *f, size_t line_number);
-__attribute__((nonnull(1,2,3,4), format(printf, 5, 6)))
+__attribute__((nonnull(1,2,3), format(printf, 5, 6)))
 void fprint_line(FILE *dest, file_t *f, const char *start, const char *end, const char *fmt, ...);
 
 #endif

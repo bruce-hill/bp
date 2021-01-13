@@ -12,11 +12,28 @@
 #include "utils.h"
 #include "vm.h"
 
+typedef struct recursive_ref_s {
+    const vm_op_t *op;
+    const char *pos;
+    struct recursive_ref_s *prev;
+    int hit;
+    match_t *result;
+} recursive_ref_t;
+
+__attribute__((nonnull, pure))
+static inline const char *next_char(file_t *f, const char *str);
+__attribute__((nonnull))
+static const char *match_backref(const char *str, vm_op_t *op, match_t *cap, unsigned int flags);
+__attribute__((hot, nonnull(2,3,4)))
+static match_t *_match(def_t *defs, file_t *f, const char *str, vm_op_t *op, unsigned int flags, recursive_ref_t *rec);
+__attribute__((nonnull))
+static match_t *get_capture_by_num(match_t *m, int *n);
+__attribute__((nonnull, pure))
+static match_t *get_capture_by_name(match_t *m, const char *name);
 
 //
 // UTF8-compliant char iteration
 //
-__attribute__((nonnull, pure))
 static inline const char *next_char(file_t *f, const char *str)
 {
     char c = *str;
@@ -44,19 +61,10 @@ void destroy_match(match_t **m)
     *m = NULL;
 }
 
-typedef struct recursive_ref_s {
-    const vm_op_t *op;
-    const char *pos;
-    struct recursive_ref_s *prev;
-    int hit;
-    match_t *result;
-} recursive_ref_t;
-
 //
 // Attempt to match text against a previously captured value.
 // Return the character position after the backref has matched, or NULL if no match has occurred.
 //
-__attribute__((nonnull))
 static const char *match_backref(const char *str, vm_op_t *op, match_t *cap, unsigned int flags)
 {
     check(op->type == VM_BACKREF, "Attempt to match backref against something that's not a backref");
@@ -117,7 +125,6 @@ static const char *match_backref(const char *str, vm_op_t *op, match_t *cap, uns
 // a match struct, or NULL if no match is found.
 // The returned value should be free()'d to avoid memory leaking.
 //
-__attribute__((hot, nonnull(2,3,4)))
 static match_t *_match(def_t *defs, file_t *f, const char *str, vm_op_t *op, unsigned int flags, recursive_ref_t *rec)
 {
     switch (op->type) {
@@ -477,7 +484,6 @@ static match_t *_match(def_t *defs, file_t *f, const char *str, vm_op_t *op, uns
 //
 // Get a specific numbered pattern capture.
 //
-__attribute__((nonnull))
 static match_t *get_capture_by_num(match_t *m, int *n)
 {
     if (*n == 0) return m;
@@ -493,7 +499,6 @@ static match_t *get_capture_by_num(match_t *m, int *n)
 //
 // Get a capture with a specific name.
 //
-__attribute__((nonnull, pure))
 static match_t *get_capture_by_name(match_t *m, const char *name)
 {
     if (m->op->type == VM_CAPTURE && m->op->args.capture.name

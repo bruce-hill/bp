@@ -10,6 +10,9 @@
 #include "grammar.h"
 #include "utils.h"
 
+__attribute__((nonnull(2,3,4), returns_nonnull))
+static def_t *with_backref(def_t *defs, file_t *f, const char *name, match_t *m);
+
 //
 // Return a new list of definitions with one added to the front
 //
@@ -67,7 +70,6 @@ vm_op_t *lookup(def_t *defs, const char *name)
 //
 // Push a backreference onto the backreference stack
 //
-__attribute__((nonnull))
 static def_t *with_backref(def_t *defs, file_t *f, const char *name, match_t *m)
 {
     vm_op_t *op = new(vm_op_t);

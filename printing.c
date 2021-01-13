@@ -21,11 +21,21 @@ typedef struct {
     const char *color;
 } print_state_t;
 
+__attribute__((nonnull, pure))
+static int height_of_match(match_t *m);
+__attribute__((nonnull))
+static void _visualize_matches(match_node_t *firstmatch, int depth, const char *text, size_t textlen);
+__attribute__((nonnull))
+static void _visualize_patterns(match_t *m);
+__attribute__((nonnull))
+static void print_line_number(FILE *out, print_state_t *state, print_options_t options);
+__attribute__((nonnull))
+static void _print_match(FILE *out, file_t *f, match_t *m, print_state_t *state, print_options_t options);
+
 //
 // Return the height of a match object (i.e. the number of descendents of the
 // structure).
 //
-__attribute__((nonnull, pure))
 static int height_of_match(match_t *m)
 {
     int height = 0;
@@ -39,7 +49,6 @@ static int height_of_match(match_t *m)
 //
 // Print a visual explanation for the as-yet-unprinted matches provided.
 //
-__attribute__((nonnull))
 static void _visualize_matches(match_node_t *firstmatch, int depth, const char *text, size_t textlen)
 {
     const char *V = "│"; // Vertical bar
@@ -164,7 +173,6 @@ static void _visualize_matches(match_node_t *firstmatch, int depth, const char *
 // Recursively look for references to a rule called "pattern" and print an
 // explanation for each one.
 //
-__attribute__((nonnull))
 static void _visualize_patterns(match_t *m)
 {
     if (m->op->type == VM_REF && streq(m->op->args.s, "pattern")) {
@@ -191,7 +199,6 @@ void visualize_match(match_t *m)
 //
 // Print a line number.
 //
-__attribute__((nonnull))
 static void print_line_number(FILE *out, print_state_t *state, print_options_t options)
 {
     state->printed_line = state->line;
@@ -205,7 +212,6 @@ static void print_line_number(FILE *out, print_state_t *state, print_options_t o
 //
 // Helper function for print_match(), using a struct to keep track of some state.
 //
-__attribute__((nonnull))
 static void _print_match(FILE *out, file_t *f, match_t *m, print_state_t *state, print_options_t options)
 {
     static const char *hl = "\033[0;31;1m";

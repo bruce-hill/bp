@@ -6,12 +6,14 @@
 
 #include "types.h"
 
+__attribute__((nonnull))
+static int _json_match(const char *text, match_t *m, int comma, int verbose);
+
 //
 // Helper function for json_match().
 // `comma` is used to track whether a comma will need to be printed before the
 // next object or not.
 //
-__attribute__((nonnull))
 static int _json_match(const char *text, match_t *m, int comma, int verbose)
 {
     if (!verbose) {
