@@ -70,7 +70,7 @@ vm_op_t *lookup(def_t *defs, const char *name)
 static def_t *with_backref(def_t *defs, file_t *f, const char *name, match_t *m)
 {
     vm_op_t *op = new(vm_op_t);
-    op->op = VM_BACKREF;
+    op->type = VM_BACKREF;
     op->start = m->start;
     op->end = m->end;
     op->len = -1; // TODO: maybe calculate this? (nontrivial because of replacements)
@@ -83,8 +83,8 @@ static def_t *with_backref(def_t *defs, file_t *f, const char *name, match_t *m)
  */
 def_t *with_backrefs(def_t *defs, file_t *f, match_t *m)
 {
-    if (m->op->op != VM_REF) {
-        if (m->op->op == VM_CAPTURE && m->op->args.capture.name)
+    if (m->op->type != VM_REF) {
+        if (m->op->type == VM_CAPTURE && m->op->args.capture.name)
             defs = with_backref(defs, f, m->op->args.capture.name, m->child);
         if (m->child) defs = with_backrefs(defs, f, m->child);
         if (m->nextsibling) defs = with_backrefs(defs, f, m->nextsibling);

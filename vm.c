@@ -55,8 +55,8 @@ typedef struct recursive_ref_s {
  */
 static const char *match_backref(const char *str, vm_op_t *op, match_t *cap, unsigned int flags)
 {
-    check(op->op == VM_BACKREF, "Attempt to match backref against something that's not a backref");
-    if (cap->op->op == VM_REPLACE) {
+    check(op->type == VM_BACKREF, "Attempt to match backref against something that's not a backref");
+    if (cap->op->type == VM_REPLACE) {
         const char *text = cap->op->args.replace.text;
         const char *end = &text[cap->op->args.replace.len];
         for (const char *r = text; r < end; ) {
@@ -115,7 +115,7 @@ static const char *match_backref(const char *str, vm_op_t *op, match_t *cap, uns
  */
 static match_t *_match(def_t *defs, file_t *f, const char *str, vm_op_t *op, unsigned int flags, recursive_ref_t *rec)
 {
-    switch (op->op) {
+    switch (op->type) {
         case VM_ANYCHAR: {
             if (str >= f->end || *str == '\n')
                 return NULL;
@@ -352,7 +352,7 @@ static match_t *_match(def_t *defs, file_t *f, const char *str, vm_op_t *op, uns
                 .mmapped=f->mmapped,
             };
             match_t *m2 = _match(defs, &inner, str, op->args.multiple.second, flags, rec);
-            if ((m2 == NULL) == (op->op == VM_EQUAL)) {
+            if ((m2 == NULL) == (op->type == VM_EQUAL)) {
                 destroy_match(&m1);
                 destroy_match(&m2);
                 return NULL;
@@ -362,7 +362,7 @@ static match_t *_match(def_t *defs, file_t *f, const char *str, vm_op_t *op, uns
             m->end = m1->end;
             m->op = op;
             m->child = m1;
-            if (op->op == VM_EQUAL) {
+            if (op->type == VM_EQUAL) {
                 m1->nextsibling = m2;
             } else {
                 destroy_match(&m2);
@@ -461,7 +461,7 @@ static match_t *_match(def_t *defs, file_t *f, const char *str, vm_op_t *op, uns
             return m;
         }
         default: {
-            fprintf(stderr, "Unknown opcode: %d", op->op);
+            fprintf(stderr, "Unknown opcode: %d", op->type);
             _exit(1);
             return NULL;
         }
@@ -474,8 +474,8 @@ static match_t *_match(def_t *defs, file_t *f, const char *str, vm_op_t *op, uns
 static match_t *get_capture_by_num(match_t *m, int *n)
 {
     if (*n == 0) return m;
-    if (m->op->op == VM_CAPTURE && *n == 1) return m;
-    if (m->op->op == VM_CAPTURE) --(*n);
+    if (m->op->type == VM_CAPTURE && *n == 1) return m;
+    if (m->op->type == VM_CAPTURE) --(*n);
     for (match_t *c = m->child; c; c = c->nextsibling) {
         match_t *cap = get_capture_by_num(c, n);
         if (cap) return cap;
@@ -488,7 +488,7 @@ static match_t *get_capture_by_num(match_t *m, int *n)
  */
 static match_t *get_capture_by_name(match_t *m, const char *name)
 {
-    if (m->op->op == VM_CAPTURE && m->op->args.capture.name
+    if (m->op->type == VM_CAPTURE && m->op->args.capture.name
         && streq(m->op->args.capture.name, name))
         return m;
     for (match_t *c = m->child; c; c = c->nextsibling) {

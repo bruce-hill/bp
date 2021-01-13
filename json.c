@@ -12,7 +12,7 @@
 static int _json_match(const char *text, match_t *m, int comma, int verbose)
 {
     if (!verbose) {
-        if (m->op->op != VM_REF) {
+        if (m->op->type != VM_REF) {
             for (match_t *child = m->child; child; child = child->nextsibling) {
                 comma |= _json_match(text, child, comma, verbose);
             }

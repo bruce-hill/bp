@@ -155,7 +155,7 @@ static void _visualize_matches(match_node_t *firstmatch, int depth, const char *
 
 static void _visualize_patterns(match_t *m)
 {
-    if (m->op->op == VM_REF && streq(m->op->args.s, "pattern")) {
+    if (m->op->type == VM_REF && streq(m->op->args.s, "pattern")) {
         m = m->child;
         match_node_t first = {.m = m};
         _visualize_matches(&first, 0, m->start, (size_t)(m->end - m->start));
@@ -191,12 +191,12 @@ static void _print_match(FILE *out, file_t *f, match_t *m, print_state_t *state,
 {
     static const char *hl = "\033[0;31;1m";
     const char *old_color = state->color;
-    if (m->op->op == VM_HIDE) {
+    if (m->op->type == VM_HIDE) {
         // TODO: handle replacements?
         for (const char *p = m->start; p < m->end; p++) {
             if (*p == '\n') ++state->line;
         }
-    } else if (m->op->op == VM_REPLACE) {
+    } else if (m->op->type == VM_REPLACE) {
         if (options & PRINT_COLOR && state->color != hl) {
             state->color = hl;
             fprintf(out, "%s", state->color);
@@ -236,7 +236,7 @@ static void _print_match(FILE *out, file_t *f, match_t *m, print_state_t *state,
             }
         }
     } else {
-        if (m->op->op == VM_CAPTURE) {
+        if (m->op->type == VM_CAPTURE) {
             if (options & PRINT_COLOR && state->color != hl) {
                 state->color = hl;
                 fprintf(out, "%s", state->color);

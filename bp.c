@@ -60,7 +60,7 @@ static char *getflag(const char *flag, char *argv[], int *i)
 static int print_errors(file_t *f, match_t *m)
 {
     int ret = 0;
-    if (m->op->op == VM_CAPTURE && m->op->args.capture.name && streq(m->op->args.capture.name, "!")) {
+    if (m->op->type == VM_CAPTURE && m->op->args.capture.name && streq(m->op->args.capture.name, "!")) {
         printf("\033[31;1m");
         print_match(stdout, f, m, print_options);
         printf("\033[0m\n");

@@ -47,7 +47,7 @@ struct match_s; // forward declared to resolve circular struct defs
  * A struct reperesenting a BP virtual machine operation
  */
 typedef struct vm_op_s {
-    enum VMOpcode op;
+    enum VMOpcode type;
     const char *start, *end;
     // Length of the match, if constant, otherwise -1
     ssize_t len;
