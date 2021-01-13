@@ -220,6 +220,7 @@ static match_t *_match(def_t *defs, file_t *f, const char *str, vm_op_t *op, uns
                 }
                 match_t *p = _match(defs, f, str, op->args.repetitions.repeat_pat, flags, rec);
                 if (p == NULL) {
+                    str = start;
                     destroy_match(&sep);
                     break;
                 }
