@@ -324,20 +324,7 @@ static match_t *_match(def_t *defs, file_t *f, const char *str, vm_op_t *op, uns
             { // Push backrefs and run matching, then cleanup
                 def_t *defs2 = with_backrefs(defs, f, m1);
                 m2 = _match(defs2, f, m1->end, op->args.multiple.second, flags, rec);
-                while (defs2 != defs) {
-                    def_t *next = defs2->next;
-                    defs2->next = NULL;
-                    // Deliberate memory leak, if there is a match, then the op
-                    // will be stored on the match and can't be freed here.
-                    // There's currently no refcounting on ops but that should
-                    // be how to prevent a memory leak from this.
-                    // TODO: add refcounting to ops?
-                    if (m2 == NULL) {
-                        xfree(&defs2->op);
-                    }
-                    xfree(&defs2);
-                    defs2 = next;
-                }
+                free_defs(&defs2, defs);
             }
 
             if (m2 == NULL) {

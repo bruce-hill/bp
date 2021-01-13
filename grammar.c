@@ -72,9 +72,7 @@ vm_op_t *lookup(def_t *defs, const char *name)
 //
 static def_t *with_backref(def_t *defs, file_t *f, const char *name, match_t *m)
 {
-    vm_op_t *op = new(vm_op_t);
-    op->type = VM_BACKREF;
-    op->start = m->start;
+    vm_op_t *op = new_op(f, m->start, VM_BACKREF);
     op->end = m->end;
     op->len = -1; // TODO: maybe calculate this? (nontrivial because of replacements)
     op->args.backref = m;
@@ -93,6 +91,19 @@ def_t *with_backrefs(def_t *defs, file_t *f, match_t *m)
         if (m->nextsibling) defs = with_backrefs(defs, f, m->nextsibling);
     }
     return defs;
+}
+
+//
+// Free all the given definitions up till (but not including) `stop`
+//
+void free_defs(def_t **defs, def_t *stop)
+{
+    while (*defs != stop && *defs != NULL) {
+        def_t *next = (*defs)->next;
+        (*defs)->next = NULL;
+        free(*defs);
+        (*defs) = next;
+    }
 }
 
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1

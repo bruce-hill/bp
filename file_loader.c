@@ -124,10 +124,12 @@ void destroy_file(file_t **f)
         xfree(&((*f)->filename));
         (*f)->filename = NULL;
     }
+
     if ((*f)->lines) {
         xfree(&((*f)->lines));
         (*f)->lines = NULL;
     }
+
     if ((*f)->contents) {
         if ((*f)->mmapped) {
             munmap((*f)->contents, (size_t)((*f)->end - (*f)->contents));
@@ -136,6 +138,14 @@ void destroy_file(file_t **f)
         }
         (*f)->contents = NULL;
     }
+
+    while ((*f)->ops) {
+        allocated_op_t *tofree = (*f)->ops;
+        (*f)->ops = tofree->next;
+        memset(tofree, 'A', sizeof(allocated_op_t)); // Sentinel
+        xfree(&tofree);
+    }
+
     xfree(f);
 }
 

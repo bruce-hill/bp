@@ -7,6 +7,8 @@
 #include "file_loader.h"
 #include "types.h"
 
+__attribute__((nonnull))
+vm_op_t *new_op(file_t *f, const char *start, enum VMOpcode type);
 __attribute__((nonnull(1,2)))
 vm_op_t *bp_simplepattern(file_t *f, const char *str);
 __attribute__((nonnull(1,2)))

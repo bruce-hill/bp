@@ -6,10 +6,13 @@
 
 #include <stdio.h>
 
+struct allocated_op_s; // declared in types.h
+
 typedef struct {
     const char *filename;
     char *contents, **lines, *end;
     size_t nlines;
+    struct allocated_op_s *ops;
     unsigned int mmapped:1;
 } file_t;
 

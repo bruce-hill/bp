@@ -120,6 +120,7 @@ static int process_file(def_t *defs, const char *filename, vm_op_t *pattern, uns
 
     if (m != NULL)
         destroy_match(&m);
+
     destroy_file(&f);
 
     return success;
@@ -285,6 +286,8 @@ int main(int argc, char *argv[])
         found += process_file(defs, NULL, pattern, flags);
     }
     if (flags & BP_JSON) printf("]\n");
+
+    free_defs(&defs, NULL);
 
     return (found > 0) ? 0 : 1;
 }
