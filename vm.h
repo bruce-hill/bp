@@ -8,12 +8,12 @@
 
 #include "types.h"
 
-__attribute__((hot, nonnull(2,3,4)))
+__attribute__((nonnull(2,3,4)))
 match_t *match(def_t *defs, file_t *f, const char *str, vm_op_t *op, unsigned int flags);
 __attribute__((nonnull))
 void destroy_match(match_t **m);
 __attribute__((nonnull))
-match_t *get_capture(match_t *m, const char **r);
+match_t *get_capture(match_t *m, const char **id);
 
 #endif
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1

@@ -7,7 +7,7 @@
 #include "file_loader.h"
 #include "types.h"
 
-__attribute__((nonnull(2,3,4)))
+__attribute__((nonnull(2,3,4), returns_nonnull))
 def_t *with_def(def_t *defs, file_t *f, const char *name, vm_op_t *op);
 __attribute__((nonnull(2,3)))
 def_t *with_backrefs(def_t *defs, file_t *f, match_t *m);

@@ -12,10 +12,13 @@
 
 #define file_err(f, ...) do { fprint_line(stderr, f, __VA_ARGS__); _exit(1); } while(0)
 
-__attribute__((nonnull)) static vm_op_t *expand_chain(file_t *f, vm_op_t *first);
-__attribute__((nonnull)) static vm_op_t *expand_choices(file_t *f, vm_op_t *first);
+__attribute__((nonnull))
+static vm_op_t *expand_chain(file_t *f, vm_op_t *first);
+__attribute__((nonnull))
+static vm_op_t *expand_choices(file_t *f, vm_op_t *first);
 static vm_op_t *chain_together(vm_op_t *first, vm_op_t *second);
-__attribute__((nonnull(1,4))) static void set_range(vm_op_t *op, ssize_t min, ssize_t max, vm_op_t *pat, vm_op_t *sep);
+__attribute__((nonnull(1,4)))
+static void set_range(vm_op_t *op, ssize_t min, ssize_t max, vm_op_t *pat, vm_op_t *sep);
 
 //
 // Helper function to initialize a range object.
@@ -113,6 +116,10 @@ static vm_op_t *expand_choices(file_t *f, vm_op_t *first)
     return choice;
 }
 
+//
+// Given two patterns, return a new opcode for the first pattern followed by
+// the second. If either pattern is NULL, return the other.
+//
 static vm_op_t *chain_together(vm_op_t *first, vm_op_t *second)
 {
     if (first == NULL) return second;

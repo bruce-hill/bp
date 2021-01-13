@@ -19,6 +19,7 @@
 // In the file object, populate the `lines` array with pointers to the
 // beginning of each line.
 //
+__attribute__((nonnull))
 static void populate_lines(file_t *f)
 {
     // Calculate line numbers:

@@ -25,11 +25,12 @@ typedef struct {
 // Return the height of a match object (i.e. the number of descendents of the
 // structure).
 //
-static int match_height(match_t *m)
+__attribute__((nonnull, pure))
+static int height_of_match(match_t *m)
 {
     int height = 0;
     for (match_t *c = m->child; c; c = c->nextsibling) {
-        int childheight = match_height(c);
+        int childheight = height_of_match(c);
         if (childheight > height) height = childheight;
     }
     return 1 + height;
@@ -38,10 +39,9 @@ static int match_height(match_t *m)
 //
 // Print a visual explanation for the as-yet-unprinted matches provided.
 //
+__attribute__((nonnull))
 static void _visualize_matches(match_node_t *firstmatch, int depth, const char *text, size_t textlen)
 {
-    if (!firstmatch) return;
-
     const char *V = "│"; // Vertical bar
     const char *H = "─"; // Horizontal bar
     const char *color = (depth % 2 == 0) ? "34" : "33";
@@ -54,7 +54,7 @@ static void _visualize_matches(match_node_t *firstmatch, int depth, const char *
     // while also printing earlier matches first when it doesn't affect overall
     // output height.
     for (match_node_t *p = firstmatch; p; p = p->next)
-        if (match_height(p->m) > match_height(viz))
+        if (height_of_match(p->m) > height_of_match(viz))
             viz = p->m;
     const char *viz_type = viz->op->start;
     size_t viz_typelen = (size_t)(viz->op->end - viz->op->start);
@@ -164,6 +164,7 @@ static void _visualize_matches(match_node_t *firstmatch, int depth, const char *
 // Recursively look for references to a rule called "pattern" and print an
 // explanation for each one.
 //
+__attribute__((nonnull))
 static void _visualize_patterns(match_t *m)
 {
     if (m->op->type == VM_REF && streq(m->op->args.s, "pattern")) {
@@ -190,6 +191,7 @@ void visualize_match(match_t *m)
 //
 // Print a line number.
 //
+__attribute__((nonnull))
 static void print_line_number(FILE *out, print_state_t *state, print_options_t options)
 {
     state->printed_line = state->line;
@@ -203,6 +205,7 @@ static void print_line_number(FILE *out, print_state_t *state, print_options_t o
 //
 // Helper function for print_match(), using a struct to keep track of some state.
 //
+__attribute__((nonnull))
 static void _print_match(FILE *out, file_t *f, match_t *m, print_state_t *state, print_options_t options)
 {
     static const char *hl = "\033[0;31;1m";
@@ -298,6 +301,24 @@ void print_match(FILE *out, file_t *f, match_t *m, print_options_t options)
 {
     print_state_t state = {.line = 1, .color = "\033[0m"};
     _print_match(out, f, m, &state, options);
+}
+
+//
+// Print any errors that are present in the given match object.
+//
+int print_errors(file_t *f, match_t *m, print_options_t options)
+{
+    int ret = 0;
+    if (m->op->type == VM_CAPTURE && m->op->args.capture.name && streq(m->op->args.capture.name, "!")) {
+        printf("\033[31;1m");
+        print_match(stdout, f, m, options);
+        printf("\033[0m\n");
+        fprint_line(stdout, f, m->start, m->end, " ");
+        return 1;
+    }
+    if (m->child) ret += print_errors(f, m->child, options);
+    if (m->nextsibling) ret += print_errors(f, m->nextsibling, options);
+    return ret;
 }
 
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1

@@ -41,6 +41,11 @@ static const char *usage = (
 
 static print_options_t print_options = 0;
 
+//
+// Return a pointer to the value part of a flag, if present, otherwise NULL.
+// This works for --foo=value or --foo value
+//
+__attribute__((nonnull))
 static char *getflag(const char *flag, char *argv[], int *i)
 {
     size_t n = strlen(flag);
@@ -57,22 +62,11 @@ static char *getflag(const char *flag, char *argv[], int *i)
     return NULL;
 }
 
-static int print_errors(file_t *f, match_t *m)
-{
-    int ret = 0;
-    if (m->op->type == VM_CAPTURE && m->op->args.capture.name && streq(m->op->args.capture.name, "!")) {
-        printf("\033[31;1m");
-        print_match(stdout, f, m, print_options);
-        printf("\033[0m\n");
-        fprint_line(stdout, f, m->start, m->end, " ");
-        return 1;
-    }
-    if (m->child) ret += print_errors(f, m->child);
-    if (m->nextsibling) ret += print_errors(f, m->nextsibling);
-    return ret;
-}
-
-static int run_match(def_t *defs, const char *filename, vm_op_t *pattern, unsigned int flags)
+//
+// For a given filename, open the file and attempt to match the given pattern
+// against it, printing any results according to the flags.
+//
+static int process_file(def_t *defs, const char *filename, vm_op_t *pattern, unsigned int flags)
 {
     static int printed_matches = 0;
     int success = 0;
@@ -81,7 +75,7 @@ static int run_match(def_t *defs, const char *filename, vm_op_t *pattern, unsign
     if (flags & BP_INPLACE) // Need to do this before matching
         intern_file(f);
     match_t *m = match(defs, f, f->contents, pattern, flags);
-    if (m && print_errors(f, m) > 0)
+    if (m && print_errors(f, m, print_options) > 0)
         _exit(1);
     if (m != NULL && m->end > m->start + 1) {
         success = 1;
@@ -271,7 +265,7 @@ int main(int argc, char *argv[])
     if (i < argc) {
         // Files pass in as command line args:
         for (int nfiles = 0; i < argc; nfiles++, i++) {
-            found += run_match(defs, argv[i], pattern, flags);
+            found += process_file(defs, argv[i], pattern, flags);
         }
     } else if (isatty(STDIN_FILENO)) {
         // No files, no piped in input, so use * **/*:
@@ -279,12 +273,12 @@ int main(int argc, char *argv[])
         glob("*", 0, NULL, &globbuf);
         glob("**/*", GLOB_APPEND, NULL, &globbuf);
         for (size_t i = 0; i < globbuf.gl_pathc; i++) {
-            found += run_match(defs, globbuf.gl_pathv[i], pattern, flags);
+            found += process_file(defs, globbuf.gl_pathv[i], pattern, flags);
         }
         globfree(&globbuf);
     } else {
         // Piped in input:
-        found += run_match(defs, NULL, pattern, flags);
+        found += process_file(defs, NULL, pattern, flags);
     }
     if (flags & BP_JSON) printf("]\n");
 

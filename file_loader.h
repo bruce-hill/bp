@@ -14,6 +14,7 @@ typedef struct {
 } file_t;
 
 file_t *load_file(const char *filename);
+__attribute__((nonnull(2), returns_nonnull))
 file_t *spoof_file(const char *filename, char *text);
 __attribute__((nonnull))
 void intern_file(file_t *f);
@@ -25,7 +26,7 @@ __attribute__((pure, nonnull))
 size_t get_char_number(file_t *f, const char *p);
 __attribute__((pure, nonnull))
 const char *get_line(file_t *f, size_t line_number);
-__attribute__((format (printf, 5, 6)))
+__attribute__((nonnull(1,2,3,4), format(printf, 5, 6)))
 void fprint_line(FILE *dest, file_t *f, const char *start, const char *end, const char *fmt, ...);
 
 #endif
