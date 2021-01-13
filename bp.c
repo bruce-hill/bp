@@ -75,6 +75,7 @@ static int print_errors(file_t *f, match_t *m)
 static int run_match(def_t *defs, const char *filename, vm_op_t *pattern, unsigned int flags)
 {
     static int printed_matches = 0;
+    int success = 0;
     file_t *f = load_file(filename);
     check(f, "Could not open file: %s", filename);
     if (flags & BP_INPLACE) // Need to do this before matching
@@ -83,6 +84,7 @@ static int run_match(def_t *defs, const char *filename, vm_op_t *pattern, unsign
     if (m && print_errors(f, m) > 0)
         _exit(1);
     if (m != NULL && m->end > m->start + 1) {
+        success = 1;
         ++printed_matches;
 
         if (flags & BP_EXPLAIN) {
@@ -116,12 +118,13 @@ static int run_match(def_t *defs, const char *filename, vm_op_t *pattern, unsign
             print_match(stdout, f, m,
                 filename ? print_options : print_options & (print_options_t)~PRINT_LINE_NUMBERS);
         }
-        destroy_file(&f);
-        return 0;
-    } else {
-        destroy_file(&f);
-        return 1;
     }
+
+    if (m != NULL)
+        destroy_match(&m);
+    destroy_file(&f);
+
+    return success;
 }
 
 #define FLAG(f) (flag=getflag((f), argv, &i))
@@ -263,12 +266,12 @@ int main(int argc, char *argv[])
     vm_op_t *pattern = lookup(defs, rule);
     check(pattern != NULL, "No such rule: '%s'", rule);
 
-    int ret = 1;
+    int found = 0;
     if (flags & BP_JSON) printf("[");
     if (i < argc) {
         // Files pass in as command line args:
         for (int nfiles = 0; i < argc; nfiles++, i++) {
-            ret &= run_match(defs, argv[i], pattern, flags);
+            found += run_match(defs, argv[i], pattern, flags);
         }
     } else if (isatty(STDIN_FILENO)) {
         // No files, no piped in input, so use * **/*:
@@ -276,16 +279,16 @@ int main(int argc, char *argv[])
         glob("*", 0, NULL, &globbuf);
         glob("**/*", GLOB_APPEND, NULL, &globbuf);
         for (size_t i = 0; i < globbuf.gl_pathc; i++) {
-            ret &= run_match(defs, globbuf.gl_pathv[i], pattern, flags);
+            found += run_match(defs, globbuf.gl_pathv[i], pattern, flags);
         }
         globfree(&globbuf);
     } else {
         // Piped in input:
-        ret &= run_match(defs, NULL, pattern, flags);
+        found += run_match(defs, NULL, pattern, flags);
     }
     if (flags & BP_JSON) printf("]\n");
 
-    return ret;
+    return (found > 0) ? 0 : 1;
 }
 
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1
