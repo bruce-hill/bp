@@ -268,6 +268,8 @@ vm_op_t *bp_simplepattern(file_t *f, const char *str)
             size_t len = (size_t)(str - start);
             char *literal = xcalloc(sizeof(char), len+1);
             memcpy(literal, start, len);
+            // Note: an unescaped string is guaranteed to be no longer than the
+            // escaped string, so this is safe to do inplace.
             len = unescape_string(literal, literal, len);
 
             op->op = VM_STRING;
@@ -529,6 +531,8 @@ vm_op_t *bp_stringpattern(file_t *f, const char *str)
         size_t len = (size_t)(str - start);
         char *literal = xcalloc(sizeof(char), len+1);
         memcpy(literal, start, len);
+        // Note: an unescaped string is guaranteed to be no longer than the
+        // escaped string, so this is safe to do inplace.
         len = unescape_string(literal, literal, len);
         strop->len = (ssize_t)len;
         strop->args.s = literal;
