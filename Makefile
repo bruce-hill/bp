@@ -12,7 +12,7 @@ OBJFILES=$(CFILES:.c=.o)
 
 all: $(NAME)
 
-.c.o:
+%.o: %.c %.h types.h
 	$(CC) -c $(CFLAGS) $(CWARN) $(G) $(O) -o $@ $<
 
 $(NAME): $(OBJFILES) $(NAME).c
