@@ -42,7 +42,7 @@ static void populate_lines(file_t *f)
 //
 // Read an entire file into memory.
 //
-file_t *load_file(const char *filename)
+file_t *load_file(file_t **files, const char *filename)
 {
     if (filename == NULL) filename = "-";
     int fd = streq(filename, "-") ? STDIN_FILENO : open(filename, O_RDONLY);
@@ -79,20 +79,28 @@ file_t *load_file(const char *filename)
   finished_loading:
     f->end = &f->contents[length];
     populate_lines(f);
+    if (files != NULL) {
+        f->next = *files;
+        *files = f;
+    }
     return f;
 }
 
 //
 // Create a virtual file from a string.
 //
-file_t *spoof_file(const char *filename, char *text)
+file_t *spoof_file(file_t **files, const char *filename, char *text)
 {
     if (filename == NULL) filename = "";
     file_t *f = new(file_t);
     f->filename = strdup(filename);
-    f->contents = text;
+    f->contents = strdup(text);
     f->end = &f->contents[strlen(text)];
     populate_lines(f);
+    if (files != NULL) {
+        f->next = *files;
+        *files = f;
+    }
     return f;
 }
 
@@ -122,24 +130,23 @@ void destroy_file(file_t **f)
 {
     if ((*f)->filename) {
         xfree(&((*f)->filename));
-        (*f)->filename = NULL;
     }
 
     if ((*f)->lines) {
         xfree(&((*f)->lines));
-        (*f)->lines = NULL;
     }
 
     if ((*f)->contents) {
         if ((*f)->mmapped) {
             munmap((*f)->contents, (size_t)((*f)->end - (*f)->contents));
+            (*f)->contents = NULL;
         } else {
             xfree(&((*f)->contents));
         }
-        (*f)->contents = NULL;
     }
 
     while ((*f)->ops) {
+        destroy_op(&(*f)->ops->op);
         allocated_op_t *tofree = (*f)->ops;
         (*f)->ops = tofree->next;
         memset(tofree, 'A', sizeof(allocated_op_t)); // Sentinel

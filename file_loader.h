@@ -8,7 +8,8 @@
 
 struct allocated_op_s; // declared in types.h
 
-typedef struct {
+typedef struct file_s {
+    struct file_s *next;
     const char *filename;
     char *contents, **lines, *end;
     size_t nlines;
@@ -16,9 +17,9 @@ typedef struct {
     unsigned int mmapped:1;
 } file_t;
 
-file_t *load_file(const char *filename);
-__attribute__((nonnull(2), returns_nonnull))
-file_t *spoof_file(const char *filename, char *text);
+file_t *load_file(file_t **files, const char *filename);
+__attribute__((nonnull(3), returns_nonnull))
+file_t *spoof_file(file_t **files, const char *filename, char *text);
 __attribute__((nonnull))
 void intern_file(file_t *f);
 __attribute__((nonnull))

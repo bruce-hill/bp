@@ -12,24 +12,24 @@
 #include "utils.h"
 #include "vm.h"
 
-typedef struct recursive_ref_s {
-    const vm_op_t *op;
-    const char *pos;
-    struct recursive_ref_s *prev;
-    int hit;
-    match_t *result;
-} recursive_ref_t;
-
 __attribute__((nonnull, pure))
 static inline const char *next_char(file_t *f, const char *str);
 __attribute__((nonnull))
 static const char *match_backref(const char *str, vm_op_t *op, match_t *cap, unsigned int flags);
 __attribute__((hot, nonnull(2,3,4)))
-static match_t *_match(def_t *defs, file_t *f, const char *str, vm_op_t *op, unsigned int flags, recursive_ref_t *rec);
+static match_t *_match(def_t *defs, file_t *f, const char *str, vm_op_t *op, unsigned int flags);
 __attribute__((nonnull))
 static match_t *get_capture_by_num(match_t *m, int *n);
 __attribute__((nonnull, pure))
 static match_t *get_capture_by_name(match_t *m, const char *name);
+
+static inline void set_owner(match_t *m, match_t **owner)
+{
+    check(owner != &m->child, "Circular ownership");
+    check(owner != &m->nextsibling, "Circular ownership");
+    *owner = m;
+    ++m->refcount;
+}
 
 //
 // Return the location of the next character or UTF8 codepoint.
@@ -56,9 +56,14 @@ static inline const char *next_char(file_t *f, const char *str)
 //
 void destroy_match(match_t **m)
 {
-    if (!*m) return;
+    if (*m == NULL) return;
+    if (--(*m)->refcount > 0) {
+        *m = NULL;
+        return;
+    }
     destroy_match(&((*m)->child));
     destroy_match(&((*m)->nextsibling));
+    free(*m);
     *m = NULL;
 }
 
@@ -126,9 +131,18 @@ static const char *match_backref(const char *str, vm_op_t *op, match_t *cap, uns
 // a match struct, or NULL if no match is found.
 // The returned value should be free()'d to avoid memory leaking.
 //
-static match_t *_match(def_t *defs, file_t *f, const char *str, vm_op_t *op, unsigned int flags, recursive_ref_t *rec)
+static match_t *_match(def_t *defs, file_t *f, const char *str, vm_op_t *op, unsigned int flags)
 {
     switch (op->type) {
+        case VM_CANNED: {
+            if (str == op->args.canned.at) {
+                ++op->args.canned.visits;
+                // TODO: deep copy?
+                return op->args.canned.match;
+            } else {
+                return _match(defs, f, str, op->args.canned.fallback, flags);
+            }
+        }
         case VM_ANYCHAR: {
             if (str >= f->end || *str == '\n')
                 return NULL;
@@ -141,7 +155,7 @@ static match_t *_match(def_t *defs, file_t *f, const char *str, vm_op_t *op, uns
         case VM_STRING: {
             if (&str[op->len] > f->end) return NULL;
             if ((flags & BP_IGNORECASE) ? memicmp(str, op->args.s, (size_t)op->len) != 0
-                                          : memcmp(str, op->args.s, (size_t)op->len) != 0)
+                                        : memcmp(str, op->args.s, (size_t)op->len) != 0)
                 return NULL;
             match_t *m = new(match_t);
             m->op = op;
@@ -160,7 +174,7 @@ static match_t *_match(def_t *defs, file_t *f, const char *str, vm_op_t *op, uns
             return m;
         }
         case VM_NOT: {
-            match_t *m = _match(defs, f, str, op->args.pat, flags, rec);
+            match_t *m = _match(defs, f, str, op->args.pat, flags);
             if (m != NULL) {
                 destroy_match(&m);
                 return NULL;
@@ -175,43 +189,45 @@ static match_t *_match(def_t *defs, file_t *f, const char *str, vm_op_t *op, uns
             match_t *m = new(match_t);
             m->start = str;
             m->op = op;
-            if (!op->args.multiple.first && !op->args.multiple.second) {
+
+            vm_op_t *pat = op->args.multiple.first, *skip = op->args.multiple.second;
+            if (!pat && !skip) {
                 while (str < f->end && *str != '\n') ++str;
-            } else {
-                match_t **dest = &m->child;
-                for (const char *prev = NULL; prev < str; ) {
-                    prev = str;
-                    if (op->args.multiple.first) {
-                        match_t *p = _match(defs, f, str, op->args.multiple.first, flags, rec);
-                        if (p) {
-                            *dest = p;
-                            m->end = p->end;
-                            return m;
-                        }
-                    } else if (str == f->end) {
-                        m->end = str;
+                m->end = str;
+                return m;
+            }
+
+            match_t **dest = &m->child;
+            for (const char *prev = NULL; prev < str; ) {
+                prev = str;
+                if (pat) {
+                    match_t *p = _match(defs, f, str, pat, flags);
+                    if (p != NULL) {
+                        set_owner(p, dest);
+                        m->end = p->end;
                         return m;
                     }
-                    if (op->args.multiple.second) {
-                        match_t *p = _match(defs, f, str, op->args.multiple.second, flags, rec);
-                        if (p) {
-                            *dest = p;
-                            dest = &p->nextsibling;
-                            str = p->end;
-                            continue;
-                        }
-                    }
-                    // This isn't in the for() structure because there needs to
-                    // be at least once chance to match the pattern, even if
-                    // we're at the end of the string already (e.g. "..$").
-                    if (str < f->end && *str != '\n')
-                        str = next_char(f, str);
+                } else if (str == f->end) {
+                    m->end = str;
+                    return m;
                 }
-                destroy_match(&m);
-                return NULL;
+                if (skip) {
+                    match_t *s = _match(defs, f, str, skip, flags);
+                    if (s != NULL) {
+                        set_owner(s, dest);
+                        dest = &s->nextsibling;
+                        str = s->end;
+                        continue;
+                    }
+                }
+                // This isn't in the for() structure because there needs to
+                // be at least once chance to match the pattern, even if
+                // we're at the end of the string already (e.g. "..$").
+                if (str < f->end && *str != '\n')
+                    str = next_char(f, str);
             }
-            m->end = str;
-            return m;
+            destroy_match(&m);
+            return NULL;
         }
         case VM_REPEAT: {
             match_t *m = new(match_t);
@@ -227,11 +243,11 @@ static match_t *_match(def_t *defs, file_t *f, const char *str, vm_op_t *op, uns
                 // Separator
                 match_t *sep = NULL;
                 if (op->args.repetitions.sep != NULL && reps > 0) {
-                    sep = _match(defs, f, str, op->args.repetitions.sep, flags, rec);
+                    sep = _match(defs, f, str, op->args.repetitions.sep, flags);
                     if (sep == NULL) break;
                     str = sep->end;
                 }
-                match_t *p = _match(defs, f, str, op->args.repetitions.repeat_pat, flags, rec);
+                match_t *p = _match(defs, f, str, op->args.repetitions.repeat_pat, flags);
                 if (p == NULL) {
                     str = start;
                     destroy_match(&sep);
@@ -253,10 +269,10 @@ static match_t *_match(def_t *defs, file_t *f, const char *str, vm_op_t *op, uns
                     break;
                 }
                 if (sep) {
-                    *dest = sep;
+                    set_owner(sep, dest);
                     dest = &sep->nextsibling;
                 }
-                *dest = p;
+                set_owner(p, dest);
                 dest = &p->nextsibling;
                 str = p->end;
             }
@@ -272,58 +288,58 @@ static match_t *_match(def_t *defs, file_t *f, const char *str, vm_op_t *op, uns
             ssize_t backtrack = op->args.pat->len;
             check(backtrack != -1, "'<' is only allowed for fixed-length operations");
             if (str - backtrack < f->contents) return NULL;
-            match_t *before = _match(defs, f, str - backtrack, op->args.pat, flags, rec);
+            match_t *before = _match(defs, f, str - backtrack, op->args.pat, flags);
             if (before == NULL) return NULL;
             match_t *m = new(match_t);
             m->start = str;
             m->end = str;
             m->op = op;
-            m->child = before;
+            set_owner(before, &m->child);
             return m;
         }
         case VM_BEFORE: {
-            match_t *after = _match(defs, f, str, op->args.pat, flags, rec);
+            match_t *after = _match(defs, f, str, op->args.pat, flags);
             if (after == NULL) return NULL;
             match_t *m = new(match_t);
             m->start = str;
             m->end = str;
             m->op = op;
-            m->child = after;
+            set_owner(after, &m->child);
             return m;
         }
         case VM_CAPTURE: {
-            match_t *p = _match(defs, f, str, op->args.pat, flags, rec);
+            match_t *p = _match(defs, f, str, op->args.pat, flags);
             if (p == NULL) return NULL;
             match_t *m = new(match_t);
             m->start = str;
             m->end = p->end;
             m->op = op;
-            m->child = p;
+            set_owner(p, &m->child);
             return m;
         }
         case VM_HIDE: {
-            match_t *p = _match(defs, f, str, op->args.pat, flags, rec);
+            match_t *p = _match(defs, f, str, op->args.pat, flags);
             if (p == NULL) return NULL;
             match_t *m = new(match_t);
             m->start = str;
             m->end = p->end;
             m->op = op;
-            m->child = p;
+            set_owner(p, &m->child);
             return m;
         }
         case VM_OTHERWISE: {
-            match_t *m = _match(defs, f, str, op->args.multiple.first, flags, rec);
-            if (m == NULL) m = _match(defs, f, str, op->args.multiple.second, flags, rec);
+            match_t *m = _match(defs, f, str, op->args.multiple.first, flags);
+            if (m == NULL) m = _match(defs, f, str, op->args.multiple.second, flags);
             return m;
         }
         case VM_CHAIN: {
-            match_t *m1 = _match(defs, f, str, op->args.multiple.first, flags, rec);
+            match_t *m1 = _match(defs, f, str, op->args.multiple.first, flags);
             if (m1 == NULL) return NULL;
 
             match_t *m2;
             { // Push backrefs and run matching, then cleanup
                 def_t *defs2 = with_backrefs(defs, f, m1);
-                m2 = _match(defs2, f, m1->end, op->args.multiple.second, flags, rec);
+                m2 = _match(defs2, f, m1->end, op->args.multiple.second, flags);
                 free_defs(&defs2, defs);
             }
 
@@ -335,12 +351,12 @@ static match_t *_match(def_t *defs, file_t *f, const char *str, vm_op_t *op, uns
             m->start = str;
             m->end = m2->end;
             m->op = op;
-            m->child = m1;
-            m1->nextsibling = m2;
+            set_owner(m1, &m->child);
+            set_owner(m2, &m1->nextsibling);
             return m;
         }
         case VM_EQUAL: case VM_NOT_EQUAL: {
-            match_t *m1 = _match(defs, f, str, op->args.multiple.first, flags, rec);
+            match_t *m1 = _match(defs, f, str, op->args.multiple.first, flags);
             if (m1 == NULL) return NULL;
 
             // <p1>==<p2> matches iff the text of <p1> matches <p2>
@@ -352,19 +368,19 @@ static match_t *_match(def_t *defs, file_t *f, const char *str, vm_op_t *op, uns
                 .nlines=1 + get_line_number(f, m1->end)-get_line_number(f, m1->start),
                 .mmapped=f->mmapped,
             };
-            match_t *m2 = _match(defs, &inner, str, op->args.multiple.second, flags, rec);
+            match_t *m2 = _match(defs, &inner, str, op->args.multiple.second, flags);
             if ((m2 == NULL) == (op->type == VM_EQUAL)) {
                 destroy_match(&m1);
-                destroy_match(&m2);
+                if (m2 != NULL) destroy_match(&m2);
                 return NULL;
             }
             match_t *m = new(match_t);
             m->start = m1->start;
             m->end = m1->end;
             m->op = op;
-            m->child = m1;
+            set_owner(m1, &m->child);
             if (op->type == VM_EQUAL) {
-                m1->nextsibling = m2;
+                set_owner(m2, &m1->nextsibling);
             } else {
                 destroy_match(&m2);
             }
@@ -373,14 +389,14 @@ static match_t *_match(def_t *defs, file_t *f, const char *str, vm_op_t *op, uns
         case VM_REPLACE: {
             match_t *p = NULL;
             if (op->args.replace.pat) {
-                p = _match(defs, f, str, op->args.replace.pat, flags, rec);
+                p = _match(defs, f, str, op->args.replace.pat, flags);
                 if (p == NULL) return NULL;
             }
             match_t *m = new(match_t);
             m->start = str;
             m->op = op;
             if (p) {
-                m->child = p;
+                set_owner(p, &m->child);
                 m->end = p->end;
             } else {
                 m->end = m->start;
@@ -388,41 +404,43 @@ static match_t *_match(def_t *defs, file_t *f, const char *str, vm_op_t *op, uns
             return m;
         }
         case VM_REF: {
-            vm_op_t *r = lookup(defs, op->args.s);
-            check(r != NULL, "Unknown identifier: '%s'", op->args.s);
+            def_t *def = lookup(defs, op->args.s);
+            check(def != NULL, "Unknown identifier: '%s'", op->args.s);
+            vm_op_t *ref = def->op;
 
-            // Prevent infinite left recursion:
-            for (recursive_ref_t *p = rec; p; p = p->prev) {
-                if (p->pos == str && p->op == r) {
-                    ++p->hit;
-                    return p->result;
-                }
-            }
-
-            recursive_ref_t wrap = {
-                .op = r,
-                .pos = str,
-                .prev = rec,
-                .hit = 0,
-                .result = NULL,
+            vm_op_t fail_op = {
+                .type = VM_CANNED,
+                .start = ref->start,
+                .end = ref->end,
+                .len = 0,
+                .args.canned = {
+                    .match = NULL,
+                    .visits = 0,
+                    .at = str,
+                    .fallback = ref,
+                },
             };
-            match_t *best = NULL;
-          left_recursive:;
-            match_t *p = _match(defs, f, str, r, flags, &wrap);
-            if (p == NULL) return best;
-            if (wrap.hit && (best == NULL || p->end > best->end)) {
-                best = p;
-                wrap.hit = 0;
-                wrap.result = p;
-                goto left_recursive;
-            } else if (best == NULL) {
-                best = p;
+            def_t defs2 = {
+                .namelen = def->namelen,
+                .name = def->name,
+                .file = def->file,
+                .op = &fail_op,
+                .next = defs,
+            };
+
+            const char *prev = str;
+            match_t *m = _match(&defs2, f, str, ref, flags);
+            if (m == NULL) return NULL;
+
+            while (fail_op.args.canned.visits > 0 && m->end > prev) {
+                fail_op.args.canned.visits = 0;
+                fail_op.args.canned.match = m;
+                prev = m->end;
+                match_t *m2 = _match(&defs2, f, str, ref, flags);
+                if (m2 == NULL) break;
+                m = m2;
             }
-            match_t *m = new(match_t);
-            m->start = best->start;
-            m->end = best->end;
-            m->op = op;
-            m->child = best;
+
             return m;
         }
         case VM_BACKREF: {
@@ -526,7 +544,26 @@ match_t *get_capture(match_t *m, const char **id)
 //
 match_t *match(def_t *defs, file_t *f, const char *str, vm_op_t *op, unsigned int flags)
 {
-    return _match(defs, f, str, op, flags, NULL);
+    return _match(defs, f, str, op, flags);
+}
+
+// Deallocate memory associated with an op
+void destroy_op(vm_op_t *op)
+{
+    switch (op->type) {
+        case VM_STRING: case VM_REF:
+            xfree(&op->args.s);
+            break;
+        case VM_CAPTURE:
+            if (op->args.capture.name)
+                xfree(&op->args.capture.name);
+            break;
+        case VM_REPLACE:
+            if (op->args.replace.text)
+                xfree(&op->args.replace.text);
+            break;
+        default: break;
+    }
 }
 
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1

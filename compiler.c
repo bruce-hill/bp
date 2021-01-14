@@ -140,7 +140,7 @@ static vm_op_t *chain_together(file_t *f, vm_op_t *first, vm_op_t *second)
 {
     if (first == NULL) return second;
     if (second == NULL) return first;
-    check(first->type != VM_CHAIN, "A chain should not be the first item in a chain.\n");
+    check(first->type != VM_CHAIN, "A chain should not be the first item in a chain.");
     vm_op_t *chain = new_op(f, first->start, VM_CHAIN);
     chain->start = first->start;
     if (first->len >= 0 && second->len >= 0)
@@ -160,7 +160,7 @@ vm_op_t *bp_simplepattern(file_t *f, const char *str)
     vm_op_t *op = _bp_simplepattern(f, str);
     if (op == NULL) return op;
 
-    check(op->end != NULL, "op->end is uninitialized!\n");
+    check(op->end != NULL, "op->end is uninitialized!");
 
     // Expand postfix operators (if any)
     str = after_spaces(op->end);
@@ -516,8 +516,6 @@ vm_op_t *bp_stringpattern(file_t *f, const char *str)
 {
     vm_op_t *ret = NULL;
     while (*str) {
-        vm_op_t *strop = new_op(f, str, VM_STRING);
-        strop->len = 0;
         char *start = (char*)str;
         vm_op_t *interp = NULL;
         for (; *str; str++) {
@@ -553,13 +551,11 @@ vm_op_t *bp_stringpattern(file_t *f, const char *str)
         // Note: an unescaped string is guaranteed to be no longer than the
         // escaped string, so this is safe to do inplace.
         len = unescape_string(literal, literal, len);
-        strop->len = (ssize_t)len;
-        strop->args.s = literal;
-        strop->end = str;
-
-        if (strop->len == 0) {
-            xfree(&strop);
-        } else {
+        if (len > 0) {
+            vm_op_t *strop = new_op(f, str, VM_STRING);
+            strop->len = (ssize_t)len;
+            strop->args.s = literal;
+            strop->end = str;
             ret = chain_together(f, ret, strop);
         }
         if (interp) {

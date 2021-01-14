@@ -16,11 +16,12 @@ static def_t *with_backref(def_t *defs, file_t *f, const char *name, match_t *m)
 //
 // Return a new list of definitions with one added to the front
 //
-def_t *with_def(def_t *defs, file_t *f, const char *name, vm_op_t *op)
+def_t *with_def(def_t *defs, file_t *f, size_t namelen, const char *name, vm_op_t *op)
 {
     def_t *def = new(def_t);
     def->next = defs;
     def->file = f;
+    def->namelen = namelen;
     def->name = name;
     def->op = op;
     return def;
@@ -38,11 +39,11 @@ def_t *load_grammar(def_t *defs, file_t *f)
         const char *name = src;
         src = after_name(name);
         check(src > name, "Invalid name for definition: %s", name);
-        name = strndup(name, (size_t)(src-name));
+        size_t namelen = (size_t)(src - name);
         check(matchchar(&src, ':'), "Expected ':' in definition");
         vm_op_t *op = bp_pattern(f, src);
         if (op == NULL) break;
-        defs = with_def(defs, f, name, op);
+        defs = with_def(defs, f, namelen, name, op);
         src = op->end;
         src = after_spaces(src);
         if (matchchar(&src, ';'))
@@ -58,11 +59,11 @@ def_t *load_grammar(def_t *defs, file_t *f)
 //
 // Look up a backreference or grammar definition by name
 //
-vm_op_t *lookup(def_t *defs, const char *name)
+def_t *lookup(def_t *defs, const char *name)
 {
     for ( ; defs; defs = defs->next) {
-        if (streq(defs->name, name))
-            return defs->op;
+        if (strlen(name) == defs->namelen && strncmp(defs->name, name, defs->namelen) == 0)
+            return defs;
     }
     return NULL;
 }
@@ -76,7 +77,7 @@ static def_t *with_backref(def_t *defs, file_t *f, const char *name, match_t *m)
     op->end = m->end;
     op->len = -1; // TODO: maybe calculate this? (nontrivial because of replacements)
     op->args.backref = m;
-    return with_def(defs, f, name, op);
+    return with_def(defs, f, strlen(name), name, op);
 }
 
 //

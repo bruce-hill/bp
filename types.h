@@ -39,6 +39,7 @@ enum VMOpcode {
     VM_REF,
     VM_BACKREF,
     VM_NODENT,
+    VM_CANNED,
 };
 
 struct match_s; // forward declared to resolve circular struct defs
@@ -74,6 +75,12 @@ typedef struct vm_op_s {
             char *name;
         } capture;
         struct match_s *backref;
+        struct {
+            struct match_s *match;
+            unsigned int visits;
+            const char *at;
+            struct vm_op_s *fallback;
+        } canned;
         struct vm_op_s *pat;
     } args;
 } vm_op_t;
@@ -86,12 +93,14 @@ typedef struct match_s {
     const char *start, *end;
     struct match_s *child, *nextsibling;
     vm_op_t *op;
+    unsigned int refcount;
 } match_t;
 
 //
 // Pattern matching rule definition(s)
 //
 typedef struct def_s {
+    size_t namelen;
     const char *name;
     file_t *file;
     vm_op_t *op;
