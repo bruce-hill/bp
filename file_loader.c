@@ -145,12 +145,10 @@ void destroy_file(file_t **f)
         }
     }
 
-    while ((*f)->ops) {
+    for (allocated_op_t *next; (*f)->ops; (*f)->ops = next) {
+        next = (*f)->ops->next;
         destroy_op(&(*f)->ops->op);
-        allocated_op_t *tofree = (*f)->ops;
-        (*f)->ops = tofree->next;
-        memset(tofree, 'A', sizeof(allocated_op_t)); // Sentinel
-        xfree(&tofree);
+        xfree(&(*f)->ops);
     }
 
     xfree(f);
