@@ -481,7 +481,7 @@ static match_t *_match(def_t *defs, file_t *f, const char *str, vm_op_t *op, uns
         }
         default: {
             fprintf(stderr, "Unknown opcode: %d", op->type);
-            _exit(1);
+            exit(1);
             return NULL;
         }
     }

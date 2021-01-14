@@ -51,7 +51,7 @@ def_t *load_grammar(def_t *defs, file_t *f)
     }
     if (src < f->end) {
         fprint_line(stderr, f, src, NULL, "Invalid BP pattern");
-        _exit(1);
+        exit(1);
     }
     return defs;
 }

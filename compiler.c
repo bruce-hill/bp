@@ -10,7 +10,7 @@
 #include "compiler.h"
 #include "utils.h"
 
-#define file_err(f, ...) do { fprint_line(stderr, f, __VA_ARGS__); _exit(1); } while(0)
+#define file_err(f, ...) do { fprint_line(stderr, f, __VA_ARGS__); exit(1); } while(0)
 
 __attribute__((nonnull))
 static vm_op_t *expand_chain(file_t *f, vm_op_t *first);

@@ -80,7 +80,7 @@ static int process_file(def_t *defs, const char *filename, vm_op_t *pattern, uns
         intern_file(f);
     match_t *m = match(defs, f, f->contents, pattern, flags);
     if (m && print_errors(f, m, print_options) > 0)
-        _exit(1);
+        exit(1);
 
     if (m != NULL && m->end > m->start + 1) {
         success = 1;
