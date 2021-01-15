@@ -36,7 +36,7 @@ static match_t *in_use_matches = NULL;
 __attribute__((nonnull, pure))
 static inline const char *next_char(file_t *f, const char *str);
 __attribute__((nonnull))
-static const char *match_backref(const char *str, vm_op_t *op, match_t *cap, unsigned int ignorecase);
+static const char *match_backref(const char *str, match_t *cap, unsigned int ignorecase);
 __attribute__((nonnull))
 static match_t *get_capture_by_num(match_t *m, int *n);
 __attribute__((nonnull, pure))
@@ -66,9 +66,8 @@ static inline const char *next_char(file_t *f, const char *str)
 // Attempt to match text against a previously captured value.
 // Return the character position after the backref has matched, or NULL if no match has occurred.
 //
-static const char *match_backref(const char *str, vm_op_t *op, match_t *cap, unsigned int ignorecase)
+static const char *match_backref(const char *str, match_t *cap, unsigned int ignorecase)
 {
-    check(op->type == VM_BACKREF, "Attempt to match backref against something that's not a backref");
     if (cap->op->type == VM_REPLACE) {
         const char *text = cap->op->args.replace.text;
         const char *end = &text[cap->op->args.replace.len];
@@ -87,7 +86,7 @@ static const char *match_backref(const char *str, vm_op_t *op, match_t *cap, uns
             ++r;
             match_t *value = get_capture(cap, &r);
             if (value != NULL) {
-                str = match_backref(str, op, value, ignorecase);
+                str = match_backref(str, value, ignorecase);
                 if (str == NULL) return NULL;
             }
         }
@@ -104,7 +103,7 @@ static const char *match_backref(const char *str, vm_op_t *op, match_t *cap, uns
                 prev = child->start;
             }
             if (child->start < prev) continue;
-            str = match_backref(str, op, child, ignorecase);
+            str = match_backref(str, child, ignorecase);
             if (str == NULL) return NULL;
             prev = child->end;
         }
@@ -346,7 +345,10 @@ match_t *match(def_t *defs, file_t *f, const char *str, vm_op_t *op, unsigned in
 
             match_t *m2;
             { // Push backrefs and run matching, then cleanup
-                def_t *defs2 = with_backrefs(defs, f, m1);
+                def_t *defs2 = defs;
+                if (m1->op->type == VM_CAPTURE && m1->op->args.capture.name)
+                    defs2 = with_backref(defs2, f, m1->op->args.capture.name, m1);
+                // def_t *defs2 = with_backrefs(defs, f, m1);
                 m2 = match(defs2, f, m1->end, op->args.multiple.second, ignorecase);
                 free_defs(&defs2, defs);
             }
@@ -462,10 +464,20 @@ match_t *match(def_t *defs, file_t *f, const char *str, vm_op_t *op, unsigned in
                 --m->refcount;
             }
 
-            return m;
+            check(m, "Match should be non-null at this point");
+            // This match wrapper mainly exists for record-keeping purposes and
+            // does not affect correctness. It also helps with visualization of
+            // match results.
+            // OPTIMIZE: remove this if necessary
+            match_t *m2 = new_match();
+            m2->op = op;
+            m2->start = m->start;
+            m2->end = m->end;
+            ADD_OWNER(m2->child, m);
+            return m2;
         }
         case VM_BACKREF: {
-            const char *end = match_backref(str, op, op->args.backref, ignorecase);
+            const char *end = match_backref(str, op->args.backref, ignorecase);
             if (end == NULL) return NULL;
             match_t *m = new_match();
             m->op = op;

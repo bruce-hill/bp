@@ -10,9 +10,6 @@
 #include "grammar.h"
 #include "utils.h"
 
-__attribute__((nonnull(2,3,4), returns_nonnull))
-static def_t *with_backref(def_t *defs, file_t *f, const char *name, match_t *m);
-
 //
 // Return a new list of definitions with one added to the front
 //
@@ -71,27 +68,13 @@ def_t *lookup(def_t *defs, const char *name)
 //
 // Push a backreference onto the backreference stack
 //
-static def_t *with_backref(def_t *defs, file_t *f, const char *name, match_t *m)
+def_t *with_backref(def_t *defs, file_t *f, const char *name, match_t *m)
 {
     vm_op_t *op = new_op(f, m->start, VM_BACKREF);
     op->end = m->end;
     op->len = -1; // TODO: maybe calculate this? (nontrivial because of replacements)
     op->args.backref = m;
     return with_def(defs, f, strlen(name), name, op);
-}
-
-//
-// Push all the backreferences contained in a match onto the backreference stack
-//
-def_t *with_backrefs(def_t *defs, file_t *f, match_t *m)
-{
-    if (m->op->type != VM_REF) {
-        if (m->op->type == VM_CAPTURE && m->op->args.capture.name)
-            defs = with_backref(defs, f, m->op->args.capture.name, m->child);
-        if (m->child) defs = with_backrefs(defs, f, m->child);
-        if (m->nextsibling) defs = with_backrefs(defs, f, m->nextsibling);
-    }
-    return defs;
 }
 
 //
