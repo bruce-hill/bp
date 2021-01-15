@@ -140,7 +140,6 @@ static vm_op_t *chain_together(file_t *f, vm_op_t *first, vm_op_t *second)
 {
     if (first == NULL) return second;
     if (second == NULL) return first;
-    check(first->type != VM_CHAIN, "A chain should not be the first item in a chain.");
     vm_op_t *chain = new_op(f, first->start, VM_CHAIN);
     chain->start = first->start;
     if (first->len >= 0 && second->len >= 0)
