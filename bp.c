@@ -119,9 +119,8 @@ static int process_file(def_t *defs, const char *filename, vm_op_t *pattern, uns
         }
     }
 
-    if (m != NULL)
-        destroy_match(&m);
-
+    recycle_if_unused(&m);
+    check(recycle_all_matches() == 0, "Memory leak: there should no longer be any matches in use at this point.");
     destroy_file(&f);
 
     return success;
@@ -134,11 +133,15 @@ int main(int argc, char *argv[])
     unsigned int flags = 0;
     char *flag = NULL;
     char path[PATH_MAX] = {0};
-    const char *rule = "find-all";
+    const char *mode = "find-all";
 
     def_t *defs = NULL;
 
     file_t *loaded_files = NULL;
+
+    // Define an opcode that is just a reference to the rule `pattern`
+    file_t *pat_file = spoof_file(&loaded_files, "<pattern>", "pattern");
+    vm_op_t *pattern = bp_pattern(pat_file, pat_file->contents);
 
     // Load builtins:
     if (access("/etc/xdg/bp/builtins.bp", R_OK) != -1) {
@@ -176,13 +179,11 @@ int main(int argc, char *argv[])
         } else if (FLAG("--replace") || FLAG("-r")) {
             // TODO: spoof file as sprintf("pattern => '%s'", flag)
             // except that would require handling edge cases like quotation marks etc.
-            file_t *pat_file = spoof_file(&loaded_files, "<pattern>", "pattern");
-            vm_op_t *patref = bp_pattern(pat_file, pat_file->contents);
             file_t *replace_file = spoof_file(&loaded_files, "<replace argument>", flag);
-            vm_op_t *rep = bp_replacement(replace_file, patref, replace_file->contents);
+            vm_op_t *rep = bp_replacement(replace_file, pattern, replace_file->contents);
             check(rep, "Replacement failed to compile: %s", flag);
             defs = with_def(defs, replace_file, strlen("replacement"), "replacement", rep);
-            rule = "replace-all";
+            mode = "replace-all";
         } else if (FLAG("--grammar") || FLAG("-g")) {
             file_t *f = load_file(&loaded_files, flag);
             if (f == NULL) {
@@ -229,7 +230,7 @@ int main(int argc, char *argv[])
             defs = with_def(defs, arg_file, strlen("pattern"), "pattern", p);
             ++npatterns;
         } else if (FLAG("--mode") || FLAG("-m")) {
-            rule = flag;
+            mode = flag;
         } else if (argv[i][0] == '-' && argv[i][1] && argv[i][1] != '-') { // single-char flags
             for (char *c = &argv[i][1]; *c; ++c) {
                 switch (*c) {
@@ -269,16 +270,20 @@ int main(int argc, char *argv[])
         print_options |= PRINT_COLOR | PRINT_LINE_NUMBERS;
     }
 
-    def_t *pattern_def = lookup(defs, rule);
-    check(pattern_def != NULL, "No such rule: '%s'", rule);
-    vm_op_t *pattern = pattern_def->op;
+    // Define an opcode that is just a reference to the overarching mode (e.g. find-all)
+    if (lookup(defs, mode) == NULL) {
+        printf("The mode '%s' is not defined.\n", mode);
+        return 1;
+    }
+    file_t *mode_file = spoof_file(&loaded_files, "<mode>", mode);
+    vm_op_t *mode_op = bp_pattern(mode_file, mode_file->contents);
 
     int found = 0;
     if (flags & BP_JSON) printf("[");
     if (i < argc) {
         // Files pass in as command line args:
         for (int nfiles = 0; i < argc; nfiles++, i++) {
-            found += process_file(defs, argv[i], pattern, flags);
+            found += process_file(defs, argv[i], mode_op, flags);
         }
     } else if (isatty(STDIN_FILENO)) {
         // No files, no piped in input, so use * **/*:
@@ -286,21 +291,27 @@ int main(int argc, char *argv[])
         glob("*", 0, NULL, &globbuf);
         glob("**/*", GLOB_APPEND, NULL, &globbuf);
         for (size_t i = 0; i < globbuf.gl_pathc; i++) {
-            found += process_file(defs, globbuf.gl_pathv[i], pattern, flags);
+            found += process_file(defs, globbuf.gl_pathv[i], mode_op, flags);
         }
         globfree(&globbuf);
     } else {
         // Piped in input:
-        found += process_file(defs, NULL, pattern, flags);
+        found += process_file(defs, NULL, mode_op, flags);
     }
     if (flags & BP_JSON) printf("]\n");
 
+#ifdef FREE_ON_EXIT
+    // This code frees up all residual heap-allocated memory. Since the program
+    // is about to exit, this step is unnecessary. However, it is useful for
+    // tracking down memory leaks.
     free_defs(&defs, NULL);
     while (loaded_files) {
         file_t *next = loaded_files->next;
         destroy_file(&loaded_files);
         loaded_files = next;
     }
+    free_all_matches();
+#endif
 
     return (found > 0) ? 0 : 1;
 }

@@ -4,6 +4,7 @@ PREFIX=/usr/local
 SYSCONFDIR=/etc
 CFLAGS=-std=c99 -Werror -D_XOPEN_SOURCE=700 -D_GNU_SOURCE -D_POSIX_C_SOURCE=200809L
 CWARN=-Wall -Wpedantic -Wextra -Wsign-conversion -Wtype-limits -Wunused-result
+EXTRA_FLAGS=
 G=
 O=-O3
 
@@ -13,10 +14,10 @@ OBJFILES=$(CFILES:.c=.o)
 all: $(NAME)
 
 %.o: %.c %.h types.h
-	$(CC) -c $(CFLAGS) $(CWARN) $(G) $(O) -o $@ $<
+	$(CC) -c $(CFLAGS) $(EXTRA_CFLAGS) $(CWARN) $(G) $(O) -o $@ $<
 
 $(NAME): $(OBJFILES) $(NAME).c
-	$(CC) $(CFLAGS) $(CWARN) $(G) $(O) -o $@ $(OBJFILES) $(NAME).c
+	$(CC) $(CFLAGS) $(EXTRA_CFLAGS) $(CWARN) $(G) $(O) -o $@ $(OBJFILES) $(NAME).c
 
 clean:
 	rm -f $(NAME) $(OBJFILES)

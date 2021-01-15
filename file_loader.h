@@ -19,7 +19,7 @@ typedef struct file_s {
 
 file_t *load_file(file_t **files, const char *filename);
 __attribute__((nonnull(3), returns_nonnull))
-file_t *spoof_file(file_t **files, const char *filename, char *text);
+file_t *spoof_file(file_t **files, const char *filename, const char *text);
 __attribute__((nonnull))
 void intern_file(file_t *f);
 __attribute__((nonnull))

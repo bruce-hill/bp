@@ -39,7 +39,7 @@ enum VMOpcode {
     VM_REF,
     VM_BACKREF,
     VM_NODENT,
-    VM_CANNED,
+    VM_LEFTRECURSION,
 };
 
 struct match_s; // forward declared to resolve circular struct defs
@@ -80,7 +80,7 @@ typedef struct vm_op_s {
             unsigned int visits;
             const char *at;
             struct vm_op_s *fallback;
-        } canned;
+        } leftrec;
         struct vm_op_s *pat;
     } args;
 } vm_op_t;
@@ -93,7 +93,9 @@ typedef struct match_s {
     const char *start, *end;
     struct match_s *child, *nextsibling;
     vm_op_t *op;
-    unsigned int refcount;
+    // Intrusive linked list nodes for garbage collection:
+    struct match_s **atme, *next;
+    int refcount;
 } match_t;
 
 //

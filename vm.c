@@ -12,24 +12,30 @@
 #include "utils.h"
 #include "vm.h"
 
+// Linked list operations:
+#define LL_PREPEND(head, node) do { (node)->atme = &(head); (node)->next = head; if (head) (head)->atme = &(node)->next; head = node; } while(0)
+#define LL_REMOVE(node) do { *(node)->atme = (node)->next; if ((node)->next) (node)->next->atme = (node)->atme; } while(0)
+
+// Refcounting ownership-setting macros:
+#define ADD_OWNER(owner, m) do { owner = m; ++(m)->refcount; } while(0)
+#define REMOVE_OWNERSHIP(owner) do { if (owner) { --(owner)->refcount; recycle_if_unused(&(owner)); owner = NULL; } } while(0)
+
+// New match objects are either recycled from unused match objects or allocated
+// from the heap. While it is in use, the match object is stored in the
+// `in_use_matches` linked list. Once it is no longer needed, it is moved to
+// the `unused_matches` linked list so it can be reused without the need for
+// additional calls to malloc/free. Thus, it is an invariant that every match
+// object is in one of these two lists:
+static match_t *in_use_matches = NULL, *unused_matches = NULL;
+
 __attribute__((nonnull, pure))
 static inline const char *next_char(file_t *f, const char *str);
 __attribute__((nonnull))
 static const char *match_backref(const char *str, vm_op_t *op, match_t *cap, unsigned int flags);
-__attribute__((hot, nonnull(2,3,4)))
-static match_t *_match(def_t *defs, file_t *f, const char *str, vm_op_t *op, unsigned int flags);
 __attribute__((nonnull))
 static match_t *get_capture_by_num(match_t *m, int *n);
 __attribute__((nonnull, pure))
 static match_t *get_capture_by_name(match_t *m, const char *name);
-
-static inline void set_owner(match_t *m, match_t **owner)
-{
-    check(owner != &m->child, "Circular ownership");
-    check(owner != &m->nextsibling, "Circular ownership");
-    *owner = m;
-    ++m->refcount;
-}
 
 //
 // Return the location of the next character or UTF8 codepoint.
@@ -49,22 +55,6 @@ static inline const char *next_char(file_t *f, const char *str)
     if (c > '\xEF' && __builtin_expect(str < f->end && !!(*str & 0x80), 1))
         ++str;
     return str;
-}
-
-//
-// Recursively deallocate a match object and set to NULL
-//
-void destroy_match(match_t **m)
-{
-    if (*m == NULL) return;
-    if (--(*m)->refcount > 0) {
-        *m = NULL;
-        return;
-    }
-    destroy_match(&((*m)->child));
-    destroy_match(&((*m)->nextsibling));
-    free(*m);
-    *m = NULL;
 }
 
 //
@@ -131,22 +121,26 @@ static const char *match_backref(const char *str, vm_op_t *op, match_t *cap, uns
 // a match struct, or NULL if no match is found.
 // The returned value should be free()'d to avoid memory leaking.
 //
-static match_t *_match(def_t *defs, file_t *f, const char *str, vm_op_t *op, unsigned int flags)
+match_t *match(def_t *defs, file_t *f, const char *str, vm_op_t *op, unsigned int flags)
 {
     switch (op->type) {
-        case VM_CANNED: {
-            if (str == op->args.canned.at) {
-                ++op->args.canned.visits;
-                // TODO: deep copy?
-                return op->args.canned.match;
+        case VM_LEFTRECURSION: {
+            // Left recursion occurs when a pattern directly or indirectly
+            // invokes itself at the same position in the text. It's handled as
+            // a special case, but if a pattern invokes itself at a later
+            // point, it can be handled with normal recursion.
+            // See: left-recursion.md for more details.
+            if (str == op->args.leftrec.at) {
+                ++op->args.leftrec.visits;
+                return op->args.leftrec.match;
             } else {
-                return _match(defs, f, str, op->args.canned.fallback, flags);
+                return match(defs, f, str, op->args.leftrec.fallback, flags);
             }
         }
         case VM_ANYCHAR: {
             if (str >= f->end || *str == '\n')
                 return NULL;
-            match_t *m = new(match_t);
+            match_t *m = new_match();
             m->op = op;
             m->start = str;
             m->end = next_char(f, str);
@@ -157,7 +151,7 @@ static match_t *_match(def_t *defs, file_t *f, const char *str, vm_op_t *op, uns
             if ((flags & BP_IGNORECASE) ? memicmp(str, op->args.s, (size_t)op->len) != 0
                                         : memcmp(str, op->args.s, (size_t)op->len) != 0)
                 return NULL;
-            match_t *m = new(match_t);
+            match_t *m = new_match();
             m->op = op;
             m->start = str;
             m->end = str + op->len;
@@ -167,26 +161,26 @@ static match_t *_match(def_t *defs, file_t *f, const char *str, vm_op_t *op, uns
             if (str >= f->end) return NULL;
             if ((unsigned char)*str < op->args.range.low || (unsigned char)*str > op->args.range.high)
                 return NULL;
-            match_t *m = new(match_t);
+            match_t *m = new_match();
             m->op = op;
             m->start = str;
             m->end = str + 1;
             return m;
         }
         case VM_NOT: {
-            match_t *m = _match(defs, f, str, op->args.pat, flags);
+            match_t *m = match(defs, f, str, op->args.pat, flags);
             if (m != NULL) {
-                destroy_match(&m);
+                recycle_if_unused(&m);
                 return NULL;
             }
-            m = new(match_t);
+            m = new_match();
             m->op = op;
             m->start = str;
             m->end = str;
             return m;
         }
         case VM_UPTO_AND: {
-            match_t *m = new(match_t);
+            match_t *m = new_match();
             m->start = str;
             m->op = op;
 
@@ -201,9 +195,9 @@ static match_t *_match(def_t *defs, file_t *f, const char *str, vm_op_t *op, uns
             for (const char *prev = NULL; prev < str; ) {
                 prev = str;
                 if (pat) {
-                    match_t *p = _match(defs, f, str, pat, flags);
+                    match_t *p = match(defs, f, str, pat, flags);
                     if (p != NULL) {
-                        set_owner(p, dest);
+                        ADD_OWNER(*dest, p);
                         m->end = p->end;
                         return m;
                     }
@@ -212,9 +206,9 @@ static match_t *_match(def_t *defs, file_t *f, const char *str, vm_op_t *op, uns
                     return m;
                 }
                 if (skip) {
-                    match_t *s = _match(defs, f, str, skip, flags);
+                    match_t *s = match(defs, f, str, skip, flags);
                     if (s != NULL) {
-                        set_owner(s, dest);
+                        ADD_OWNER(*dest, s);
                         dest = &s->nextsibling;
                         str = s->end;
                         continue;
@@ -226,11 +220,11 @@ static match_t *_match(def_t *defs, file_t *f, const char *str, vm_op_t *op, uns
                 if (str < f->end && *str != '\n')
                     str = next_char(f, str);
             }
-            destroy_match(&m);
+            recycle_if_unused(&m);
             return NULL;
         }
         case VM_REPEAT: {
-            match_t *m = new(match_t);
+            match_t *m = new_match();
             m->start = str;
             m->end = str;
             m->op = op;
@@ -243,14 +237,14 @@ static match_t *_match(def_t *defs, file_t *f, const char *str, vm_op_t *op, uns
                 // Separator
                 match_t *sep = NULL;
                 if (op->args.repetitions.sep != NULL && reps > 0) {
-                    sep = _match(defs, f, str, op->args.repetitions.sep, flags);
+                    sep = match(defs, f, str, op->args.repetitions.sep, flags);
                     if (sep == NULL) break;
                     str = sep->end;
                 }
-                match_t *p = _match(defs, f, str, op->args.repetitions.repeat_pat, flags);
+                match_t *p = match(defs, f, str, op->args.repetitions.repeat_pat, flags);
                 if (p == NULL) {
                     str = start;
-                    destroy_match(&sep);
+                    recycle_if_unused(&sep);
                     break;
                 }
                 if (p->end == start && reps > 0) {
@@ -260,8 +254,8 @@ static match_t *_match(def_t *defs, file_t *f, const char *str, vm_op_t *op, uns
                     // loop either. We know that this will continue to loop
                     // until reps==max, so let's just cut to the chase instead
                     // of looping infinitely.
-                    destroy_match(&sep);
-                    destroy_match(&p);
+                    recycle_if_unused(&sep);
+                    recycle_if_unused(&p);
                     if (op->args.repetitions.max == -1)
                         reps = ~(size_t)0;
                     else
@@ -269,16 +263,16 @@ static match_t *_match(def_t *defs, file_t *f, const char *str, vm_op_t *op, uns
                     break;
                 }
                 if (sep) {
-                    set_owner(sep, dest);
+                    ADD_OWNER(*dest, sep);
                     dest = &sep->nextsibling;
                 }
-                set_owner(p, dest);
+                ADD_OWNER(*dest, p);
                 dest = &p->nextsibling;
                 str = p->end;
             }
 
             if (reps < (size_t)op->args.repetitions.min) {
-                destroy_match(&m);
+                recycle_if_unused(&m);
                 return NULL;
             }
             m->end = str;
@@ -288,75 +282,75 @@ static match_t *_match(def_t *defs, file_t *f, const char *str, vm_op_t *op, uns
             ssize_t backtrack = op->args.pat->len;
             check(backtrack != -1, "'<' is only allowed for fixed-length operations");
             if (str - backtrack < f->contents) return NULL;
-            match_t *before = _match(defs, f, str - backtrack, op->args.pat, flags);
+            match_t *before = match(defs, f, str - backtrack, op->args.pat, flags);
             if (before == NULL) return NULL;
-            match_t *m = new(match_t);
+            match_t *m = new_match();
             m->start = str;
             m->end = str;
             m->op = op;
-            set_owner(before, &m->child);
+            ADD_OWNER(m->child, before);
             return m;
         }
         case VM_BEFORE: {
-            match_t *after = _match(defs, f, str, op->args.pat, flags);
+            match_t *after = match(defs, f, str, op->args.pat, flags);
             if (after == NULL) return NULL;
-            match_t *m = new(match_t);
+            match_t *m = new_match();
             m->start = str;
             m->end = str;
             m->op = op;
-            set_owner(after, &m->child);
+            ADD_OWNER(m->child, after);
             return m;
         }
         case VM_CAPTURE: {
-            match_t *p = _match(defs, f, str, op->args.pat, flags);
+            match_t *p = match(defs, f, str, op->args.pat, flags);
             if (p == NULL) return NULL;
-            match_t *m = new(match_t);
+            match_t *m = new_match();
             m->start = str;
             m->end = p->end;
             m->op = op;
-            set_owner(p, &m->child);
+            ADD_OWNER(m->child, p);
             return m;
         }
         case VM_HIDE: {
-            match_t *p = _match(defs, f, str, op->args.pat, flags);
+            match_t *p = match(defs, f, str, op->args.pat, flags);
             if (p == NULL) return NULL;
-            match_t *m = new(match_t);
+            match_t *m = new_match();
             m->start = str;
             m->end = p->end;
             m->op = op;
-            set_owner(p, &m->child);
+            ADD_OWNER(m->child, p);
             return m;
         }
         case VM_OTHERWISE: {
-            match_t *m = _match(defs, f, str, op->args.multiple.first, flags);
-            if (m == NULL) m = _match(defs, f, str, op->args.multiple.second, flags);
+            match_t *m = match(defs, f, str, op->args.multiple.first, flags);
+            if (m == NULL) m = match(defs, f, str, op->args.multiple.second, flags);
             return m;
         }
         case VM_CHAIN: {
-            match_t *m1 = _match(defs, f, str, op->args.multiple.first, flags);
+            match_t *m1 = match(defs, f, str, op->args.multiple.first, flags);
             if (m1 == NULL) return NULL;
 
             match_t *m2;
             { // Push backrefs and run matching, then cleanup
                 def_t *defs2 = with_backrefs(defs, f, m1);
-                m2 = _match(defs2, f, m1->end, op->args.multiple.second, flags);
+                m2 = match(defs2, f, m1->end, op->args.multiple.second, flags);
                 free_defs(&defs2, defs);
             }
 
             if (m2 == NULL) {
-                destroy_match(&m1);
+                recycle_if_unused(&m1);
                 return NULL;
             }
-            match_t *m = new(match_t);
+            match_t *m = new_match();
             m->start = str;
             m->end = m2->end;
             m->op = op;
-            set_owner(m1, &m->child);
-            set_owner(m2, &m1->nextsibling);
+            ADD_OWNER(m->child, m1);
+            ADD_OWNER(m1->nextsibling, m2);
             return m;
         }
         case VM_EQUAL: case VM_NOT_EQUAL: {
-            match_t *m1 = _match(defs, f, str, op->args.multiple.first, flags);
+            match_t *m1 = match(defs, f, str, op->args.multiple.first, flags);
             if (m1 == NULL) return NULL;
 
             // <p1>==<p2> matches iff the text of <p1> matches <p2>
@@ -368,35 +362,35 @@ static match_t *_match(def_t *defs, file_t *f, const char *str, vm_op_t *op, uns
                 .nlines=1 + get_line_number(f, m1->end)-get_line_number(f, m1->start),
                 .mmapped=f->mmapped,
             };
-            match_t *m2 = _match(defs, &inner, str, op->args.multiple.second, flags);
+            match_t *m2 = match(defs, &inner, str, op->args.multiple.second, flags);
             if ((m2 == NULL) == (op->type == VM_EQUAL)) {
-                destroy_match(&m1);
-                if (m2 != NULL) destroy_match(&m2);
+                recycle_if_unused(&m1);
+                if (m2 != NULL) recycle_if_unused(&m2);
                 return NULL;
             }
-            match_t *m = new(match_t);
+            match_t *m = new_match();
             m->start = m1->start;
             m->end = m1->end;
             m->op = op;
-            set_owner(m1, &m->child);
+            ADD_OWNER(m->child, m1);
             if (op->type == VM_EQUAL) {
-                set_owner(m2, &m1->nextsibling);
+                ADD_OWNER(m1->nextsibling, m2);
             } else {
-                destroy_match(&m2);
+                recycle_if_unused(&m2);
             }
             return m;
         }
         case VM_REPLACE: {
             match_t *p = NULL;
             if (op->args.replace.pat) {
-                p = _match(defs, f, str, op->args.replace.pat, flags);
+                p = match(defs, f, str, op->args.replace.pat, flags);
                 if (p == NULL) return NULL;
             }
-            match_t *m = new(match_t);
+            match_t *m = new_match();
             m->start = str;
             m->op = op;
             if (p) {
-                set_owner(p, &m->child);
+                ADD_OWNER(m->child, p);
                 m->end = p->end;
             } else {
                 m->end = m->start;
@@ -408,12 +402,12 @@ static match_t *_match(def_t *defs, file_t *f, const char *str, vm_op_t *op, uns
             check(def != NULL, "Unknown identifier: '%s'", op->args.s);
             vm_op_t *ref = def->op;
 
-            vm_op_t fail_op = {
-                .type = VM_CANNED,
+            vm_op_t rec_op = {
+                .type = VM_LEFTRECURSION,
                 .start = ref->start,
                 .end = ref->end,
                 .len = 0,
-                .args.canned = {
+                .args.leftrec = {
                     .match = NULL,
                     .visits = 0,
                     .at = str,
@@ -424,21 +418,34 @@ static match_t *_match(def_t *defs, file_t *f, const char *str, vm_op_t *op, uns
                 .namelen = def->namelen,
                 .name = def->name,
                 .file = def->file,
-                .op = &fail_op,
+                .op = &rec_op,
                 .next = defs,
             };
 
             const char *prev = str;
-            match_t *m = _match(&defs2, f, str, ref, flags);
+            match_t *m = match(&defs2, f, str, ref, flags);
             if (m == NULL) return NULL;
 
-            while (fail_op.args.canned.visits > 0 && m->end > prev) {
-                fail_op.args.canned.visits = 0;
-                fail_op.args.canned.match = m;
+            while (rec_op.args.leftrec.visits > 0) {
+                rec_op.args.leftrec.visits = 0;
+                REMOVE_OWNERSHIP(rec_op.args.leftrec.match);
+                ADD_OWNER(rec_op.args.leftrec.match, m);
                 prev = m->end;
-                match_t *m2 = _match(&defs2, f, str, ref, flags);
+                match_t *m2 = match(&defs2, f, str, ref, flags);
                 if (m2 == NULL) break;
+                if (m2->end <= prev) {
+                    recycle_if_unused(&m2);
+                    break;
+                }
                 m = m2;
+            }
+
+            if (rec_op.args.leftrec.match) {
+                // Ensure that `m` isn't garbage collected right now, but do
+                // clean up the recursive match result if it's not needed.
+                ++m->refcount;
+                REMOVE_OWNERSHIP(rec_op.args.leftrec.match);
+                --m->refcount;
             }
 
             return m;
@@ -446,7 +453,7 @@ static match_t *_match(def_t *defs, file_t *f, const char *str, vm_op_t *op, uns
         case VM_BACKREF: {
             const char *end = match_backref(str, op, op->args.backref, flags);
             if (end == NULL) return NULL;
-            match_t *m = new(match_t);
+            match_t *m = new_match();
             m->op = op;
             m->start = str;
             m->end = end;
@@ -473,7 +480,7 @@ static match_t *_match(def_t *defs, file_t *f, const char *str, vm_op_t *op, uns
                 if (str[i] != denter || &str[i] >= f->end) return NULL;
             }
 
-            match_t *m = new(match_t);
+            match_t *m = new_match();
             m->start = start;
             m->end = &str[dents];
             m->op = op;
@@ -540,14 +547,79 @@ match_t *get_capture(match_t *m, const char **id)
 }
 
 //
-// Wrapper function for _match() to kickstart the recursion info.
+// Return a match object which can be used (may be allocated or recycled).
 //
-match_t *match(def_t *defs, file_t *f, const char *str, vm_op_t *op, unsigned int flags)
+match_t *new_match(void)
 {
-    return _match(defs, f, str, op, flags);
+    match_t *m;
+    if (unused_matches) {
+        m = unused_matches;
+        LL_REMOVE(m);
+        memset(m, 0, sizeof(match_t));
+    } else {
+        m = new(match_t);
+    }
+    // Keep track of the object:
+    LL_PREPEND(in_use_matches, m);
+    return m;
 }
 
+//
+// If the given match is not currently a child member of another match (or
+// otherwise reserved) then put it back in the pool of unused match objects.
+//
+void recycle_if_unused(match_t **at_m)
+{
+    match_t *m = *at_m;
+    if (m == NULL) return;
+    if (m->refcount > 0) {
+        *at_m = NULL;
+        return;
+    }
+
+    REMOVE_OWNERSHIP(m->child);
+    REMOVE_OWNERSHIP(m->nextsibling);
+
+    LL_REMOVE(m);
+    memset(m, 0, sizeof(match_t));
+    LL_PREPEND(unused_matches, m);
+    *at_m = NULL;
+}
+
+//
+// Force all match objects into the pool of unused match objects.
+//
+size_t recycle_all_matches(void)
+{
+    size_t count = 0;
+    while (in_use_matches) {
+        match_t *m = in_use_matches;
+        LL_REMOVE(m);
+        LL_PREPEND(unused_matches, m);
+        ++count;
+    }
+    return count;
+}
+
+//
+// Free all match objects in memory.
+//
+size_t free_all_matches(void)
+{
+    size_t count = 0;
+    recycle_all_matches();
+    while (unused_matches) {
+        match_t *m = unused_matches;
+        LL_REMOVE(m);
+        free(m);
+        ++count;
+    }
+    return count;
+}
+
+//
 // Deallocate memory associated with an op
+//
 void destroy_op(vm_op_t *op)
 {
     switch (op->type) {

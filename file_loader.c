@@ -89,7 +89,7 @@ file_t *load_file(file_t **files, const char *filename)
 //
 // Create a virtual file from a string.
 //
-file_t *spoof_file(file_t **files, const char *filename, char *text)
+file_t *spoof_file(file_t **files, const char *filename, const char *text)
 {
     if (filename == NULL) filename = "";
     file_t *f = new(file_t);
