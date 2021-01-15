@@ -80,7 +80,7 @@ file_t *load_file(file_t **files, const char *fmt, ...)
         if (length >= capacity)
             f->contents = xrealloc(f->contents, sizeof(char)*(capacity *= 2) + 1);
     }
-    close(fd);
+    if (fd != STDIN_FILENO) close(fd);
 
   finished_loading:
     f->end = &f->contents[length];
