@@ -7,14 +7,14 @@
 #include "types.h"
 
 __attribute__((nonnull))
-static int _json_match(const char *text, match_t *m, int comma, int verbose);
+static int _json_match(const char *text, match_t *m, int comma, unsigned int verbose);
 
 //
 // Helper function for json_match().
 // `comma` is used to track whether a comma will need to be printed before the
 // next object or not.
 //
-static int _json_match(const char *text, match_t *m, int comma, int verbose)
+static int _json_match(const char *text, match_t *m, int comma, unsigned int verbose)
 {
     if (!verbose) {
         if (m->op->type != VM_REF) {
@@ -49,7 +49,7 @@ static int _json_match(const char *text, match_t *m, int comma, int verbose)
 //
 // Print a match object as a JSON object.
 //
-void json_match(const char *text, match_t *m, int verbose)
+void json_match(const char *text, match_t *m, unsigned int verbose)
 {
     _json_match(text, m, 0, verbose);
 }

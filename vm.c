@@ -36,7 +36,7 @@ static match_t *in_use_matches = NULL;
 __attribute__((nonnull, pure))
 static inline const char *next_char(file_t *f, const char *str);
 __attribute__((nonnull))
-static const char *match_backref(const char *str, vm_op_t *op, match_t *cap, unsigned int flags);
+static const char *match_backref(const char *str, vm_op_t *op, match_t *cap, unsigned int ignorecase);
 __attribute__((nonnull))
 static match_t *get_capture_by_num(match_t *m, int *n);
 __attribute__((nonnull, pure))
@@ -66,7 +66,7 @@ static inline const char *next_char(file_t *f, const char *str)
 // Attempt to match text against a previously captured value.
 // Return the character position after the backref has matched, or NULL if no match has occurred.
 //
-static const char *match_backref(const char *str, vm_op_t *op, match_t *cap, unsigned int flags)
+static const char *match_backref(const char *str, vm_op_t *op, match_t *cap, unsigned int ignorecase)
 {
     check(op->type == VM_BACKREF, "Attempt to match backref against something that's not a backref");
     if (cap->op->type == VM_REPLACE) {
@@ -87,7 +87,7 @@ static const char *match_backref(const char *str, vm_op_t *op, match_t *cap, uns
             ++r;
             match_t *value = get_capture(cap, &r);
             if (value != NULL) {
-                str = match_backref(str, op, value, flags);
+                str = match_backref(str, op, value, ignorecase);
                 if (str == NULL) return NULL;
             }
         }
@@ -96,22 +96,22 @@ static const char *match_backref(const char *str, vm_op_t *op, match_t *cap, uns
         for (match_t *child = cap->child; child; child = child->nextsibling) {
             if (child->start > prev) {
                 size_t len = (size_t)(child->start - prev);
-                if ((flags & BP_IGNORECASE) ? memicmp(str, prev, len) != 0
-                                            : memcmp(str, prev, len) != 0) {
+                if (ignorecase ? memicmp(str, prev, len) != 0
+                               : memcmp(str, prev, len) != 0) {
                     return NULL;
                 }
                 str += len;
                 prev = child->start;
             }
             if (child->start < prev) continue;
-            str = match_backref(str, op, child, flags);
+            str = match_backref(str, op, child, ignorecase);
             if (str == NULL) return NULL;
             prev = child->end;
         }
         if (cap->end > prev) {
             size_t len = (size_t)(cap->end - prev);
-            if ((flags & BP_IGNORECASE) ? memicmp(str, prev, len) != 0
-                                        : memcmp(str, prev, len) != 0) {
+            if (ignorecase ? memicmp(str, prev, len) != 0
+                           : memcmp(str, prev, len) != 0) {
                 return NULL;
             }
             str += len;
@@ -124,7 +124,7 @@ static const char *match_backref(const char *str, vm_op_t *op, match_t *cap, uns
 //
 // Find the next match after prev (or the first match if prev is NULL)
 //
-match_t *next_match(def_t *defs, file_t *f, match_t *prev, vm_op_t *op, unsigned int flags)
+match_t *next_match(def_t *defs, file_t *f, match_t *prev, vm_op_t *op, unsigned int ignorecase)
 {
     const char *str;
     if (prev) {
@@ -134,7 +134,7 @@ match_t *next_match(def_t *defs, file_t *f, match_t *prev, vm_op_t *op, unsigned
         str = f->contents;
     }
     for (; str < f->end; ++str) {
-        match_t *m = match(defs, f, str, op, flags);
+        match_t *m = match(defs, f, str, op, ignorecase);
         if (m) return m;
     }
     return NULL;
@@ -145,7 +145,7 @@ match_t *next_match(def_t *defs, file_t *f, match_t *prev, vm_op_t *op, unsigned
 // a match struct, or NULL if no match is found.
 // The returned value should be free()'d to avoid memory leaking.
 //
-match_t *match(def_t *defs, file_t *f, const char *str, vm_op_t *op, unsigned int flags)
+match_t *match(def_t *defs, file_t *f, const char *str, vm_op_t *op, unsigned int ignorecase)
 {
     switch (op->type) {
         case VM_LEFTRECURSION: {
@@ -158,7 +158,7 @@ match_t *match(def_t *defs, file_t *f, const char *str, vm_op_t *op, unsigned in
                 ++op->args.leftrec.visits;
                 return op->args.leftrec.match;
             } else {
-                return match(defs, f, str, op->args.leftrec.fallback, flags);
+                return match(defs, f, str, op->args.leftrec.fallback, ignorecase);
             }
         }
         case VM_ANYCHAR: {
@@ -172,8 +172,8 @@ match_t *match(def_t *defs, file_t *f, const char *str, vm_op_t *op, unsigned in
         }
         case VM_STRING: {
             if (&str[op->len] > f->end) return NULL;
-            if ((flags & BP_IGNORECASE) ? memicmp(str, op->args.s, (size_t)op->len) != 0
-                                        : memcmp(str, op->args.s, (size_t)op->len) != 0)
+            if (ignorecase ? memicmp(str, op->args.s, (size_t)op->len) != 0
+                           : memcmp(str, op->args.s, (size_t)op->len) != 0)
                 return NULL;
             match_t *m = new_match();
             m->op = op;
@@ -192,7 +192,7 @@ match_t *match(def_t *defs, file_t *f, const char *str, vm_op_t *op, unsigned in
             return m;
         }
         case VM_NOT: {
-            match_t *m = match(defs, f, str, op->args.pat, flags);
+            match_t *m = match(defs, f, str, op->args.pat, ignorecase);
             if (m != NULL) {
                 recycle_if_unused(&m);
                 return NULL;
@@ -219,7 +219,7 @@ match_t *match(def_t *defs, file_t *f, const char *str, vm_op_t *op, unsigned in
             for (const char *prev = NULL; prev < str; ) {
                 prev = str;
                 if (pat) {
-                    match_t *p = match(defs, f, str, pat, flags);
+                    match_t *p = match(defs, f, str, pat, ignorecase);
                     if (p != NULL) {
                         ADD_OWNER(*dest, p);
                         m->end = p->end;
@@ -230,7 +230,7 @@ match_t *match(def_t *defs, file_t *f, const char *str, vm_op_t *op, unsigned in
                     return m;
                 }
                 if (skip) {
-                    match_t *s = match(defs, f, str, skip, flags);
+                    match_t *s = match(defs, f, str, skip, ignorecase);
                     if (s != NULL) {
                         ADD_OWNER(*dest, s);
                         dest = &s->nextsibling;
@@ -261,11 +261,11 @@ match_t *match(def_t *defs, file_t *f, const char *str, vm_op_t *op, unsigned in
                 // Separator
                 match_t *sep = NULL;
                 if (op->args.repetitions.sep != NULL && reps > 0) {
-                    sep = match(defs, f, str, op->args.repetitions.sep, flags);
+                    sep = match(defs, f, str, op->args.repetitions.sep, ignorecase);
                     if (sep == NULL) break;
                     str = sep->end;
                 }
-                match_t *p = match(defs, f, str, op->args.repetitions.repeat_pat, flags);
+                match_t *p = match(defs, f, str, op->args.repetitions.repeat_pat, ignorecase);
                 if (p == NULL) {
                     str = start;
                     recycle_if_unused(&sep);
@@ -306,7 +306,7 @@ match_t *match(def_t *defs, file_t *f, const char *str, vm_op_t *op, unsigned in
             ssize_t backtrack = op->args.pat->len;
             check(backtrack != -1, "'<' is only allowed for fixed-length operations");
             if (str - backtrack < f->contents) return NULL;
-            match_t *before = match(defs, f, str - backtrack, op->args.pat, flags);
+            match_t *before = match(defs, f, str - backtrack, op->args.pat, ignorecase);
             if (before == NULL) return NULL;
             match_t *m = new_match();
             m->start = str;
@@ -316,7 +316,7 @@ match_t *match(def_t *defs, file_t *f, const char *str, vm_op_t *op, unsigned in
             return m;
         }
         case VM_BEFORE: {
-            match_t *after = match(defs, f, str, op->args.pat, flags);
+            match_t *after = match(defs, f, str, op->args.pat, ignorecase);
             if (after == NULL) return NULL;
             match_t *m = new_match();
             m->start = str;
@@ -326,7 +326,7 @@ match_t *match(def_t *defs, file_t *f, const char *str, vm_op_t *op, unsigned in
             return m;
         }
         case VM_CAPTURE: {
-            match_t *p = match(defs, f, str, op->args.pat, flags);
+            match_t *p = match(defs, f, str, op->args.pat, ignorecase);
             if (p == NULL) return NULL;
             match_t *m = new_match();
             m->start = str;
@@ -336,18 +336,18 @@ match_t *match(def_t *defs, file_t *f, const char *str, vm_op_t *op, unsigned in
             return m;
         }
         case VM_OTHERWISE: {
-            match_t *m = match(defs, f, str, op->args.multiple.first, flags);
-            if (m == NULL) m = match(defs, f, str, op->args.multiple.second, flags);
+            match_t *m = match(defs, f, str, op->args.multiple.first, ignorecase);
+            if (m == NULL) m = match(defs, f, str, op->args.multiple.second, ignorecase);
             return m;
         }
         case VM_CHAIN: {
-            match_t *m1 = match(defs, f, str, op->args.multiple.first, flags);
+            match_t *m1 = match(defs, f, str, op->args.multiple.first, ignorecase);
             if (m1 == NULL) return NULL;
 
             match_t *m2;
             { // Push backrefs and run matching, then cleanup
                 def_t *defs2 = with_backrefs(defs, f, m1);
-                m2 = match(defs2, f, m1->end, op->args.multiple.second, flags);
+                m2 = match(defs2, f, m1->end, op->args.multiple.second, ignorecase);
                 free_defs(&defs2, defs);
             }
 
@@ -364,7 +364,7 @@ match_t *match(def_t *defs, file_t *f, const char *str, vm_op_t *op, unsigned in
             return m;
         }
         case VM_EQUAL: case VM_NOT_EQUAL: {
-            match_t *m1 = match(defs, f, str, op->args.multiple.first, flags);
+            match_t *m1 = match(defs, f, str, op->args.multiple.first, ignorecase);
             if (m1 == NULL) return NULL;
 
             // <p1>==<p2> matches iff the text of <p1> matches <p2>
@@ -376,7 +376,7 @@ match_t *match(def_t *defs, file_t *f, const char *str, vm_op_t *op, unsigned in
                 .nlines=1 + get_line_number(f, m1->end)-get_line_number(f, m1->start),
                 .mmapped=f->mmapped,
             };
-            match_t *m2 = match(defs, &inner, str, op->args.multiple.second, flags);
+            match_t *m2 = match(defs, &inner, str, op->args.multiple.second, ignorecase);
             if ((m2 == NULL) == (op->type == VM_EQUAL)) {
                 recycle_if_unused(&m1);
                 if (m2 != NULL) recycle_if_unused(&m2);
@@ -397,7 +397,7 @@ match_t *match(def_t *defs, file_t *f, const char *str, vm_op_t *op, unsigned in
         case VM_REPLACE: {
             match_t *p = NULL;
             if (op->args.replace.pat) {
-                p = match(defs, f, str, op->args.replace.pat, flags);
+                p = match(defs, f, str, op->args.replace.pat, ignorecase);
                 if (p == NULL) return NULL;
             }
             match_t *m = new_match();
@@ -437,7 +437,7 @@ match_t *match(def_t *defs, file_t *f, const char *str, vm_op_t *op, unsigned in
             };
 
             const char *prev = str;
-            match_t *m = match(&defs2, f, str, ref, flags);
+            match_t *m = match(&defs2, f, str, ref, ignorecase);
             if (m == NULL) return NULL;
 
             while (rec_op.args.leftrec.visits > 0) {
@@ -445,7 +445,7 @@ match_t *match(def_t *defs, file_t *f, const char *str, vm_op_t *op, unsigned in
                 REMOVE_OWNERSHIP(rec_op.args.leftrec.match);
                 ADD_OWNER(rec_op.args.leftrec.match, m);
                 prev = m->end;
-                match_t *m2 = match(&defs2, f, str, ref, flags);
+                match_t *m2 = match(&defs2, f, str, ref, ignorecase);
                 if (m2 == NULL) break;
                 if (m2->end <= prev) {
                     recycle_if_unused(&m2);
@@ -465,7 +465,7 @@ match_t *match(def_t *defs, file_t *f, const char *str, vm_op_t *op, unsigned in
             return m;
         }
         case VM_BACKREF: {
-            const char *end = match_backref(str, op, op->args.backref, flags);
+            const char *end = match_backref(str, op, op->args.backref, ignorecase);
             if (end == NULL) return NULL;
             match_t *m = new_match();
             m->op = op;

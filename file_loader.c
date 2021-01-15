@@ -42,10 +42,16 @@ static void populate_lines(file_t *f)
 //
 // Read an entire file into memory.
 //
-file_t *load_file(file_t **files, const char *filename)
+file_t *load_file(file_t **files, const char *fmt, ...)
 {
-    if (filename == NULL) filename = "-";
-    int fd = streq(filename, "-") ? STDIN_FILENO : open(filename, O_RDONLY);
+    char filename[PATH_MAX+1] = {0};
+    va_list args;
+    va_start(args, fmt);
+    check(vsnprintf(filename, PATH_MAX, fmt, args) <= PATH_MAX,
+          "File name is too large");
+    va_end(args);
+
+    int fd = filename[0] == '\0' ? STDIN_FILENO : open(filename, O_RDONLY);
     if (fd < 0) return NULL;
     size_t length;
     file_t *f = new(file_t);

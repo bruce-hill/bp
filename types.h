@@ -8,15 +8,6 @@
 
 #include "file_loader.h"
 
-enum BPFlag {
-    BP_VERBOSE    = 1 << 0,
-    BP_IGNORECASE = 1 << 1,
-    BP_EXPLAIN    = 1 << 2,
-    BP_JSON       = 1 << 3,
-    BP_LISTFILES  = 1 << 4,
-    BP_INPLACE    = 1 << 5,
-};
-
 //
 // BP virtual machine opcodes (these must be kept in sync with the names in vm.c)
 //

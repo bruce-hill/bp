@@ -17,7 +17,8 @@ typedef struct file_s {
     unsigned int mmapped:1;
 } file_t;
 
-file_t *load_file(file_t **files, const char *filename);
+__attribute__((format(printf,2,3)))
+file_t *load_file(file_t **files, const char *fmt, ...);
 __attribute__((nonnull(3), returns_nonnull))
 file_t *spoof_file(file_t **files, const char *filename, const char *text);
 __attribute__((nonnull))
@@ -30,7 +31,7 @@ __attribute__((pure, nonnull))
 size_t get_char_number(file_t *f, const char *p);
 __attribute__((pure, nonnull))
 const char *get_line(file_t *f, size_t line_number);
-__attribute__((nonnull(1,2,3), format(printf, 5, 6)))
+__attribute__((nonnull(1,2,3), format(printf,5,6)))
 void fprint_line(FILE *dest, file_t *f, const char *start, const char *end, const char *fmt, ...);
 
 #endif

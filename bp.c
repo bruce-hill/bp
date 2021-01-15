@@ -39,10 +39,21 @@ static const char *usage = (
     " -c --context <context>           set number of lines of context to print (all: the whole file, 0: only the match, 1: the line, N: N lines of context)\n"
     " -g --grammar <grammar file>      use the specified file as a grammar\n");
 
+// Flag-configurable options:
 #define USE_DEFAULT_CONTEXT -2
 #define ALL_CONTEXT -1
-static int print_color = 0;
-static int print_line_numbers = 0;
+static int context_lines = USE_DEFAULT_CONTEXT;
+static unsigned int print_color = 0;
+static unsigned int print_line_numbers = 0;
+static unsigned int ignorecase = 0;
+static unsigned int verbose = 0;
+static enum {
+    MODE_NORMAL,
+    MODE_LISTFILES,
+    MODE_INPLACE,
+    MODE_JSON,
+    MODE_EXPLAIN,
+} mode = MODE_NORMAL;
 
 __attribute__((nonnull))
 static char *getflag(const char *flag, char *argv[], int *i);
@@ -91,16 +102,16 @@ static int is_text_file(const char *filename)
 //
 // Print matches in JSON format.
 //
-static int print_matches_as_json(def_t *defs, file_t *f, vm_op_t *pattern, unsigned int flags)
+static int print_matches_as_json(def_t *defs, file_t *f, vm_op_t *pattern)
 {
     int matches = 0;
-    for (match_t *m = NULL; (m = next_match(defs, f, m, pattern, flags)); ) {
+    for (match_t *m = NULL; (m = next_match(defs, f, m, pattern, ignorecase)); ) {
         if (++matches > 1)
             printf(",\n");
-        printf("{\"filename\":\"%s\",", f->filename ? f->filename : "-");
+        printf("{\"filename\":\"%s\",", f->filename);
         printf("\"tree\":{\"rule\":\"text\",\"start\":%d,\"end\":%ld,\"children\":[",
                0, f->end - f->contents);
-        json_match(f->contents, m, (flags & BP_VERBOSE) ? 1 : 0);
+        json_match(f->contents, m, verbose);
         printf("]}}\n");
     }
     return matches;
@@ -109,10 +120,10 @@ static int print_matches_as_json(def_t *defs, file_t *f, vm_op_t *pattern, unsig
 //
 // Print matches in a visual explanation style
 //
-static int explain_matches(def_t *defs, file_t *f, vm_op_t *pattern, unsigned int flags)
+static int explain_matches(def_t *defs, file_t *f, vm_op_t *pattern)
 {
     int matches = 0;
-    for (match_t *m = NULL; (m = next_match(defs, f, m, pattern, flags)); ) {
+    for (match_t *m = NULL; (m = next_match(defs, f, m, pattern, ignorecase)); ) {
         if (++matches == 1) {
             if (print_color)
                 printf("\033[0;1;4;33m%s\033[0m\n", f->filename);
@@ -130,21 +141,21 @@ static int explain_matches(def_t *defs, file_t *f, vm_op_t *pattern, unsigned in
 // Replace a file's contents with the text version of a match.
 // (Useful for replacements)
 //
-static int inplace_modify_file(def_t *defs, file_t *f, vm_op_t *pattern, int context, unsigned int flags)
+static int inplace_modify_file(def_t *defs, file_t *f, vm_op_t *pattern)
 {
     // Need to do this before matching:
     intern_file(f);
 
     printer_t pr = {
         .file = f,
-        .context_lines = context,
+        .context_lines = context_lines,
         .use_color = 0,
         .print_line_numbers = 0,
     };
 
     FILE *inplace_file = NULL; // Lazy-open this on the first match
     int matches = 0;
-    for (match_t *m = NULL; (m = next_match(defs, f, m, pattern, flags)); ) {
+    for (match_t *m = NULL; (m = next_match(defs, f, m, pattern, ignorecase)); ) {
         ++matches;
         if (print_errors(&pr, m) > 0)
             exit(1);
@@ -166,18 +177,18 @@ static int inplace_modify_file(def_t *defs, file_t *f, vm_op_t *pattern, int con
 //
 // Print all the matches in a file.
 //
-static int print_matches(def_t *defs, file_t *f, vm_op_t *pattern, int context, unsigned int flags)
+static int print_matches(def_t *defs, file_t *f, vm_op_t *pattern)
 {
     static int printed_filenames = 0;
     int matches = 0;
     printer_t pr = {
         .file = f,
-        .context_lines = context,
+        .context_lines = context_lines,
         .use_color = print_color,
         .print_line_numbers = print_line_numbers,
     };
 
-    for (match_t *m = NULL; (m = next_match(defs, f, m, pattern, flags)); ) {
+    for (match_t *m = NULL; (m = next_match(defs, f, m, pattern, ignorecase)); ) {
         if (print_errors(&pr, m) > 0)
             exit(1);
 
@@ -205,27 +216,27 @@ static int print_matches(def_t *defs, file_t *f, vm_op_t *pattern, int context, 
 // For a given filename, open the file and attempt to match the given pattern
 // against it, printing any results according to the flags.
 //
-static int process_file(def_t *defs, const char *filename, vm_op_t *pattern, int context, unsigned int flags)
+static int process_file(def_t *defs, const char *filename, vm_op_t *pattern)
 {
     file_t *f = load_file(NULL, filename);
     check(f, "Could not open file: %s", filename);
 
     int matches = 0;
-    if (flags & BP_EXPLAIN) {
-        matches += explain_matches(defs, f, pattern, flags);
-    } else if (flags & BP_LISTFILES) {
-        match_t *m = next_match(defs, f, NULL, pattern, flags);
+    if (mode == MODE_EXPLAIN) {
+        matches += explain_matches(defs, f, pattern);
+    } else if (mode == MODE_LISTFILES) {
+        match_t *m = next_match(defs, f, NULL, pattern, ignorecase);
         if (m) {
             recycle_if_unused(&m);
             printf("%s\n", f->filename);
             matches += 1;
         }
-    } else if (flags & BP_JSON) {
-        matches += print_matches_as_json(defs, f, pattern, flags);
-    } else if (flags & BP_INPLACE) {
-        matches += inplace_modify_file(defs, f, pattern, context, flags);
+    } else if (mode == MODE_JSON) {
+        matches += print_matches_as_json(defs, f, pattern);
+    } else if (mode == MODE_INPLACE) {
+        matches += inplace_modify_file(defs, f, pattern);
     } else {
-        matches += print_matches(defs, f, pattern, context, flags);
+        matches += print_matches(defs, f, pattern);
     }
 
 #ifdef DEBUG_HEAP
@@ -240,33 +251,24 @@ static int process_file(def_t *defs, const char *filename, vm_op_t *pattern, int
 
 int main(int argc, char *argv[])
 {
-    unsigned int flags = 0;
-    int context = USE_DEFAULT_CONTEXT;
     char *flag = NULL;
-    char path[PATH_MAX] = {0};
 
     def_t *defs = NULL;
-
     file_t *loaded_files = NULL;
 
     // Define an opcode that is just a reference to the rule `pattern`
     file_t *pat_file = spoof_file(&loaded_files, "<pattern>", "pattern");
-    vm_op_t *pattern = bp_pattern(pat_file, pat_file->contents);
+    vm_op_t *pattern = bp_pattern(loaded_files, pat_file->contents);
 
     // Define an opcode that is just a reference to the rule `replacement`
     file_t *rep_file = spoof_file(&loaded_files, "<replacement>", "replacement");
     vm_op_t *replacement = bp_pattern(rep_file, rep_file->contents);
 
     // Load builtins:
-    if (access("/etc/xdg/bp/builtins.bp", R_OK) != -1) {
-        file_t *f = load_file(&loaded_files, "/etc/xdg/bp/builtins.bp");
-        defs = load_grammar(defs, f);
-    }
-    sprintf(path, "%s/.config/bp/builtins.bp", getenv("HOME"));
-    if (access(path, R_OK) != -1) {
-        file_t *f = load_file(&loaded_files, path);
-        defs = load_grammar(defs, f);
-    }
+    file_t *xdg_file = load_file(&loaded_files, "/etc/xdg/bp/builtins.bp");
+    if (xdg_file) defs = load_grammar(defs, xdg_file);
+    file_t *local_file = load_file(&loaded_files, "%s/.config/bp/builtins.bp", getenv("HOME"));
+    if (local_file) defs = load_grammar(defs, local_file);
 
     int i, npatterns = 0;
     check(argc > 1, "%s", usage);
@@ -279,18 +281,18 @@ int main(int argc, char *argv[])
             printf("%s\n", usage);
             return 0;
         } else if (streq(argv[i], "--verbose")) {
-            flags |= BP_VERBOSE;
+            verbose = 1;
         } else if (streq(argv[i], "--explain")) {
-            flags |= BP_EXPLAIN;
+            mode = MODE_EXPLAIN;
         } else if (streq(argv[i], "--json")) {
-            flags |= BP_JSON;
+            mode = MODE_JSON;
         } else if (streq(argv[i], "--inplace")) {
-            flags |= BP_INPLACE;
-            context = ALL_CONTEXT;
+            mode = MODE_INPLACE;
+            context_lines = ALL_CONTEXT;
         } else if (streq(argv[i], "--ignore-case")) {
-            flags |= BP_IGNORECASE;
+            ignorecase = 1;
         } else if (streq(argv[i], "--list-files")) {
-            flags |= BP_LISTFILES;
+            mode = MODE_LISTFILES;
         } else if (FLAG("--replace") || FLAG("-r")) {
             // TODO: spoof file as sprintf("pattern => '%s'", flag)
             // except that would require handling edge cases like quotation marks etc.
@@ -299,17 +301,14 @@ int main(int argc, char *argv[])
             check(rep, "Replacement failed to compile: %s", flag);
             defs = with_def(defs, replace_file, strlen("replacement"), "replacement", rep);
             pattern = replacement;
-            if (context == USE_DEFAULT_CONTEXT) context = 1;
+            if (context_lines == USE_DEFAULT_CONTEXT)
+                context_lines = ALL_CONTEXT;
         } else if (FLAG("--grammar") || FLAG("-g")) {
             file_t *f = load_file(&loaded_files, flag);
-            if (f == NULL) {
-                sprintf(path, "%s/.config/bp/%s.bp", getenv("HOME"), flag);
-                f = load_file(&loaded_files, path);
-            }
-            if (f == NULL) {
-                sprintf(path, "/etc/xdg/bp/%s.bp", flag);
-                f = load_file(&loaded_files, path);
-            }
+            if (f == NULL)
+                f = load_file(&loaded_files, "%s/.config/bp/%s.bp", getenv("HOME"), flag);
+            if (f == NULL)
+                f = load_file(&loaded_files, "/etc/xdg/bp/%s.bp", flag);
             check(f != NULL, "Couldn't find grammar: %s", flag);
             defs = load_grammar(defs, f); // Keep in memory for debug output
         } else if (FLAG("--define") || FLAG("-d")) {
@@ -347,19 +346,21 @@ int main(int argc, char *argv[])
             ++npatterns;
         } else if (FLAG("--context") || FLAG("-c")) {
             if (streq(flag, "all"))
-                context = ALL_CONTEXT;
+                context_lines = ALL_CONTEXT;
+            else if (streq(flag, "none"))
+                context_lines = 0;
             else
-                context = (int)strtol(flag, NULL, 10);
+                context_lines = (int)strtol(flag, NULL, 10);
         } else if (argv[i][0] == '-' && argv[i][1] && argv[i][1] != '-') { // single-char flags
             for (char *c = &argv[i][1]; *c; ++c) {
                 switch (*c) {
                     case 'h': goto flag_help; // -h
-                    case 'v': flags |= BP_VERBOSE; break; // -v
-                    case 'e': flags |= BP_EXPLAIN; break; // -e
-                    case 'j': flags |= BP_JSON; break; // -j
-                    case 'I': flags |= BP_INPLACE; context = ALL_CONTEXT; break; // -I
-                    case 'i': flags |= BP_IGNORECASE; break; // -i
-                    case 'l': flags |= BP_LISTFILES; break; // -l
+                    case 'v': verbose = 1; break; // -v
+                    case 'e': mode = MODE_EXPLAIN; break; // -e
+                    case 'j': mode = MODE_JSON; break; // -j
+                    case 'I': mode = MODE_INPLACE; break; // -I
+                    case 'i': ignorecase = 1; break; // -i
+                    case 'l': mode = MODE_LISTFILES; break; // -l
                     default:
                         printf("Unrecognized flag: -%c\n\n%s\n", *c, usage);
                         return 1;
@@ -379,22 +380,9 @@ int main(int argc, char *argv[])
         }
     }
 
-    if (((flags & BP_JSON) != 0) + ((flags & BP_EXPLAIN) != 0) + ((flags & BP_LISTFILES) != 0) > 1) {
-        printf("Please choose no more than one of the flags: -j/--json, -e/--explain, and -l/--list-files.\n"
-               "They are mutually contradictory.\n");
-        return 1;
-    }
-
-    if (context < 0) {
-        if (context == USE_DEFAULT_CONTEXT) context = 1;
-        else if (context != ALL_CONTEXT) context = 0;
-    }
-
-    if (flags & BP_INPLACE && context != ALL_CONTEXT) {
-        printf("--inplace and --context are mutually exclusive.\n"
-               "Please drop one of the two arguments and try again.\n");
-        return 1;
-    }
+    if (mode == MODE_INPLACE) context_lines = ALL_CONTEXT;
+    if (context_lines == USE_DEFAULT_CONTEXT) context_lines = 1;
+    if (context_lines < 0 && context_lines != ALL_CONTEXT) context_lines = 0;
 
     if (isatty(STDOUT_FILENO)) {
         print_color = 1;
@@ -402,11 +390,11 @@ int main(int argc, char *argv[])
     }
 
     int found = 0;
-    if (flags & BP_JSON) printf("[");
+    if (mode == MODE_JSON) printf("[");
     if (i < argc) {
         // Files pass in as command line args:
         for (int nfiles = 0; i < argc; nfiles++, i++) {
-            found += process_file(defs, argv[i], pattern, context, flags);
+            found += process_file(defs, argv[i], pattern);
         }
     } else if (isatty(STDIN_FILENO)) {
         // No files, no piped in input, so use * **/*:
@@ -415,14 +403,14 @@ int main(int argc, char *argv[])
         glob("**/*", GLOB_APPEND, NULL, &globbuf);
         for (size_t i = 0; i < globbuf.gl_pathc; i++) {
             if (is_text_file(globbuf.gl_pathv[i]))
-                found += process_file(defs, globbuf.gl_pathv[i], pattern, context, flags);
+                found += process_file(defs, globbuf.gl_pathv[i], pattern);
         }
         globfree(&globbuf);
     } else {
         // Piped in input:
-        found += process_file(defs, NULL, pattern, context, flags);
+        found += process_file(defs, NULL, pattern);
     }
-    if (flags & BP_JSON) printf("]\n");
+    if (mode == MODE_JSON) printf("]\n");
 
 #ifdef DEBUG_HEAP
     // This code frees up all residual heap-allocated memory. Since the program
