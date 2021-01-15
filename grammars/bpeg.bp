@@ -11,7 +11,7 @@ String-pattern: ..$$ % (\n / Nodent / Escape / `\ pat [`;])
 
 pat: simple-pat !(__("!="/"==")) / suffixed-pat
 simple-pat: Upto-and / Dot / String / Chars / Nodent / Escape-range
-    / Escape / Repeat / Optional / No / After / Before / Capture
+    / Escape / Repeat / Optional / No / Hide / After / Before / Capture
     / Ref / parens
 
 suffixed-pat: (
@@ -41,6 +41,7 @@ escape-sequence: (
       / `x 2 `0-9,a-f,A-F
     )
 No: `! (__@pat / @!=(''=>"Expected a pattern after the exclamation mark"))
+Hide: `~ (__@pat / @!=(''=>"Expected a pattern after the tilde"))
 Nodent: `\ `N
 Upto-and: ".." [__@first=simple-pat] [__`%__@second=simple-pat]
 Repeat: (
