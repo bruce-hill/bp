@@ -310,7 +310,6 @@ int main(int argc, char *argv[])
             check(f != NULL, "Couldn't find grammar: %s", flag);
             defs = load_grammar(defs, f); // Keep in memory for debug output
         } else if (FLAG("--pattern") || FLAG("-p")) {
-            check(npatterns == 0, "Cannot define multiple patterns");
             file_t *arg_file = spoof_file(&loaded_files, "<pattern argument>", flag);
             for (const char *str = arg_file->contents; str < arg_file->end; ) {
                 def_t *d = bp_definition(arg_file, str);
@@ -319,6 +318,7 @@ int main(int argc, char *argv[])
                     defs = d;
                     str = d->op->end;
                 } else {
+                    check(npatterns == 0, "Cannot define multiple patterns");
                     vm_op_t *p = bp_pattern(arg_file, str);
                     check(p, "Pattern failed to compile: %s", flag);
                     defs = with_def(defs, arg_file, strlen("pattern"), "pattern", p);
