@@ -17,6 +17,7 @@ typedef struct match_node_s {
 } match_node_t;
 
 static const char *color_hl = "\033[0;31;1m";
+static const char *color_hl2 = "\033[0;34;1m";
 static const char *color_normal = "\033[0m";
 
 __attribute__((nonnull, pure))
@@ -264,20 +265,21 @@ void _print_match(FILE *out, printer_t *pr, match_t *m)
         size_t line_end = get_line_number(pr->file, m->end);
         size_t line = line_start;
 
-        if (pr->use_color) printf("%s", color_hl);
+        if (pr->use_color) printf("%s", color_hl2);
         const char *text = m->op->args.replace.text;
         const char *end = &text[m->op->args.replace.len];
 
         // TODO: clean up the line numbering code
         for (const char *r = text; r < end; ) {
-            print_line_number(out, pr, line > line_end ? 0 : line, pr->use_color ? color_hl : NULL);
+            print_line_number(out, pr, line > line_end ? 0 : line, pr->use_color ? color_hl2 : NULL);
 
             // Capture substitution
             if (*r == '@' && r[1] && r[1] != '@') {
                 ++r;
                 match_t *cap = get_capture(m, &r);
                 if (cap != NULL) {
-                    print_match(out, pr, cap);
+                    _print_match(out, pr, cap);
+                    if (pr->use_color) printf("%s", color_hl2);
                     continue;
                 } else {
                     --r;
@@ -305,7 +307,7 @@ void _print_match(FILE *out, printer_t *pr, match_t *m)
                 continue;
             }
         }
-        print_line_number(out, pr, line > line_end ? 0 : line, pr->use_color ? color_hl : NULL);
+        print_line_number(out, pr, line > line_end ? 0 : line, pr->use_color ? color_normal : NULL);
     } else {
         const char *prev = m->start;
         for (match_t *child = m->child; child; child = child->nextsibling) {
@@ -315,7 +317,7 @@ void _print_match(FILE *out, printer_t *pr, match_t *m)
                 continue;
             if (child->start > prev)
                 print_between(out, pr, prev, child->start, pr->use_color ? color_hl : NULL);
-            print_match(out, pr, child);
+            _print_match(out, pr, child);
             prev = child->end;
         }
         if (m->end > prev)
