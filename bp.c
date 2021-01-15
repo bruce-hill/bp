@@ -286,7 +286,6 @@ int main(int argc, char *argv[])
             mode = MODE_JSON;
         } else if (streq(argv[i], "--inplace")) {
             mode = MODE_INPLACE;
-            context_lines = ALL_CONTEXT;
         } else if (streq(argv[i], "--ignore-case")) {
             ignorecase = 1;
         } else if (streq(argv[i], "--list-files")) {
@@ -299,8 +298,6 @@ int main(int argc, char *argv[])
             check(rep, "Replacement failed to compile: %s", flag);
             defs = with_def(defs, replace_file, strlen("replacement"), "replacement", rep);
             pattern = replacement;
-            if (context_lines == USE_DEFAULT_CONTEXT)
-                context_lines = ALL_CONTEXT;
         } else if (FLAG("--grammar") || FLAG("-g")) {
             file_t *f = load_file(&loaded_files, flag);
             if (f == NULL)
