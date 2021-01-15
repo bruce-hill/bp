@@ -94,7 +94,10 @@ typedef struct match_s {
     struct match_s *child, *nextsibling;
     vm_op_t *op;
     // Intrusive linked list nodes for garbage collection:
-    struct match_s **atme, *next;
+    struct match_s *next;
+#ifdef DEBUG_HEAP
+    struct match_s **atme;
+#endif
     int refcount;
 } match_t;
 

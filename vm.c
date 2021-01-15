@@ -12,9 +12,11 @@
 #include "utils.h"
 #include "vm.h"
 
-// Linked list operations:
-#define LL_PREPEND(head, node) do { (node)->atme = &(head); (node)->next = head; if (head) (head)->atme = &(node)->next; head = node; } while(0)
-#define LL_REMOVE(node) do { *(node)->atme = (node)->next; if ((node)->next) (node)->next->atme = (node)->atme; } while(0)
+#ifdef DEBUG_HEAP
+// Doubly-linked list operations:
+#define DLL_PREPEND(head, node) do { (node)->atme = &(head); (node)->next = head; if (head) (head)->atme = &(node)->next; head = node; } while(0)
+#define DLL_REMOVE(node) do { *(node)->atme = (node)->next; if ((node)->next) (node)->next->atme = (node)->atme; } while(0)
+#endif
 
 // Refcounting ownership-setting macros:
 #define ADD_OWNER(owner, m) do { owner = m; ++(m)->refcount; } while(0)
@@ -26,7 +28,10 @@
 // the `unused_matches` linked list so it can be reused without the need for
 // additional calls to malloc/free. Thus, it is an invariant that every match
 // object is in one of these two lists:
-static match_t *in_use_matches = NULL, *unused_matches = NULL;
+static match_t *unused_matches = NULL;
+#ifdef DEBUG_HEAP
+static match_t *in_use_matches = NULL;
+#endif
 
 __attribute__((nonnull, pure))
 static inline const char *next_char(file_t *f, const char *str);
@@ -552,15 +557,27 @@ match_t *get_capture(match_t *m, const char **id)
 match_t *new_match(void)
 {
     match_t *m;
+
+#ifdef DEBUG_HEAP
     if (unused_matches) {
         m = unused_matches;
-        LL_REMOVE(m);
+        DLL_REMOVE(m);
         memset(m, 0, sizeof(match_t));
     } else {
         m = new(match_t);
     }
     // Keep track of the object:
-    LL_PREPEND(in_use_matches, m);
+    DLL_PREPEND(in_use_matches, m);
+#else
+    if (unused_matches) {
+        m = unused_matches;
+        unused_matches = unused_matches->next;
+        memset(m, 0, sizeof(match_t));
+    } else {
+        m = new(match_t);
+    }
+#endif
+
     return m;
 }
 
@@ -580,12 +597,20 @@ void recycle_if_unused(match_t **at_m)
     REMOVE_OWNERSHIP(m->child);
     REMOVE_OWNERSHIP(m->nextsibling);
 
-    LL_REMOVE(m);
+#ifdef DEBUG_HEAP
+    DLL_REMOVE(m); // Remove from in_use_matches
     memset(m, 0, sizeof(match_t));
-    LL_PREPEND(unused_matches, m);
+    DLL_PREPEND(unused_matches, m);
+#else
+    memset(m, 0, sizeof(match_t));
+    m->next = unused_matches;
+    unused_matches = m;
+#endif
+
     *at_m = NULL;
 }
 
+#ifdef DEBUG_HEAP
 //
 // Force all match objects into the pool of unused match objects.
 //
@@ -594,8 +619,8 @@ size_t recycle_all_matches(void)
     size_t count = 0;
     while (in_use_matches) {
         match_t *m = in_use_matches;
-        LL_REMOVE(m);
-        LL_PREPEND(unused_matches, m);
+        DLL_REMOVE(m);
+        DLL_PREPEND(unused_matches, m);
         ++count;
     }
     return count;
@@ -610,12 +635,13 @@ size_t free_all_matches(void)
     recycle_all_matches();
     while (unused_matches) {
         match_t *m = unused_matches;
-        LL_REMOVE(m);
+        DLL_REMOVE(m);
         free(m);
         ++count;
     }
     return count;
 }
+#endif
 
 //
 // Deallocate memory associated with an op

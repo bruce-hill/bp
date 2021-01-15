@@ -120,7 +120,9 @@ static int process_file(def_t *defs, const char *filename, vm_op_t *pattern, uns
     }
 
     recycle_if_unused(&m);
+#ifdef DEBUG_HEAP
     check(recycle_all_matches() == 0, "Memory leak: there should no longer be any matches in use at this point.");
+#endif
     destroy_file(&f);
 
     return success;
@@ -300,7 +302,7 @@ int main(int argc, char *argv[])
     }
     if (flags & BP_JSON) printf("]\n");
 
-#ifdef FREE_ON_EXIT
+#ifdef DEBUG_HEAP
     // This code frees up all residual heap-allocated memory. Since the program
     // is about to exit, this step is unnecessary. However, it is useful for
     // tracking down memory leaks.

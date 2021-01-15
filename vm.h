@@ -15,10 +15,12 @@ match_t *get_capture(match_t *m, const char **id);
 __attribute__((nonnull))
 void destroy_op(vm_op_t *op);
 match_t *new_match(void);
-size_t free_all_matches(void);
 __attribute__((nonnull))
 void recycle_if_unused(match_t **at_m);
+#ifdef DEBUG_HEAP
+size_t free_all_matches(void);
 size_t recycle_all_matches(void);
+#endif
 
 #endif
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1
