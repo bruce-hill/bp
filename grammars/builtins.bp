@@ -9,26 +9,6 @@ is-text-file: >32(\t/\n/\r/\x20-x7e/!\x00-x7f utf8-codepoint/$$)
 # Meta-rules for acting on everything:
 pattern: !'' # Not defined by default
 replacement: !'' # Not defined by default
-replace-all: (
-    (include-binary-files / is-text-file)
-    +(..replacement%\n) ..%\n
-)
-find-all: (
-    (include-binary-files / is-text-file)
-    *(!..pattern ~(..\n))
-    +(+(..@pattern) ..(\n/$$) / ~(..\n))
-    [!<\n => "\n"]
-)
-find-lines: (
-    (include-binary-files / is-text-file)
-    *(!(pattern$) ~(..\n))
-    +(@pattern (\n/$$) / ~(..\n))
-    [!<\n => "\n"]
-)
-only-matches: (
-    (include-binary-files / is-text-file)
-    +(..@pattern%\n =>'@1\n')
-)
 
 # Helper definitions (commonly used)
 url: (

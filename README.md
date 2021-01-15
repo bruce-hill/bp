@@ -19,7 +19,7 @@ It's written in pure C with no dependencies.
 * `-p` `--pattern <pat>` provide a pattern (equivalent to `bp '\(<pat>)'`)
 * `-P` `--pattern-string <pat>` provide a string pattern (equivalent to `bp '<pat>'`, but may be useful if `'<pat>'` begins with a '-')
 * `-r` `--replace <replacement>`   replace the input pattern with the given replacement
-* `-m` `--mode <mode>` set the behavior mode (defult: `find-all`)
+* `-c` `--context <N>` change how many lines of context are printed (`0`: no context, `all`: the whole file, `<N>` matching lines and `<N-1>` lines before/after)
 * `-g` `--grammar <grammar file>`  use the specified file as a grammar
 
 See `man ./bp.1` for more details.

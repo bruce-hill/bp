@@ -465,17 +465,6 @@ static vm_op_t *_bp_simplepattern(file_t *f, const char *str)
             op->end = pat->end;
             return op;
         }
-        // Hide
-        case '~': {
-            vm_op_t *pat = bp_simplepattern(f, str);
-            if (!pat)
-                file_err(f, str, str, "There should be a pattern after this '~'");
-            vm_op_t *op = new_op(f, start, VM_HIDE);
-            op->len = 0;
-            op->args.pat = pat;
-            op->end = pat->end;
-            return op;
-        }
         // Special rules:
         case '_': case '^': case '$': case '|': {
             const char *name = NULL;

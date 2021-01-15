@@ -122,6 +122,25 @@ static const char *match_backref(const char *str, vm_op_t *op, match_t *cap, uns
 
 
 //
+// Find the next match after prev (or the first match if prev is NULL)
+//
+match_t *next_match(def_t *defs, file_t *f, match_t *prev, vm_op_t *op, unsigned int flags)
+{
+    const char *str;
+    if (prev) {
+        str = prev->end > prev->start ? prev->end : prev->end + 1;
+        recycle_if_unused(&prev);
+    } else {
+        str = f->contents;
+    }
+    for (; str < f->end; ++str) {
+        match_t *m = match(defs, f, str, op, flags);
+        if (m) return m;
+    }
+    return NULL;
+}
+
+//
 // Run virtual machine operation against a string and return
 // a match struct, or NULL if no match is found.
 // The returned value should be free()'d to avoid memory leaking.
@@ -307,16 +326,6 @@ match_t *match(def_t *defs, file_t *f, const char *str, vm_op_t *op, unsigned in
             return m;
         }
         case VM_CAPTURE: {
-            match_t *p = match(defs, f, str, op->args.pat, flags);
-            if (p == NULL) return NULL;
-            match_t *m = new_match();
-            m->start = str;
-            m->end = p->end;
-            m->op = op;
-            ADD_OWNER(m->child, p);
-            return m;
-        }
-        case VM_HIDE: {
             match_t *p = match(defs, f, str, op->args.pat, flags);
             if (p == NULL) return NULL;
             match_t *m = new_match();

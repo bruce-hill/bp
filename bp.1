@@ -18,7 +18,7 @@ bp \- Bruce's Parsing Expression Grammar tool
 [\fI-D\fR|\fI--define-string\fR \fI<name>\fR:\fI<string-pattern>\fR]
 [\fI-r\fR|\fI--replace\fR \fI<replacement>\fR]
 [\fI-g\fR|\fI--grammar\fR \fI<grammar file>\fR]
-[\fI-m\fR|\fI--mode\fR \fI<mode>\fR]
+[\fI-c\fR|\fI--conntext\fR \fI<N>\fR]
 \fI<pattern\fR
 [[--] \fI<input files...>\fR]
 .SH DESCRIPTION
@@ -54,10 +54,12 @@ Replace all occurrences of the main pattern with the given string.
 .B \-g\fR, \fB--grammar \fI<grammar file>\fR
 Load the grammar from the given file.
 
-.B \-m\fR, \fB--mode \fI<mode>\fR
-The mode to operate in. Options are: \fIfind-all\fR (the default),
-\fIonly-matches\fR, \fIpattern\fR, \fIreplacement\fR, \fIreplace-all\fR
-(implied by \fB--replace\fR), or any other grammar rule name.
+.B \-c\fR, \fB--context \fI<N>\fR
+The number of lines of context to print. If \fI<N>\fR is 0, print only the
+exact text of the matches. If \fI<N>\fR is "all", print the entire file.
+Otherwise, if \fI<N>\fR is a positive integer, print the whole line on which
+matches occur, as well as the \fI<N-1>\fR lines before and after the match. The
+default value for this argument is 1 (print whole lines where matches occur).
 
 .B \--help
 Print the usage and exit.

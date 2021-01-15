@@ -30,7 +30,6 @@ enum VMOpcode {
     VM_BEFORE,
     VM_AFTER,
     VM_CAPTURE,
-    VM_HIDE,
     VM_OTHERWISE,
     VM_CHAIN,
     VM_EQUAL,

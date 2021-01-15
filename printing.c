@@ -16,21 +16,15 @@ typedef struct match_node_s {
     struct match_node_s *next;
 } match_node_t;
 
-typedef struct {
-    size_t line, printed_line;
-    const char *color;
-} print_state_t;
+static const char *color_hl = "\033[0;31;1m";
+static const char *color_normal = "\033[0m";
 
 __attribute__((nonnull, pure))
 static int height_of_match(match_t *m);
 __attribute__((nonnull))
 static void _visualize_matches(match_node_t *firstmatch, int depth, const char *text, size_t textlen);
-__attribute__((nonnull))
-static void _visualize_patterns(match_t *m);
-__attribute__((nonnull))
-static void print_line_number(FILE *out, print_state_t *state, print_options_t options);
-__attribute__((nonnull))
-static void _print_match(FILE *out, file_t *f, match_t *m, print_state_t *state, print_options_t options);
+__attribute__((nonnull(1,2)))
+static inline void print_line_number(FILE *out, printer_t *pr, size_t line_number, const char *color);
 
 //
 // Return the height of a match object (i.e. the number of descendents of the
@@ -170,88 +164,139 @@ static void _visualize_matches(match_node_t *firstmatch, int depth, const char *
 }
 
 //
-// Recursively look for references to a rule called "pattern" and print an
-// explanation for each one.
+// Print a visualization of a match object.
 //
-static void _visualize_patterns(match_t *m)
+void visualize_match(match_t *m)
 {
-    if (m->op->type == VM_REF && streq(m->op->args.s, "pattern")) {
-        m = m->child;
-        match_node_t first = {.m = m};
-        _visualize_matches(&first, 0, m->start, (size_t)(m->end - m->start));
+    printf("\033[?7l"); // Disable line wrapping
+    match_node_t first = {.m = m};
+    _visualize_matches(&first, 0, m->start, (size_t)(m->end - m->start));
+    printf("\033[?7h"); // Re-enable line wrapping
+}
+
+//
+// Print a line number, if it needs to be printed.
+// line number of 0 means "just print an empty space for the number"
+//
+__attribute__((nonnull(1,2)))
+static inline void print_line_number(FILE *out, printer_t *pr, size_t line_number, const char *color)
+{
+    if (!pr->print_line_numbers) return;
+    if (!pr->needs_line_number) return;
+    if (line_number == 0) {
+        if (color) fprintf(out, "\033[0;2m     \033(0\x78\033(B%s", color);
+        else fprintf(out, "     |");
     } else {
-        for (match_t *c = m->child; c; c = c->nextsibling)
-            _visualize_patterns(c);
+        if (color) fprintf(out, "\033[0;2m% 5ld\033(0\x78\033(B%s", line_number, color);
+        else fprintf(out, "% 5ld|", line_number);
+    }
+    pr->needs_line_number = 0;
+}
+
+// 
+// Print a range of text from a file, adding line numbers if necessary.
+//
+__attribute__((nonnull(1,2,3,4)))
+static void print_between(FILE *out, printer_t *pr, const char *start, const char *end, const char *color)
+{
+    file_t *f = pr->file;
+    while (start < end) {
+        size_t line_num = get_line_number(f, start);
+        print_line_number(out, pr, line_num, color);
+        const char *eol = get_line(pr->file, line_num + 1);
+        if (!eol || eol > end) eol = end;
+        if (color) fprintf(out, "%s", color);
+        fprintf(out, "%.*s", (int)(eol - start), start);
+        if (eol[-1] == '\n')
+            pr->needs_line_number = 1;
+        start = eol;
+    }
+    pr->pos = end;
+}
+
+//
+// Return a pointer to the first character of context information before `pos`,
+// according to the context settings in `pr`
+//
+static const char *context_before(printer_t *pr, const char *pos)
+{
+    if (pr->context_lines == -1) {
+        return pr->pos;
+    } else if (pr->context_lines > 0) {
+        size_t n = get_line_number(pr->file, pos);
+        if (n >= (size_t)((pr->context_lines - 1) + 1))
+            n -= (size_t)(pr->context_lines - 1);
+        else
+            n = 1;
+        const char *sol = get_line(pr->file, n);
+        if (sol == NULL || sol < pr->pos) sol = pr->pos;
+        return sol;
+    } else {
+        return pos;
     }
 }
 
 //
-// For a match object, print a visual explanation for each "pattern" matched
-// inside it.
+// Return a pointer to the last character of context information after `pos`,
+// according to the context settings in `pr`
 //
-void visualize_match(match_t *m)
+static const char *context_after(printer_t *pr, const char *pos)
 {
-    printf("\033[?7l");
-    _visualize_patterns(m);
-    printf("\033[?7h");
+    if (pr->context_lines == -1) {
+        return pr->file->end;
+    } else if (pr->context_lines > 0) {
+        size_t n = get_line_number(pr->file, pos) + (size_t)(pr->context_lines - 1);
+        const char *eol = get_line(pr->file, n+1);
+        return eol ? eol : pr->file->end;
+    } else {
+        return pos;
+    }
 }
 
 //
-// Print a line number.
+// Print the text of a match (no context).
 //
-static void print_line_number(FILE *out, print_state_t *state, print_options_t options)
+void _print_match(FILE *out, printer_t *pr, match_t *m)
 {
-    state->printed_line = state->line;
-    if (!(options & PRINT_LINE_NUMBERS)) return;
-    if (options & PRINT_COLOR)
-        fprintf(out, "\033[0;2m% 5ld\033(0\x78\033(B%s", state->line, state->color);
-    else
-        fprintf(out, "% 5ld|", state->line);
-}
+    pr->pos = m->start;
+    if (m->op->type == VM_REPLACE) {
+        size_t line_start = get_line_number(pr->file, m->start);
+        size_t line_end = get_line_number(pr->file, m->end);
+        size_t line = line_start;
 
-//
-// Helper function for print_match(), using a struct to keep track of some state.
-//
-static void _print_match(FILE *out, file_t *f, match_t *m, print_state_t *state, print_options_t options)
-{
-    static const char *hl = "\033[0;31;1m";
-    const char *old_color = state->color;
-    if (m->op->type == VM_HIDE) {
-        // TODO: handle replacements?
-        for (const char *p = m->start; p < m->end; p++) {
-            if (*p == '\n') ++state->line;
-        }
-    } else if (m->op->type == VM_REPLACE) {
-        if (options & PRINT_COLOR && state->color != hl) {
-            state->color = hl;
-            fprintf(out, "%s", state->color);
-        }
+        if (pr->use_color) printf("%s", color_hl);
         const char *text = m->op->args.replace.text;
         const char *end = &text[m->op->args.replace.len];
+
+        // TODO: clean up the line numbering code
         for (const char *r = text; r < end; ) {
+            print_line_number(out, pr, line > line_end ? 0 : line, pr->use_color ? color_hl : NULL);
+
+            // Capture substitution
             if (*r == '@' && r[1] && r[1] != '@') {
                 ++r;
                 match_t *cap = get_capture(m, &r);
                 if (cap != NULL) {
-                    _print_match(out, f, cap, state, options);
+                    print_match(out, pr, cap);
                     continue;
                 } else {
                     --r;
                 }
             }
 
-            if (state->printed_line != state->line)
-                print_line_number(out, state, options);
-
             if (*r == '\\') {
                 ++r;
                 unsigned char c = unescapechar(r, &r);
                 fputc(c, out);
-                if (c == '\n') ++state->line;
+                if (c == '\n') {
+                    ++line;
+                    pr->needs_line_number = 1;
+                }
                 continue;
             } else if (*r == '\n') {
                 fputc('\n', out);
-                ++state->line;
+                ++line;
+                pr->needs_line_number = 1;
                 ++r;
                 continue;
             } else {
@@ -260,70 +305,74 @@ static void _print_match(FILE *out, file_t *f, match_t *m, print_state_t *state,
                 continue;
             }
         }
+        print_line_number(out, pr, line > line_end ? 0 : line, pr->use_color ? color_hl : NULL);
     } else {
-        if (m->op->type == VM_CAPTURE) {
-            if (options & PRINT_COLOR && state->color != hl) {
-                state->color = hl;
-                fprintf(out, "%s", state->color);
-            }
-        }
-
         const char *prev = m->start;
         for (match_t *child = m->child; child; child = child->nextsibling) {
             // Skip children from e.g. zero-width matches like >@foo
             if (!(prev <= child->start && child->start <= m->end &&
                   prev <= child->end && child->end <= m->end))
                 continue;
-            if (child->start > prev) {
-                for (const char *p = prev; p < child->start; ++p) {
-                    if (state->printed_line != state->line)
-                        print_line_number(out, state, options);
-                    fputc(*p, out);
-                    if (*p == '\n') ++state->line;
-                }
-            }
-            _print_match(out, f, child, state, options);
+            if (child->start > prev)
+                print_between(out, pr, prev, child->start, pr->use_color ? color_hl : NULL);
+            print_match(out, pr, child);
             prev = child->end;
         }
-        if (m->end > prev) {
-            for (const char *p = prev; p < m->end; ++p) {
-                if (state->printed_line != state->line)
-                    print_line_number(out, state, options);
-                fputc(*p, out);
-                if (*p == '\n') ++state->line;
-            }
-        }
+        if (m->end > prev)
+            print_between(out, pr, prev, m->end, pr->use_color ? color_hl : NULL);
     }
-    if (options & PRINT_COLOR && old_color != state->color) {
-        fprintf(out, "%s", old_color);
-        state->color = old_color;
-    }
+    pr->pos = m->end;
 }
 
 //
-// Print a match with replacements and highlighting.
+// Print the text of a match and any context.
 //
-void print_match(FILE *out, file_t *f, match_t *m, print_options_t options)
+void print_match(FILE *out, printer_t *pr, match_t *m)
 {
-    print_state_t state = {.line = 1, .color = "\033[0m"};
-    _print_match(out, f, m, &state, options);
+    int first = (pr->pos == NULL);
+    if (first) { // First match printed:
+        pr->pos = pr->file->contents;
+        pr->needs_line_number = 1;
+    }
+    if (m) {
+        const char *before_m = context_before(pr, m->start);
+        if (!first) {
+            const char *after_last = context_after(pr, pr->pos);
+            if (after_last >= before_m) {
+                // Overlapping ranges:
+                before_m = pr->pos;
+            } else {
+                // Non-overlapping ranges:
+                print_between(out, pr, pr->pos, after_last, pr->use_color ? color_normal : NULL);
+                if (pr->context_lines > 1)
+                    printf("\n"); // Gap between chunks
+            }
+        }
+        print_between(out, pr, before_m, m->start, pr->use_color ? color_normal : NULL);
+        _print_match(out, pr, m);
+        if (pr->use_color) printf("%s", color_normal);
+    } else {
+        // After the last match is printed, print the trailing context:
+        const char *after_last = context_after(pr, pr->pos);
+        print_between(out, pr, pr->pos, after_last, pr->use_color ? color_normal : NULL);
+    }
 }
 
 //
 // Print any errors that are present in the given match object.
 //
-int print_errors(file_t *f, match_t *m, print_options_t options)
+int print_errors(printer_t *pr, match_t *m)
 {
     int ret = 0;
     if (m->op->type == VM_CAPTURE && m->op->args.capture.name && streq(m->op->args.capture.name, "!")) {
         printf("\033[31;1m");
-        print_match(stdout, f, m, options);
+        print_match(stdout, pr, m);
         printf("\033[0m\n");
-        fprint_line(stdout, f, m->start, m->end, " ");
+        fprint_line(stdout, pr->file, m->start, m->end, " ");
         return 1;
     }
-    if (m->child) ret += print_errors(f, m->child, options);
-    if (m->nextsibling) ret += print_errors(f, m->nextsibling, options);
+    if (m->child) ret += print_errors(pr, m->child);
+    if (m->nextsibling) ret += print_errors(pr, m->nextsibling);
     return ret;
 }
 
