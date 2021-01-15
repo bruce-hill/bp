@@ -14,8 +14,6 @@ bp \- Bruce's Parsing Expression Grammar tool
 [\fI-I\fR|\fI--inplace\fR]
 [\fI-p\fR|\fI--pattern\fR \fI<pattern>\fR]
 [\fI-P\fR|\fI--pattern-string\fR \fI<string-pattern>\fR]
-[\fI-d\fR|\fI--define\fR \fI<name>\fR:\fI<pattern>\fR]
-[\fI-D\fR|\fI--define-string\fR \fI<name>\fR:\fI<string-pattern>\fR]
 [\fI-r\fR|\fI--replace\fR \fI<replacement>\fR]
 [\fI-g\fR|\fI--grammar\fR \fI<grammar file>\fR]
 [\fI-c\fR|\fI--conntext\fR \fI<N>\fR]
@@ -41,12 +39,6 @@ Perform pattern matching case-insensitively.
 
 .B \-I\fR, \fB--inplace
 Perform filtering or replacement in-place (i.e. overwrite files with new content).
-
-.B \-d\fR, \fB--define \fI<name>\fR:\fI<pattern>\fR
-Define a grammar rule using a bp pattern.
-
-.B \-D\fR, \fB--define-string \fI<name>\fR:\fI<string-pattern>\fR
-Define a grammar rule using a bp string pattern.
 
 .B \-r\fR, \fB--replace \fI<replacement>\fR
 Replace all occurrences of the main pattern with the given string.
@@ -187,6 +179,9 @@ Will match only if \fI<pat1>\fR matches and \fI<pat2>\fR doesn't match the text 
 .B \fI<pat1>\fB != \fI<pat2>\fR
 Will match only if \fI<pat1>\fR and \fI<pat2>\fR don't both match and have the
 exact same length. Pronounced \fI<pat1>\fB-assuming-it-doesn't-equal-\fI<pat2>\fR
+
+.B \fI<name>\fB:\fI<pat>\fR
+\fBDefine-\fI<name>\fB-to-mean-\fI<pat>\fR (pattern definition)
 
 .B |
 This pattern matches the indentation at the beginning of a line that has the

@@ -14,8 +14,6 @@ It's written in pure C with no dependencies.
 * `-e` `--explain` print an explanation of the matches
 * `-j` `--json` print matches as JSON objects
 * `-l` `--list-files` print only filenames containing matches
-* `-d` `--define <name>:<def>` define a grammar rule
-* `-D` `--define-string <name>:<def>` define a grammar rule (string-pattern)
 * `-p` `--pattern <pat>` provide a pattern (equivalent to `bp '\(<pat>)'`)
 * `-P` `--pattern-string <pat>` provide a string pattern (equivalent to `bp '<pat>'`, but may be useful if `'<pat>'` begins with a '-')
 * `-r` `--replace <replacement>`   replace the input pattern with the given replacement
@@ -63,6 +61,7 @@ Pattern            | Meaning
 `(pat1 @keep=pat2) => "@keep"` | Match `pat1` followed by `pat2` and replace it with the text of `pat2`
 `pat1==pat2`       | `pat1`, assuming `pat2` also matches with the same length
 `pat1!=pat2`       | `pat1`, unless `pat2` also matches with the same length
+`name:pat2`        | `name` is defined to mean `pat`
 `#( block comment )#` | A block comment
 `# line comment`   | A line comment
 

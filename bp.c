@@ -31,8 +31,6 @@ static const char *usage = (
     " -I --inplace                     modify a file in-place\n"
     " -i --ignore-case                 preform matching case-insensitively\n"
     " -l --list-files                  list filenames only\n"
-    " -d --define <name>:<def>         define a grammar rule\n"
-    " -D --define-string <name>:<def>  define a grammar rule (string-pattern)\n"
     " -p --pattern <pat>               provide a pattern (equivalent to bp '\\(<pat>)')\n"
     " -P --pattern-string <pat>        provide a string pattern (may be useful if '<pat>' begins with a '-')\n"
     " -r --replace <replacement>       replace the input pattern with the given replacement\n"
@@ -311,33 +309,24 @@ int main(int argc, char *argv[])
                 f = load_file(&loaded_files, "/etc/xdg/bp/%s.bp", flag);
             check(f != NULL, "Couldn't find grammar: %s", flag);
             defs = load_grammar(defs, f); // Keep in memory for debug output
-        } else if (FLAG("--define") || FLAG("-d")) {
-            char *def = flag;
-            char *eq = strchr(def, ':');
-            check(eq, "Rule definitions must include an ':'\n\n%s", usage);
-            *eq = '\0';
-            char *src = ++eq;
-            file_t *def_file = spoof_file(&loaded_files, def, src);
-            vm_op_t *pat = bp_pattern(def_file, def_file->contents);
-            check(pat, "Failed to compile pattern: %s", flag);
-            defs = with_def(defs, def_file, strlen(def), def, pat);
-        } else if (FLAG("--define-string") || FLAG("-D")) {
-            char *def = flag;
-            char *eq = strchr(def, ':');
-            check(eq, "Rule definitions must include an ':'\n\n%s", usage);
-            *eq = '\0';
-            char *src = ++eq;
-            file_t *def_file = spoof_file(&loaded_files, def, src);
-            vm_op_t *pat = bp_stringpattern(def_file, def_file->contents);
-            check(pat, "Failed to compile pattern: %s", src);
-            defs = with_def(defs, def_file, strlen(def), def, pat);
         } else if (FLAG("--pattern") || FLAG("-p")) {
             check(npatterns == 0, "Cannot define multiple patterns");
             file_t *arg_file = spoof_file(&loaded_files, "<pattern argument>", flag);
-            vm_op_t *p = bp_pattern(arg_file, arg_file->contents);
-            check(p, "Pattern failed to compile: %s", flag);
-            defs = with_def(defs, arg_file, strlen("pattern"), "pattern", p);
-            ++npatterns;
+            for (const char *str = arg_file->contents; str < arg_file->end; ) {
+                def_t *d = bp_definition(arg_file, str);
+                if (d) {
+                    d->next = defs;
+                    defs = d;
+                    str = d->op->end;
+                } else {
+                    vm_op_t *p = bp_pattern(arg_file, str);
+                    check(p, "Pattern failed to compile: %s", flag);
+                    defs = with_def(defs, arg_file, strlen("pattern"), "pattern", p);
+                    ++npatterns;
+                    str = p->end;
+                }
+                str = strchr(str, ';') ? strchr(str, ';') + 1 : str;
+            }
         } else if (FLAG("--pattern-string") || FLAG("-P")) {
             file_t *arg_file = spoof_file(&loaded_files, "<pattern argument>", flag);
             vm_op_t *p = bp_stringpattern(arg_file, arg_file->contents);

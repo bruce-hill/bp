@@ -593,4 +593,25 @@ vm_op_t *bp_pattern(file_t *f, const char *str)
     return op;
 }
 
+//
+// Match a definition (id__`:__pattern)
+//
+def_t *bp_definition(file_t *f, const char *str)
+{
+    const char *name = after_spaces(str);
+    str = after_name(name);
+    if (!str) return NULL;
+    size_t namelen = (size_t)(str - name);
+    if (!matchchar(&str, ':')) return NULL;
+    vm_op_t *pat = bp_pattern(f, str);
+    if (!pat) return NULL;
+    matchchar(&pat->end, ';'); // TODO: verify this is safe to mutate
+    def_t *def = new(def_t);
+    def->file = f;
+    def->namelen = namelen;
+    def->name = name;
+    def->op = pat;
+    return def;
+}
+
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1
