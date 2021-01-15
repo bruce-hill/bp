@@ -56,7 +56,7 @@ recursive.
 
 Consider the rule `laugh: laugh "ha" / "Ha"` being applied to the input text `"Hahaha!"`:
 
-|Definition of `match(<laugh>, "Hahaha!")` | Result of `match(<laugh "ha" / "Ha">, "Hahaha!")` |
+| Temp. definition of `match(<laugh>, "Hahaha!")` | Result of `match(<laugh "ha" / "Ha">, "Hahaha!")` |
 |------------------------------------------|---------------------------------------------------|
 |`Fail`                                    | `Match{"Ha"}`                                     |
 |`Match{"Ha"}`                             | `Match{"Haha"}`                                   |
