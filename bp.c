@@ -166,6 +166,8 @@ static int inplace_modify_file(def_t *defs, file_t *f, vm_op_t *pattern)
     }
 
     if (inplace_file) {
+        // Print trailing context lines:
+        print_match(inplace_file, &pr, NULL);
         printf("%s\n", f->filename);
         fclose(inplace_file);
     }
