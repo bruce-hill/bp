@@ -12,6 +12,7 @@ bp \- Bruce's Parsing Expression Grammar tool
 [\fI-l\fR|\fI--list-files\fR]
 [\fI-i\fR|\fI--ignore-case\fR \fI<pattern>\fR]
 [\fI-I\fR|\fI--inplace\fR]
+[\fI-C\fR|\fI--confirm\fR]
 [\fI-p\fR|\fI--pattern\fR \fI<pattern>\fR]
 [\fI-P\fR|\fI--pattern-string\fR \fI<string-pattern>\fR]
 [\fI-r\fR|\fI--replace\fR \fI<replacement>\fR]
@@ -39,6 +40,9 @@ Perform pattern matching case-insensitively.
 
 .B \-I\fR, \fB--inplace
 Perform filtering or replacement in-place (i.e. overwrite files with new content).
+
+.B \-C\fR, \fB--confirm
+During in-place modification of a file, confirm before each modification.
 
 .B \-r\fR, \fB--replace \fI<replacement>\fR
 Replace all occurrences of the main pattern with the given string.

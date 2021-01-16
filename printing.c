@@ -261,11 +261,15 @@ void _print_match(FILE *out, printer_t *pr, match_t *m)
 {
     pr->pos = m->start;
     if (m->op->type == VM_REPLACE) {
+        if (m->skip_replacement) {
+            _print_match(out, pr, m->child);
+            return;
+        }
         size_t line_start = get_line_number(pr->file, m->start);
         size_t line_end = get_line_number(pr->file, m->end);
         size_t line = line_start;
 
-        if (pr->use_color) printf("%s", color_replace);
+        if (pr->use_color) fprintf(out, "%s", color_replace);
         const char *text = m->op->args.replace.text;
         const char *end = &text[m->op->args.replace.len];
 
@@ -279,7 +283,7 @@ void _print_match(FILE *out, printer_t *pr, match_t *m)
                 match_t *cap = get_capture(m, &r);
                 if (cap != NULL) {
                     _print_match(out, pr, cap);
-                    if (pr->use_color) printf("%s", color_replace);
+                    if (pr->use_color) fprintf(out, "%s", color_replace);
                     continue;
                 } else {
                     --r;
@@ -347,17 +351,19 @@ void print_match(FILE *out, printer_t *pr, match_t *m)
                 // Non-overlapping ranges:
                 print_between(out, pr, pr->pos, after_last, pr->use_color ? color_normal : NULL);
                 if (pr->context_lines > 1)
-                    printf("\n"); // Gap between chunks
+                    fprintf(out, "\n"); // Gap between chunks
             }
         }
         print_between(out, pr, before_m, m->start, pr->use_color ? color_normal : NULL);
         _print_match(out, pr, m);
-        if (pr->use_color) printf("%s", color_normal);
     } else {
         // After the last match is printed, print the trailing context:
         const char *after_last = context_after(pr, pr->pos);
         print_between(out, pr, pr->pos, after_last, pr->use_color ? color_normal : NULL);
+        // Guarantee trailing newline
+        if (pr->pos > pr->file->contents && pr->pos[-1] != '\n') fprintf(out, "\n");
     }
+    if (pr->use_color) fprintf(out, "%s", color_normal);
 }
 
 //
