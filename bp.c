@@ -12,13 +12,13 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "pattern.h"
-#include "files.h"
 #include "definitions.h"
+#include "files.h"
 #include "json.h"
+#include "match.h"
+#include "pattern.h"
 #include "print.h"
 #include "utils.h"
-#include "match.h"
 
 #ifndef BP_NAME
 #define BP_NAME "bp"

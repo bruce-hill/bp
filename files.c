@@ -13,6 +13,7 @@
 #include <unistd.h>
 
 #include "files.h"
+#include "pattern.h"
 #include "utils.h"
 
 __attribute__((nonnull))

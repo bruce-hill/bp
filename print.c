@@ -6,10 +6,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "match.h"
 #include "print.h"
 #include "types.h"
 #include "utils.h"
-#include "match.h"
 
 typedef struct match_node_s {
     match_t *m;

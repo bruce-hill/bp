@@ -8,9 +8,9 @@
 #include <string.h>
 
 #include "definitions.h"
+#include "match.h"
 #include "types.h"
 #include "utils.h"
-#include "match.h"
 
 #ifdef DEBUG_HEAP
 // Doubly-linked list operations:
