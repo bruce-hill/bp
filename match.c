@@ -7,7 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "grammar.h"
+#include "definitions.h"
 #include "types.h"
 #include "utils.h"
 #include "match.h"

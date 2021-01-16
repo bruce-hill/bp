@@ -14,7 +14,7 @@
 
 #include "pattern.h"
 #include "files.h"
-#include "grammar.h"
+#include "definitions.h"
 #include "json.h"
 #include "print.h"
 #include "utils.h"

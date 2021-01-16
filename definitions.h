@@ -1,8 +1,8 @@
 //
-// grammar.h - Header file defining grammars (sets of rule definitions)
+// definitions.h - Header file defining pattern rules
 //
-#ifndef GRAMMAR__H
-#define GRAMMAR__H
+#ifndef DEFINITIONS__H
+#define DEFINITIONS__H
 
 #include "files.h"
 #include "types.h"

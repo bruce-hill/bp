@@ -1,5 +1,5 @@
 //
-// grammar.c - Code for defining grammars (sets of rules)
+// definitions.c - Code for defining named pattern rules
 //
 
 #include <stdlib.h>
@@ -7,7 +7,7 @@
 
 #include "pattern.h"
 #include "files.h"
-#include "grammar.h"
+#include "definitions.h"
 #include "utils.h"
 
 //
