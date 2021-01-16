@@ -5,7 +5,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include "compiler.h"
+#include "pattern.h"
 #include "files.h"
 #include "grammar.h"
 #include "utils.h"

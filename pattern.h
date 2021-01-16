@@ -1,8 +1,8 @@
 //
-// compiler.h - Header file for BP compiler.
+// pattern.h - Header file for BP pattern compilation.
 //
-#ifndef COMPILER__H
-#define COMPILER__H
+#ifndef PATTERN__H
+#define PATTERN__H
 
 #include "files.h"
 #include "types.h"

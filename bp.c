@@ -12,7 +12,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "compiler.h"
+#include "pattern.h"
 #include "files.h"
 #include "grammar.h"
 #include "json.h"

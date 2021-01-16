@@ -1,5 +1,5 @@
 //
-// compiler.c - Compile strings into BP virtual machine code.
+// pattern.c - Compile strings into BP pattern objects that can be matched against.
 //
 
 #include <ctype.h>
@@ -7,7 +7,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "compiler.h"
+#include "pattern.h"
 #include "utils.h"
 
 #define file_err(f, ...) do { fprint_line(stderr, f, __VA_ARGS__); exit(1); } while(0)
