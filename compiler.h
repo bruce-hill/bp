@@ -14,7 +14,7 @@ pat_t *bp_simplepattern(file_t *f, const char *str);
 __attribute__((nonnull(1,2)))
 pat_t *bp_stringpattern(file_t *f, const char *str);
 __attribute__((nonnull(1,2)))
-pat_t *bp_replacement(file_t *f, pat_t *pat, const char *replacement);
+pat_t *bp_replacement(file_t *f, pat_t *replacepat, const char *replacement);
 __attribute__((nonnull))
 pat_t *bp_pattern(file_t *f, const char *str);
 __attribute__((nonnull))

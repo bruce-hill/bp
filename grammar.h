@@ -8,7 +8,7 @@
 #include "types.h"
 
 __attribute__((nonnull(2,4,5), returns_nonnull))
-def_t *with_def(def_t *defs, file_t *f, size_t namelen, const char *name, pat_t *op);
+def_t *with_def(def_t *defs, file_t *f, size_t namelen, const char *name, pat_t *pat);
 __attribute__((nonnull(2,3,4), returns_nonnull))
 def_t *with_backref(def_t *defs, file_t *f, const char *name, match_t *m);
 __attribute__((nonnull(2)))
