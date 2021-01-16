@@ -8,10 +8,8 @@
 
 #include "file_loader.h"
 
-//
-// BP virtual machine opcodes (these must be kept in sync with the names in vm.c)
-//
-enum VMOpcode {
+// BP virtual machine pattern types
+enum pattype_e {
     VM_ANYCHAR = 1,
     VM_STRING,
     VM_RANGE,
@@ -38,7 +36,7 @@ struct match_s; // forward declared to resolve circular struct defs
 // A struct reperesenting a BP virtual machine operation
 //
 typedef struct pat_s {
-    enum VMOpcode type;
+    enum pattype_e type;
     const char *start, *end;
     // Length of the match, if constant, otherwise -1
     ssize_t len;

@@ -365,11 +365,11 @@ int main(int argc, char *argv[])
     def_t *defs = NULL;
     file_t *loaded_files = NULL;
 
-    // Define an opcode that is just a reference to the rule `pattern`
+    // Define a pattern that is just a reference to the rule `pattern`
     file_t *pat_file = spoof_file(&loaded_files, "<pattern>", "pattern");
     pat_t *pattern = bp_pattern(loaded_files, pat_file->contents);
 
-    // Define an opcode that is just a reference to the rule `replacement`
+    // Define a pattern that is just a reference to the rule `replacement`
     file_t *rep_file = spoof_file(&loaded_files, "<replacement>", "replacement");
     pat_t *replacement = bp_pattern(rep_file, rep_file->contents);
 

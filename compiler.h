@@ -8,7 +8,7 @@
 #include "types.h"
 
 __attribute__((nonnull))
-pat_t *new_pat(file_t *f, const char *start, enum VMOpcode type);
+pat_t *new_pat(file_t *f, const char *start, enum pattype_e type);
 __attribute__((nonnull(1,2)))
 pat_t *bp_simplepattern(file_t *f, const char *str);
 __attribute__((nonnull(1,2)))

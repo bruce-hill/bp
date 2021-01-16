@@ -24,10 +24,10 @@ __attribute__((nonnull(1,2,3,6)))
 static pat_t *new_range(file_t *f, const char *start, const char *end, ssize_t min, ssize_t max, pat_t *pat, pat_t *sep);
 
 //
-// Allocate a new opcode for this file (ensuring it will be automatically freed
-// when the file is freed)
+// Allocate a new pattern for this file (ensuring it will be automatically
+// freed when the file is freed)
 //
-pat_t *new_pat(file_t *f, const char *start, enum VMOpcode type)
+pat_t *new_pat(file_t *f, const char *start, enum pattype_e type)
 {
     allocated_op_t *tracker = new(allocated_op_t);
     tracker->next = f->ops;
@@ -63,7 +63,7 @@ static pat_t *new_range(file_t *f, const char *start, const char *end, ssize_t m
 }
 
 //
-// Take an opcode and expand it into a chain of patterns if it's followed by
+// Take a pattern and expand it into a chain of patterns if it's followed by
 // any patterns (e.g. "`x `y"), otherwise return the original input.
 //
 static pat_t *expand_chain(file_t *f, pat_t *first)
@@ -78,7 +78,7 @@ static pat_t *expand_chain(file_t *f, pat_t *first)
 }
 
 //
-// Take an opcode and parse any "=>" replacements and then expand it into a
+// Take a pattern and parse any "=>" replacements and then expand it into a
 // chain of choices if it's followed by any "/"-separated patterns (e.g.
 // "`x/`y"), otherwise return the original input.
 //
@@ -133,7 +133,7 @@ static pat_t *expand_choices(file_t *f, pat_t *first)
 }
 
 //
-// Given two patterns, return a new opcode for the first pattern followed by
+// Given two patterns, return a new pattern for the first pattern followed by
 // the second. If either pattern is NULL, return the other.
 //
 static pat_t *chain_together(file_t *f, pat_t *first, pat_t *second)
@@ -188,7 +188,7 @@ pat_t *bp_simplepattern(file_t *f, const char *str)
 }
 
 //
-// Compile a string of BP code into virtual machine opcodes
+// Compile a string of BP code into a BP pattern object.
 //
 static pat_t *_bp_simplepattern(file_t *f, const char *str)
 {
@@ -557,8 +557,8 @@ pat_t *bp_stringpattern(file_t *f, const char *str)
 }
 
 //
-// Given a pattern and a replacement string, compile the two into a replacement
-// VM opcode.
+// Given a pattern and a replacement string, compile the two into a BP
+// replace pattern.
 //
 pat_t *bp_replacement(file_t *f, pat_t *pat, const char *replacement)
 {
@@ -583,7 +583,7 @@ pat_t *bp_replacement(file_t *f, pat_t *pat, const char *replacement)
 }
 
 //
-// Compile a string representing a BP pattern into an opcode object.
+// Compile a string representing a BP pattern into a pattern object.
 //
 pat_t *bp_pattern(file_t *f, const char *str)
 {
