@@ -8,15 +8,15 @@
 #include "types.h"
 
 __attribute__((nonnull))
-vm_op_t *new_op(file_t *f, const char *start, enum VMOpcode type);
+pat_t *new_pat(file_t *f, const char *start, enum VMOpcode type);
 __attribute__((nonnull(1,2)))
-vm_op_t *bp_simplepattern(file_t *f, const char *str);
+pat_t *bp_simplepattern(file_t *f, const char *str);
 __attribute__((nonnull(1,2)))
-vm_op_t *bp_stringpattern(file_t *f, const char *str);
+pat_t *bp_stringpattern(file_t *f, const char *str);
 __attribute__((nonnull(1,2)))
-vm_op_t *bp_replacement(file_t *f, vm_op_t *pat, const char *replacement);
+pat_t *bp_replacement(file_t *f, pat_t *pat, const char *replacement);
 __attribute__((nonnull))
-vm_op_t *bp_pattern(file_t *f, const char *str);
+pat_t *bp_pattern(file_t *f, const char *str);
 __attribute__((nonnull))
 def_t *bp_definition(file_t *f, const char *str);
 

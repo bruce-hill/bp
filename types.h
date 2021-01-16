@@ -37,7 +37,7 @@ struct match_s; // forward declared to resolve circular struct defs
 //
 // A struct reperesenting a BP virtual machine operation
 //
-typedef struct vm_op_s {
+typedef struct pat_s {
     enum VMOpcode type;
     const char *start, *end;
     // Length of the match, if constant, otherwise -1
@@ -49,19 +49,19 @@ typedef struct vm_op_s {
         } range;
         struct {
             ssize_t min, max;
-            struct vm_op_s *sep, *repeat_pat;
+            struct pat_s *sep, *repeat_pat;
         } repetitions;
         // TODO: use a linked list instead of a binary tree
         struct {
-            struct vm_op_s *first, *second;
+            struct pat_s *first, *second;
         } multiple;
         struct {
-            struct vm_op_s *pat;
+            struct pat_s *pat;
             const char *text;
             size_t len;
         } replace;
         struct {
-            struct vm_op_s *capture_pat;
+            struct pat_s *capture_pat;
             char *name;
         } capture;
         struct match_s *backref;
@@ -69,11 +69,11 @@ typedef struct vm_op_s {
             struct match_s *match;
             unsigned int visits;
             const char *at;
-            struct vm_op_s *fallback;
+            struct pat_s *fallback;
         } leftrec;
-        struct vm_op_s *pat;
+        struct pat_s *pat;
     } args;
-} vm_op_t;
+} pat_t;
 
 //
 // Pattern matching result object
@@ -82,7 +82,7 @@ typedef struct match_s {
     // Where the match starts and ends (end is after the last character)
     const char *start, *end;
     struct match_s *child, *nextsibling;
-    vm_op_t *op;
+    pat_t *op;
     // Intrusive linked list nodes for garbage collection:
     struct match_s *next;
 #ifdef DEBUG_HEAP
@@ -103,7 +103,7 @@ typedef struct def_s {
     size_t namelen;
     const char *name;
     file_t *file;
-    vm_op_t *op;
+    pat_t *op;
     struct def_s *next;
 } def_t;
 
@@ -113,7 +113,7 @@ typedef struct def_s {
 //
 typedef struct allocated_op_s {
     struct allocated_op_s *next;
-    vm_op_t op;
+    pat_t op;
 } allocated_op_t;
 
 #endif

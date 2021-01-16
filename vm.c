@@ -123,7 +123,7 @@ static const char *match_backref(const char *str, match_t *cap, unsigned int ign
 //
 // Find the next match after prev (or the first match if prev is NULL)
 //
-match_t *next_match(def_t *defs, file_t *f, match_t *prev, vm_op_t *op, unsigned int ignorecase)
+match_t *next_match(def_t *defs, file_t *f, match_t *prev, pat_t *op, unsigned int ignorecase)
 {
     const char *str;
     if (prev) {
@@ -144,7 +144,7 @@ match_t *next_match(def_t *defs, file_t *f, match_t *prev, vm_op_t *op, unsigned
 // a match struct, or NULL if no match is found.
 // The returned value should be free()'d to avoid memory leaking.
 //
-match_t *match(def_t *defs, file_t *f, const char *str, vm_op_t *op, unsigned int ignorecase)
+match_t *match(def_t *defs, file_t *f, const char *str, pat_t *op, unsigned int ignorecase)
 {
     switch (op->type) {
         case VM_LEFTRECURSION: {
@@ -207,7 +207,7 @@ match_t *match(def_t *defs, file_t *f, const char *str, vm_op_t *op, unsigned in
             m->start = str;
             m->op = op;
 
-            vm_op_t *pat = op->args.multiple.first, *skip = op->args.multiple.second;
+            pat_t *pat = op->args.multiple.first, *skip = op->args.multiple.second;
             if (!pat && !skip) {
                 while (str < f->end && *str != '\n') ++str;
                 m->end = str;
@@ -416,9 +416,9 @@ match_t *match(def_t *defs, file_t *f, const char *str, vm_op_t *op, unsigned in
         case VM_REF: {
             def_t *def = lookup(defs, op->args.s);
             check(def != NULL, "Unknown identifier: '%s'", op->args.s);
-            vm_op_t *ref = def->op;
+            pat_t *ref = def->op;
 
-            vm_op_t rec_op = {
+            pat_t rec_op = {
                 .type = VM_LEFTRECURSION,
                 .start = ref->start,
                 .end = ref->end,
@@ -667,7 +667,7 @@ size_t free_all_matches(void)
 //
 // Deallocate memory associated with an op
 //
-void destroy_op(vm_op_t *op)
+void destroy_op(pat_t *op)
 {
     switch (op->type) {
         case VM_STRING: case VM_REF:

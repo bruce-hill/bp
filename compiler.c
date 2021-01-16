@@ -13,21 +13,21 @@
 #define file_err(f, ...) do { fprint_line(stderr, f, __VA_ARGS__); exit(1); } while(0)
 
 __attribute__((nonnull))
-static vm_op_t *expand_chain(file_t *f, vm_op_t *first);
+static pat_t *expand_chain(file_t *f, pat_t *first);
 __attribute__((nonnull))
-static vm_op_t *expand_choices(file_t *f, vm_op_t *first);
+static pat_t *expand_choices(file_t *f, pat_t *first);
 __attribute__((nonnull))
-static vm_op_t *_bp_simplepattern(file_t *f, const char *str);
+static pat_t *_bp_simplepattern(file_t *f, const char *str);
 __attribute__((nonnull(1)))
-static vm_op_t *chain_together(file_t *f,vm_op_t *first, vm_op_t *second);
+static pat_t *chain_together(file_t *f,pat_t *first, pat_t *second);
 __attribute__((nonnull(1,2,3,6)))
-static vm_op_t *new_range(file_t *f, const char *start, const char *end, ssize_t min, ssize_t max, vm_op_t *pat, vm_op_t *sep);
+static pat_t *new_range(file_t *f, const char *start, const char *end, ssize_t min, ssize_t max, pat_t *pat, pat_t *sep);
 
 //
 // Allocate a new opcode for this file (ensuring it will be automatically freed
 // when the file is freed)
 //
-vm_op_t *new_op(file_t *f, const char *start, enum VMOpcode type)
+pat_t *new_pat(file_t *f, const char *start, enum VMOpcode type)
 {
     allocated_op_t *tracker = new(allocated_op_t);
     tracker->next = f->ops;
@@ -41,9 +41,9 @@ vm_op_t *new_op(file_t *f, const char *start, enum VMOpcode type)
 //
 // Helper function to initialize a range object.
 //
-static vm_op_t *new_range(file_t *f, const char *start, const char *end, ssize_t min, ssize_t max, vm_op_t *pat, vm_op_t *sep)
+static pat_t *new_range(file_t *f, const char *start, const char *end, ssize_t min, ssize_t max, pat_t *pat, pat_t *sep)
 {
-    vm_op_t *op = new_op(f, start, VM_REPEAT);
+    pat_t *op = new_pat(f, start, VM_REPEAT);
     if (pat->len >= 0 && (sep == NULL || sep->len >= 0) && min == max && min >= 0)
         op->len = pat->len * min + (sep == NULL || min == 0 ? 0 : sep->len * (min-1));
     else
@@ -66,9 +66,9 @@ static vm_op_t *new_range(file_t *f, const char *start, const char *end, ssize_t
 // Take an opcode and expand it into a chain of patterns if it's followed by
 // any patterns (e.g. "`x `y"), otherwise return the original input.
 //
-static vm_op_t *expand_chain(file_t *f, vm_op_t *first)
+static pat_t *expand_chain(file_t *f, pat_t *first)
 {
-    vm_op_t *second = bp_simplepattern(f, first->end);
+    pat_t *second = bp_simplepattern(f, first->end);
     if (second == NULL) return first;
     second = expand_chain(f, second);
     if (second->end <= first->end)
@@ -82,7 +82,7 @@ static vm_op_t *expand_chain(file_t *f, vm_op_t *first)
 // chain of choices if it's followed by any "/"-separated patterns (e.g.
 // "`x/`y"), otherwise return the original input.
 //
-static vm_op_t *expand_choices(file_t *f, vm_op_t *first)
+static pat_t *expand_choices(file_t *f, pat_t *first)
 {
     first = expand_chain(f, first);
     const char *str = first->end;
@@ -108,8 +108,8 @@ static vm_op_t *expand_choices(file_t *f, vm_op_t *first)
         const char *replacement = xcalloc(sizeof(char), replace_len+1);
         memcpy((void*)replacement, repstr, replace_len);
         
-        vm_op_t *pat = first;
-        first = new_op(f, pat->start, VM_REPLACE);
+        pat_t *pat = first;
+        first = new_pat(f, pat->start, VM_REPLACE);
         first->args.replace.pat = pat;
         first->args.replace.text = replacement;
         first->args.replace.len = replace_len;
@@ -118,11 +118,11 @@ static vm_op_t *expand_choices(file_t *f, vm_op_t *first)
     }
 
     if (!matchchar(&str, '/')) return first;
-    vm_op_t *second = bp_simplepattern(f, str);
+    pat_t *second = bp_simplepattern(f, str);
     if (!second)
         file_err(f, str, str, "There should be a pattern here after a '/'");
     second = expand_choices(f, second);
-    vm_op_t *choice = new_op(f, first->start, VM_OTHERWISE);
+    pat_t *choice = new_pat(f, first->start, VM_OTHERWISE);
     if (first->len == second->len)
         choice->len = first->len;
     else choice->len = -1;
@@ -136,11 +136,11 @@ static vm_op_t *expand_choices(file_t *f, vm_op_t *first)
 // Given two patterns, return a new opcode for the first pattern followed by
 // the second. If either pattern is NULL, return the other.
 //
-static vm_op_t *chain_together(file_t *f, vm_op_t *first, vm_op_t *second)
+static pat_t *chain_together(file_t *f, pat_t *first, pat_t *second)
 {
     if (first == NULL) return second;
     if (second == NULL) return first;
-    vm_op_t *chain = new_op(f, first->start, VM_CHAIN);
+    pat_t *chain = new_pat(f, first->start, VM_CHAIN);
     chain->start = first->start;
     if (first->len >= 0 && second->len >= 0)
         chain->len = first->len + second->len;
@@ -154,9 +154,9 @@ static vm_op_t *chain_together(file_t *f, vm_op_t *first, vm_op_t *second)
 //
 // Wrapper for _bp_simplepattern() that expands any postfix operators
 //
-vm_op_t *bp_simplepattern(file_t *f, const char *str)
+pat_t *bp_simplepattern(file_t *f, const char *str)
 {
-    vm_op_t *op = _bp_simplepattern(f, str);
+    pat_t *op = _bp_simplepattern(f, str);
     if (op == NULL) return op;
 
     check(op->end != NULL, "op->end is uninitialized!");
@@ -165,8 +165,8 @@ vm_op_t *bp_simplepattern(file_t *f, const char *str)
     str = after_spaces(op->end);
     while (str+2 < f->end && (matchstr(&str, "!=") || matchstr(&str, "=="))) { // Equality <pat1>==<pat2> and inequality <pat1>!=<pat2>
         int equal = str[-2] == '=';
-        vm_op_t *first = op;
-        vm_op_t *second = bp_simplepattern(f, str);
+        pat_t *first = op;
+        pat_t *second = bp_simplepattern(f, str);
         if (!second)
             file_err(f, str, str, "The '%c=' operator expects a pattern before and after.", equal?'=':'!');
         if (equal) {
@@ -175,7 +175,7 @@ vm_op_t *bp_simplepattern(file_t *f, const char *str)
                   "These two patterns cannot possibly give the same result (different lengths: %ld != %ld)",
                   first->len, second->len);
         }
-        op = new_op(f, str, equal ? VM_EQUAL : VM_NOT_EQUAL);
+        op = new_pat(f, str, equal ? VM_EQUAL : VM_NOT_EQUAL);
         op->end = second->end;
         op->len = first->len != -1 ? first->len : second->len;
         op->args.multiple.first = first;
@@ -190,7 +190,7 @@ vm_op_t *bp_simplepattern(file_t *f, const char *str)
 //
 // Compile a string of BP code into virtual machine opcodes
 //
-static vm_op_t *_bp_simplepattern(file_t *f, const char *str)
+static pat_t *_bp_simplepattern(file_t *f, const char *str)
 {
     str = after_spaces(str);
     if (!*str) return NULL;
@@ -201,14 +201,14 @@ static vm_op_t *_bp_simplepattern(file_t *f, const char *str)
         // Any char (dot)
         case '.': {
             if (*str == '.') { // ".."
-                vm_op_t *op = new_op(f, start, VM_UPTO_AND);
+                pat_t *op = new_pat(f, start, VM_UPTO_AND);
                 ++str;
-                vm_op_t *till = bp_simplepattern(f, str);
+                pat_t *till = bp_simplepattern(f, str);
                 op->args.multiple.first = till;
                 if (till)
                     str = till->end;
                 if (matchchar(&str, '%')) {
-                    vm_op_t *skip = bp_simplepattern(f, str);
+                    pat_t *skip = bp_simplepattern(f, str);
                     if (!skip)
                         file_err(f, str, str, "There should be a pattern to skip here after the '%%'");
                     op->args.multiple.second = skip;
@@ -217,7 +217,7 @@ static vm_op_t *_bp_simplepattern(file_t *f, const char *str)
                 op->end = str;
                 return op;
             } else {
-                vm_op_t *op = new_op(f, start, VM_ANYCHAR);
+                pat_t *op = new_pat(f, start, VM_ANYCHAR);
                 op->len = 1;
                 op->end = str;
                 return op;
@@ -225,20 +225,20 @@ static vm_op_t *_bp_simplepattern(file_t *f, const char *str)
         }
         // Char literals
         case '`': {
-            vm_op_t *all = NULL;
+            pat_t *all = NULL;
             do {
                 char c = *str;
                 if (!c || c == '\n')
                     file_err(f, str, str, "There should be a character here after the '`'");
                 const char *opstart = str-1;
 
-                vm_op_t *op;
+                pat_t *op;
                 ++str;
                 if (matchchar(&str, '-')) { // Range
                     char c2 = *str;
                     if (!c2 || c2 == '\n')
                         file_err(f, str, str, "There should be a character here to complete the character range.");
-                    op = new_op(f, opstart, VM_RANGE);
+                    op = new_pat(f, opstart, VM_RANGE);
                     if (c < c2) {
                         op->args.range.low = (unsigned char)c;
                         op->args.range.high = (unsigned char)c2;
@@ -248,7 +248,7 @@ static vm_op_t *_bp_simplepattern(file_t *f, const char *str)
                     }
                     ++str;
                 } else {
-                    op = new_op(f, opstart, VM_STRING);
+                    op = new_pat(f, opstart, VM_STRING);
                     char *s = xcalloc(sizeof(char), 2);
                     s[0] = c;
                     op->args.s = s;
@@ -260,7 +260,7 @@ static vm_op_t *_bp_simplepattern(file_t *f, const char *str)
                 if (all == NULL) {
                     all = op;
                 } else {
-                    vm_op_t *either = new_op(f, all->start, VM_OTHERWISE);
+                    pat_t *either = new_pat(f, all->start, VM_OTHERWISE);
                     either->end = op->end;
                     either->args.multiple.first = all;
                     either->args.multiple.second = op;
@@ -278,12 +278,12 @@ static vm_op_t *_bp_simplepattern(file_t *f, const char *str)
                 file_err(f, str, str, "There should be an escape sequence here after this backslash.");
 
             if (matchchar(&str, 'N')) { // \N (nodent)
-                vm_op_t *op = new_op(f, start, VM_NODENT);
+                pat_t *op = new_pat(f, start, VM_NODENT);
                 op->end = str;
                 return op;
             }
 
-            vm_op_t *op;
+            pat_t *op;
             const char *opstart = str;
             unsigned char e = unescapechar(str, &str);
             if (*str == '-') { // Escape range (e.g. \x00-\xFF)
@@ -294,11 +294,11 @@ static vm_op_t *_bp_simplepattern(file_t *f, const char *str)
                     file_err(f, seqstart, str+1, "This value isn't a valid escape sequence");
                 if (e2 < e)
                     file_err(f, start, str, "Escape ranges should be low-to-high, but this is high-to-low.");
-                op = new_op(f, opstart, VM_RANGE);
+                op = new_pat(f, opstart, VM_RANGE);
                 op->args.range.low = e;
                 op->args.range.high = e2;
             } else {
-                op = new_op(f, opstart, VM_STRING);
+                op = new_pat(f, opstart, VM_STRING);
                 char *s = xcalloc(sizeof(char), 2);
                 s[0] = (char)e;
                 op->args.s = s;
@@ -326,7 +326,7 @@ static vm_op_t *_bp_simplepattern(file_t *f, const char *str)
             // escaped string, so this is safe to do inplace.
             len = unescape_string(literal, literal, len);
 
-            vm_op_t *op = new_op(f, start, VM_STRING);
+            pat_t *op = new_pat(f, start, VM_STRING);
             op->len = (ssize_t)len;
             op->args.s = literal;
 
@@ -338,9 +338,9 @@ static vm_op_t *_bp_simplepattern(file_t *f, const char *str)
         }
         // Not <pat>
         case '!': {
-            vm_op_t *p = bp_simplepattern(f, str);
+            pat_t *p = bp_simplepattern(f, str);
             if (!p) file_err(f, str, str, "There should be a pattern after this '!'");
-            vm_op_t *op = new_op(f, start, VM_NOT);
+            pat_t *op = new_pat(f, start, VM_NOT);
             op->len = 0;
             op->args.pat = p;
             op->end = p->end;
@@ -363,11 +363,11 @@ static vm_op_t *_bp_simplepattern(file_t *f, const char *str)
             } else {
                 min = n1, max = n1;
             }
-            vm_op_t *pat = bp_simplepattern(f, str);
+            pat_t *pat = bp_simplepattern(f, str);
             if (!pat)
                 file_err(f, str, str, "There should be a pattern after this repetition count.");
             str = pat->end;
-            vm_op_t *sep = NULL;
+            pat_t *sep = NULL;
             if (matchchar(&str, '%')) {
                 sep = bp_simplepattern(f, str);
                 if (!sep)
@@ -380,7 +380,7 @@ static vm_op_t *_bp_simplepattern(file_t *f, const char *str)
         }
         // Lookbehind
         case '<': {
-            vm_op_t *pat = bp_simplepattern(f, str);
+            pat_t *pat = bp_simplepattern(f, str);
             if (!pat)
                 file_err(f, str, str, "There should be a pattern after this '<'");
             str = pat->end;
@@ -389,7 +389,7 @@ static vm_op_t *_bp_simplepattern(file_t *f, const char *str)
                          "Sorry, variable-length lookbehind patterns like this are not supported.\n"
                          "Please use a fixed-length lookbehind pattern instead.");
             str = pat->end;
-            vm_op_t *op = new_op(f, start, VM_AFTER);
+            pat_t *op = new_pat(f, start, VM_AFTER);
             op->len = 0;
             op->args.pat = pat;
             op->end = str;
@@ -397,11 +397,11 @@ static vm_op_t *_bp_simplepattern(file_t *f, const char *str)
         }
         // Lookahead
         case '>': {
-            vm_op_t *pat = bp_simplepattern(f, str);
+            pat_t *pat = bp_simplepattern(f, str);
             if (!pat)
                 file_err(f, str, str, "There should be a pattern after this '>'");
             str = pat->end;
-            vm_op_t *op = new_op(f, start, VM_BEFORE);
+            pat_t *op = new_pat(f, start, VM_BEFORE);
             op->len = 0;
             op->args.pat = pat;
             op->end = str;
@@ -410,7 +410,7 @@ static vm_op_t *_bp_simplepattern(file_t *f, const char *str)
         // Parentheses
         case '(': case '{': {
             char closing = c == '(' ? ')' : '}';
-            vm_op_t *op = bp_simplepattern(f, str);
+            pat_t *op = bp_simplepattern(f, str);
             if (!op)
                 file_err(f, str, str, "There should be a valid pattern after this parenthesis.");
             op = expand_choices(f, op);
@@ -423,7 +423,7 @@ static vm_op_t *_bp_simplepattern(file_t *f, const char *str)
         }
         // Square brackets
         case '[': {
-            vm_op_t *pat = bp_simplepattern(f, str);
+            pat_t *pat = bp_simplepattern(f, str);
             if (!pat)
                 file_err(f, str, str, "There should be a valid pattern after this square bracket.");
             pat = expand_choices(f, pat);
@@ -435,11 +435,11 @@ static vm_op_t *_bp_simplepattern(file_t *f, const char *str)
         // Repeating
         case '*': case '+': {
             ssize_t min = c == '*' ? 0 : 1;
-            vm_op_t *pat = bp_simplepattern(f, str);
+            pat_t *pat = bp_simplepattern(f, str);
             if (!pat)
                 file_err(f, str, str, "There should be a valid pattern here after the '%c'", c);
             str = pat->end;
-            vm_op_t *sep = NULL;
+            pat_t *sep = NULL;
             if (matchchar(&str, '%')) {
                 sep = bp_simplepattern(f, str);
                 if (!sep)
@@ -450,13 +450,13 @@ static vm_op_t *_bp_simplepattern(file_t *f, const char *str)
         }
         // Capture
         case '@': {
-            vm_op_t *op = new_op(f, start, VM_CAPTURE);
+            pat_t *op = new_pat(f, start, VM_CAPTURE);
             const char *a = *str == '!' ? &str[1] : after_name(str);
             if (a > str && after_spaces(a)[0] == '=' && after_spaces(a)[1] != '>') {
                 op->args.capture.name = strndup(str, (size_t)(a-str));
                 str = after_spaces(a) + 1;
             }
-            vm_op_t *pat = bp_simplepattern(f, str);
+            pat_t *pat = bp_simplepattern(f, str);
             if (!pat)
                 file_err(f, str, str, "There should be a valid pattern here to capture after the '@'");
             op->args.capture.capture_pat = pat;
@@ -475,7 +475,7 @@ static vm_op_t *_bp_simplepattern(file_t *f, const char *str)
                 if (matchchar(&str, ':')) return NULL; // Don't match definitions
                 name = strndup(&c, 1);
             }
-            vm_op_t *op = new_op(f, start, VM_REF);
+            pat_t *op = new_pat(f, start, VM_REF);
             op->args.s = name;
             op->end = str;
             return op;
@@ -488,7 +488,7 @@ static vm_op_t *_bp_simplepattern(file_t *f, const char *str)
             str = after_name(str);
             if (matchchar(&str, ':')) // Don't match definitions
                 return NULL;
-            vm_op_t *op = new_op(f, start, VM_REF);
+            pat_t *op = new_pat(f, start, VM_REF);
             op->args.s = strndup(refname, (size_t)(str - refname));
             op->end = str;
             return op;
@@ -500,19 +500,19 @@ static vm_op_t *_bp_simplepattern(file_t *f, const char *str)
 //
 // Similar to bp_simplepattern, except that the pattern begins with an implicit, unclosable quote.
 //
-vm_op_t *bp_stringpattern(file_t *f, const char *str)
+pat_t *bp_stringpattern(file_t *f, const char *str)
 {
-    vm_op_t *ret = NULL;
+    pat_t *ret = NULL;
     while (*str) {
         char *start = (char*)str;
-        vm_op_t *interp = NULL;
+        pat_t *interp = NULL;
         for (; *str; str++) {
             if (*str == '\\') {
                 if (!str[1] || str[1] == '\n')
                     file_err(f, str, str, "There should be an escape sequence or pattern here after this backslash.");
                 
                 if (matchchar(&str, 'N')) { // \N (nodent)
-                    interp = new_op(f, str-2, VM_NODENT);
+                    interp = new_pat(f, str-2, VM_NODENT);
                     break;
                 }
 
@@ -540,7 +540,7 @@ vm_op_t *bp_stringpattern(file_t *f, const char *str)
         // escaped string, so this is safe to do inplace.
         len = unescape_string(literal, literal, len);
         if (len > 0) {
-            vm_op_t *strop = new_op(f, str, VM_STRING);
+            pat_t *strop = new_pat(f, str, VM_STRING);
             strop->len = (ssize_t)len;
             strop->args.s = literal;
             strop->end = str;
@@ -560,9 +560,9 @@ vm_op_t *bp_stringpattern(file_t *f, const char *str)
 // Given a pattern and a replacement string, compile the two into a replacement
 // VM opcode.
 //
-vm_op_t *bp_replacement(file_t *f, vm_op_t *pat, const char *replacement)
+pat_t *bp_replacement(file_t *f, pat_t *pat, const char *replacement)
 {
-    vm_op_t *op = new_op(f, pat->start, VM_REPLACE);
+    pat_t *op = new_pat(f, pat->start, VM_REPLACE);
     op->end = pat->end;
     op->len = pat->len;
     op->args.replace.pat = pat;
@@ -585,9 +585,9 @@ vm_op_t *bp_replacement(file_t *f, vm_op_t *pat, const char *replacement)
 //
 // Compile a string representing a BP pattern into an opcode object.
 //
-vm_op_t *bp_pattern(file_t *f, const char *str)
+pat_t *bp_pattern(file_t *f, const char *str)
 {
-    vm_op_t *op = bp_simplepattern(f, str);
+    pat_t *op = bp_simplepattern(f, str);
     if (op != NULL) op = expand_choices(f, op);
     return op;
 }
@@ -602,7 +602,7 @@ def_t *bp_definition(file_t *f, const char *str)
     if (!str) return NULL;
     size_t namelen = (size_t)(str - name);
     if (!matchchar(&str, ':')) return NULL;
-    vm_op_t *pat = bp_pattern(f, str);
+    pat_t *pat = bp_pattern(f, str);
     if (!pat) return NULL;
     matchchar(&pat->end, ';'); // TODO: verify this is safe to mutate
     def_t *def = new(def_t);

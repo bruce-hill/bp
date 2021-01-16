@@ -9,13 +9,13 @@
 #include "types.h"
 
 __attribute__((nonnull(2,4)))
-match_t *next_match(def_t *defs, file_t *f, match_t *prev, vm_op_t *op, unsigned int flags);
+match_t *next_match(def_t *defs, file_t *f, match_t *prev, pat_t *op, unsigned int flags);
 __attribute__((hot, nonnull(2,3,4)))
-match_t *match(def_t *defs, file_t *f, const char *str, vm_op_t *op, unsigned int flags);
+match_t *match(def_t *defs, file_t *f, const char *str, pat_t *op, unsigned int flags);
 __attribute__((nonnull))
 match_t *get_capture(match_t *m, const char **id);
 __attribute__((nonnull))
-void destroy_op(vm_op_t *op);
+void destroy_op(pat_t *op);
 match_t *new_match(void);
 __attribute__((nonnull))
 void recycle_if_unused(match_t **at_m);

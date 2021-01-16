@@ -122,7 +122,7 @@ static int is_text_file(const char *filename)
 //
 // Print matches in JSON format.
 //
-static int print_matches_as_json(def_t *defs, file_t *f, vm_op_t *pattern)
+static int print_matches_as_json(def_t *defs, file_t *f, pat_t *pattern)
 {
     int matches = 0;
     for (match_t *m = NULL; (m = next_match(defs, f, m, pattern, ignorecase)); ) {
@@ -140,7 +140,7 @@ static int print_matches_as_json(def_t *defs, file_t *f, vm_op_t *pattern)
 //
 // Print matches in a visual explanation style
 //
-static int explain_matches(def_t *defs, file_t *f, vm_op_t *pattern)
+static int explain_matches(def_t *defs, file_t *f, pat_t *pattern)
 {
     int matches = 0;
     for (match_t *m = NULL; (m = next_match(defs, f, m, pattern, ignorecase)); ) {
@@ -231,7 +231,7 @@ static void confirm_replacements(file_t *f, match_t *m, confirm_t *confirm)
 // Replace a file's contents with the text version of a match.
 // (Useful for replacements)
 //
-static int inplace_modify_file(def_t *defs, file_t *f, vm_op_t *pattern)
+static int inplace_modify_file(def_t *defs, file_t *f, pat_t *pattern)
 {
     char tmp_filename[PATH_MAX+1] = {0};
     printer_t pr = {
@@ -289,7 +289,7 @@ static int inplace_modify_file(def_t *defs, file_t *f, vm_op_t *pattern)
 //
 // Print all the matches in a file.
 //
-static int print_matches(def_t *defs, file_t *f, vm_op_t *pattern)
+static int print_matches(def_t *defs, file_t *f, pat_t *pattern)
 {
     static int printed_filenames = 0;
     int matches = 0;
@@ -325,7 +325,7 @@ static int print_matches(def_t *defs, file_t *f, vm_op_t *pattern)
 // For a given filename, open the file and attempt to match the given pattern
 // against it, printing any results according to the flags.
 //
-static int process_file(def_t *defs, const char *filename, vm_op_t *pattern)
+static int process_file(def_t *defs, const char *filename, pat_t *pattern)
 {
     file_t *f = load_file(NULL, filename);
     check(f, "Could not open file: %s", filename);
@@ -367,11 +367,11 @@ int main(int argc, char *argv[])
 
     // Define an opcode that is just a reference to the rule `pattern`
     file_t *pat_file = spoof_file(&loaded_files, "<pattern>", "pattern");
-    vm_op_t *pattern = bp_pattern(loaded_files, pat_file->contents);
+    pat_t *pattern = bp_pattern(loaded_files, pat_file->contents);
 
     // Define an opcode that is just a reference to the rule `replacement`
     file_t *rep_file = spoof_file(&loaded_files, "<replacement>", "replacement");
-    vm_op_t *replacement = bp_pattern(rep_file, rep_file->contents);
+    pat_t *replacement = bp_pattern(rep_file, rep_file->contents);
 
     // Load builtins:
     file_t *xdg_file = load_file(&loaded_files, "/etc/xdg/"BP_NAME"/builtins.bp");
@@ -407,7 +407,7 @@ int main(int argc, char *argv[])
             // TODO: spoof file as sprintf("pattern => '%s'", flag)
             // except that would require handling edge cases like quotation marks etc.
             file_t *replace_file = spoof_file(&loaded_files, "<replace argument>", flag);
-            vm_op_t *rep = bp_replacement(replace_file, pattern, replace_file->contents);
+            pat_t *rep = bp_replacement(replace_file, pattern, replace_file->contents);
             check(rep, "Replacement failed to compile: %s", flag);
             defs = with_def(defs, replace_file, strlen("replacement"), "replacement", rep);
             pattern = replacement;
@@ -428,7 +428,7 @@ int main(int argc, char *argv[])
                     defs = d;
                     str = d->op->end;
                 } else {
-                    vm_op_t *p = bp_pattern(arg_file, str);
+                    pat_t *p = bp_pattern(arg_file, str);
                     check(p, "Pattern failed to compile: %s", flag);
                     check(npatterns == 0, "Cannot define multiple patterns");
                     defs = with_def(defs, arg_file, strlen("pattern"), "pattern", p);
@@ -439,7 +439,7 @@ int main(int argc, char *argv[])
             }
         } else if (FLAG("--pattern-string") || FLAG("-P")) {
             file_t *arg_file = spoof_file(&loaded_files, "<pattern argument>", flag);
-            vm_op_t *p = bp_stringpattern(arg_file, arg_file->contents);
+            pat_t *p = bp_stringpattern(arg_file, arg_file->contents);
             check(p, "Pattern failed to compile: %s", flag);
             defs = with_def(defs, arg_file, strlen("pattern"), "pattern", p);
             ++npatterns;
@@ -470,7 +470,7 @@ int main(int argc, char *argv[])
             if (npatterns > 0) break;
             // TODO: spoof file with quotation marks for better debugging
             file_t *arg_file = spoof_file(&loaded_files, "<pattern argument>", argv[i]);
-            vm_op_t *p = bp_stringpattern(arg_file, arg_file->contents);
+            pat_t *p = bp_stringpattern(arg_file, arg_file->contents);
             check(p, "Pattern failed to compile: %s", argv[i]);
             defs = with_def(defs, arg_file, strlen("pattern"), "pattern", p);
             ++npatterns;
