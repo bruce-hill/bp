@@ -186,14 +186,15 @@ static void confirm_replacements(file_t *f, match_t *m, confirm_t *confirm)
         }
 
         { // Print the original
-            printer_t pr = {.file = f, .context_lines = 1,
+            printer_t pr = {.file = f, .context_lines = context_lines,
                 .use_color = 1, .print_line_numbers = 1};
             print_match(tty_out, &pr, m->child);
             // Print trailing context lines:
             print_match(tty_out, &pr, NULL);
         }
+        if (context_lines > 1) fprintf(tty_out, "\n");
         { // Print the replacement
-            printer_t pr = {.file = f, .context_lines = 1,
+            printer_t pr = {.file = f, .context_lines = context_lines,
                 .use_color = 1, .print_line_numbers = 1};
             print_match(tty_out, &pr, m);
             // Print trailing context lines:
@@ -236,7 +237,7 @@ static int inplace_modify_file(def_t *defs, file_t *f, pat_t *pattern)
     char tmp_filename[PATH_MAX+1] = {0};
     printer_t pr = {
         .file = f,
-        .context_lines = context_lines,
+        .context_lines = ALL_CONTEXT,
         .use_color = 0,
         .print_line_numbers = 0,
     };
@@ -480,7 +481,6 @@ int main(int argc, char *argv[])
         }
     }
 
-    if (mode == MODE_INPLACE) context_lines = ALL_CONTEXT;
     if (context_lines == USE_DEFAULT_CONTEXT) context_lines = 1;
     if (context_lines < 0 && context_lines != ALL_CONTEXT) context_lines = 0;
 
