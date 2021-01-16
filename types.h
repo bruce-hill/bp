@@ -109,10 +109,10 @@ typedef struct def_s {
 // Structure used for tracking allocated ops, which must be freed when the file
 // is freed.
 //
-typedef struct allocated_op_s {
-    struct allocated_op_s *next;
+typedef struct allocated_pat_s {
+    struct allocated_pat_s *next;
     pat_t op;
-} allocated_op_t;
+} allocated_pat_t;
 
 #endif
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1

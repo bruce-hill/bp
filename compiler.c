@@ -29,7 +29,7 @@ static pat_t *new_range(file_t *f, const char *start, const char *end, ssize_t m
 //
 pat_t *new_pat(file_t *f, const char *start, enum pattype_e type)
 {
-    allocated_op_t *tracker = new(allocated_op_t);
+    allocated_pat_t *tracker = new(allocated_pat_t);
     tracker->next = f->ops;
     f->ops = tracker;
     tracker->op.type = type;

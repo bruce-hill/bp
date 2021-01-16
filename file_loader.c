@@ -151,7 +151,7 @@ void destroy_file(file_t **f)
         }
     }
 
-    for (allocated_op_t *next; (*f)->ops; (*f)->ops = next) {
+    for (allocated_pat_t *next; (*f)->ops; (*f)->ops = next) {
         next = (*f)->ops->next;
         destroy_pat(&(*f)->ops->op);
         xfree(&(*f)->ops);

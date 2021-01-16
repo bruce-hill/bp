@@ -6,14 +6,14 @@
 
 #include <stdio.h>
 
-struct allocated_op_s; // declared in types.h
+struct allocated_pat_s; // declared in types.h
 
 typedef struct file_s {
     struct file_s *next;
     const char *filename;
     char *contents, **lines, *end;
     size_t nlines;
-    struct allocated_op_s *ops;
+    struct allocated_pat_s *ops;
     unsigned int mmapped:1;
 } file_t;
 
