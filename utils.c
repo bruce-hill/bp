@@ -14,7 +14,6 @@
 //
 const char *after_spaces(const char *str)
 {
-    int block_comment_depth = 0;
     // Skip whitespace and comments:
   skip_whitespace:
     switch (*str) {
@@ -23,20 +22,7 @@ const char *after_spaces(const char *str)
             goto skip_whitespace;
         }
         case '#': {
-            if (str[1] == '(') {
-                ++block_comment_depth;
-                for (str += 2; *str && block_comment_depth > 0; ++str) {
-                    if (str[0] == '#' && str[1] == '(') {
-                        ++block_comment_depth;
-                        ++str;
-                    } else if (str[0] == ')' && str[1] == '#') {
-                        --block_comment_depth;
-                        ++str;
-                    }
-                }
-            } else {
-                while (*str && *str != '\n') ++str;
-            }
+            while (*str && *str != '\n') ++str;
             goto skip_whitespace;
         }
     }

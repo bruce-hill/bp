@@ -74,8 +74,4 @@ $:  !.
 
 id: "^^" / "^" / "__" / "_" / "$$" / "$" / "|" / `a-z,A-Z *`a-z,A-Z,0-9,-
 
-line-comment: `# .. $
-block-comment: "#("..")#" % block-comment
-
-# Note: comments are undefined by default in regular BP
-comment: block-comment / line-comment
+comment: `# .. $

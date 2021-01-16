@@ -63,7 +63,6 @@ Pattern            | Meaning
 `pat1==pat2`       | `pat1`, assuming `pat2` also matches with the same length
 `pat1!=pat2`       | `pat1`, unless `pat2` also matches with the same length
 `name:pat2`        | `name` is defined to mean `pat`
-`#( block comment )#` | A block comment
 `# line comment`   | A line comment
 
 See `man ./bp.1` for more details.
