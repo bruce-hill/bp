@@ -613,4 +613,25 @@ def_t *bp_definition(file_t *f, const char *str)
     return def;
 }
 
+//
+// Deallocate memory referenced inside a pattern struct
+//
+void destroy_pat(pat_t *pat)
+{
+    switch (pat->type) {
+        case VM_STRING: case VM_REF:
+            xfree(&pat->args.s);
+            break;
+        case VM_CAPTURE:
+            if (pat->args.capture.name)
+                xfree(&pat->args.capture.name);
+            break;
+        case VM_REPLACE:
+            if (pat->args.replace.text)
+                xfree(&pat->args.replace.text);
+            break;
+        default: break;
+    }
+}
+
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1

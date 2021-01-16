@@ -19,6 +19,8 @@ __attribute__((nonnull))
 pat_t *bp_pattern(file_t *f, const char *str);
 __attribute__((nonnull))
 def_t *bp_definition(file_t *f, const char *str);
+__attribute__((nonnull))
+void destroy_pat(pat_t *pat);
 
 #endif
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1
