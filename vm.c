@@ -667,7 +667,7 @@ size_t free_all_matches(void)
 //
 // Deallocate memory associated with an op
 //
-void destroy_op(pat_t *op)
+void destroy_pat(pat_t *op)
 {
     switch (op->type) {
         case VM_STRING: case VM_REF:
