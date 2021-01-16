@@ -80,7 +80,7 @@ typedef struct match_s {
     // Where the match starts and ends (end is after the last character)
     const char *start, *end;
     struct match_s *child, *nextsibling;
-    pat_t *op;
+    pat_t *pat;
     // Intrusive linked list nodes for garbage collection:
     struct match_s *next;
 #ifdef DEBUG_HEAP
@@ -101,17 +101,17 @@ typedef struct def_s {
     size_t namelen;
     const char *name;
     file_t *file;
-    pat_t *op;
+    pat_t *pat;
     struct def_s *next;
 } def_t;
 
 //
-// Structure used for tracking allocated ops, which must be freed when the file
-// is freed.
+// Structure used for tracking allocated patterns, which must be freed when the
+// file is freed.
 //
 typedef struct allocated_pat_s {
     struct allocated_pat_s *next;
-    pat_t op;
+    pat_t pat;
 } allocated_pat_t;
 
 #endif

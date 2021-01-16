@@ -17,7 +17,7 @@ static int _json_match(const char *text, match_t *m, int comma, unsigned int ver
 static int _json_match(const char *text, match_t *m, int comma, unsigned int verbose)
 {
     if (!verbose) {
-        if (m->op->type != VM_REF) {
+        if (m->pat->type != VM_REF) {
             for (match_t *child = m->child; child; child = child->nextsibling) {
                 comma |= _json_match(text, child, comma, verbose);
             }
@@ -28,7 +28,7 @@ static int _json_match(const char *text, match_t *m, int comma, unsigned int ver
     if (comma) printf(",\n");
     comma = 0;
     printf("{\"rule\":\"");
-    for (const char *c = m->op->start; c < m->op->end; c++) {
+    for (const char *c = m->pat->start; c < m->pat->end; c++) {
         switch (*c) {
             case '"': printf("\\\""); break;
             case '\\': printf("\\\\"); break;

@@ -151,10 +151,10 @@ void destroy_file(file_t **f)
         }
     }
 
-    for (allocated_pat_t *next; (*f)->ops; (*f)->ops = next) {
-        next = (*f)->ops->next;
-        destroy_pat(&(*f)->ops->op);
-        xfree(&(*f)->ops);
+    for (allocated_pat_t *next; (*f)->pats; (*f)->pats = next) {
+        next = (*f)->pats->next;
+        destroy_pat(&(*f)->pats->pat);
+        xfree(&(*f)->pats);
     }
 
     xfree(f);

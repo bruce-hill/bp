@@ -20,7 +20,7 @@ def_t *with_def(def_t *defs, file_t *f, size_t namelen, const char *name, pat_t 
     def->file = f;
     def->namelen = namelen;
     def->name = name;
-    def->op = op;
+    def->pat = op;
     return def;
 }
 

@@ -68,9 +68,9 @@ static inline const char *next_char(file_t *f, const char *str)
 //
 static const char *match_backref(const char *str, match_t *cap, unsigned int ignorecase)
 {
-    if (cap->op->type == VM_REPLACE) {
-        const char *text = cap->op->args.replace.text;
-        const char *end = &text[cap->op->args.replace.len];
+    if (cap->pat->type == VM_REPLACE) {
+        const char *text = cap->pat->args.replace.text;
+        const char *end = &text[cap->pat->args.replace.len];
         for (const char *r = text; r < end; ) {
             if (*r == '\\') {
                 ++r;
@@ -164,7 +164,7 @@ match_t *match(def_t *defs, file_t *f, const char *str, pat_t *op, unsigned int 
             if (str >= f->end || *str == '\n')
                 return NULL;
             match_t *m = new_match();
-            m->op = op;
+            m->pat = op;
             m->start = str;
             m->end = next_char(f, str);
             return m;
@@ -175,7 +175,7 @@ match_t *match(def_t *defs, file_t *f, const char *str, pat_t *op, unsigned int 
                            : memcmp(str, op->args.s, (size_t)op->len) != 0)
                 return NULL;
             match_t *m = new_match();
-            m->op = op;
+            m->pat = op;
             m->start = str;
             m->end = str + op->len;
             return m;
@@ -185,7 +185,7 @@ match_t *match(def_t *defs, file_t *f, const char *str, pat_t *op, unsigned int 
             if ((unsigned char)*str < op->args.range.low || (unsigned char)*str > op->args.range.high)
                 return NULL;
             match_t *m = new_match();
-            m->op = op;
+            m->pat = op;
             m->start = str;
             m->end = str + 1;
             return m;
@@ -197,7 +197,7 @@ match_t *match(def_t *defs, file_t *f, const char *str, pat_t *op, unsigned int 
                 return NULL;
             }
             m = new_match();
-            m->op = op;
+            m->pat = op;
             m->start = str;
             m->end = str;
             return m;
@@ -205,7 +205,7 @@ match_t *match(def_t *defs, file_t *f, const char *str, pat_t *op, unsigned int 
         case VM_UPTO_AND: {
             match_t *m = new_match();
             m->start = str;
-            m->op = op;
+            m->pat = op;
 
             pat_t *pat = op->args.multiple.first, *skip = op->args.multiple.second;
             if (!pat && !skip) {
@@ -250,7 +250,7 @@ match_t *match(def_t *defs, file_t *f, const char *str, pat_t *op, unsigned int 
             match_t *m = new_match();
             m->start = str;
             m->end = str;
-            m->op = op;
+            m->pat = op;
 
             match_t **dest = &m->child;
             size_t reps = 0;
@@ -310,7 +310,7 @@ match_t *match(def_t *defs, file_t *f, const char *str, pat_t *op, unsigned int 
             match_t *m = new_match();
             m->start = str;
             m->end = str;
-            m->op = op;
+            m->pat = op;
             ADD_OWNER(m->child, before);
             return m;
         }
@@ -320,7 +320,7 @@ match_t *match(def_t *defs, file_t *f, const char *str, pat_t *op, unsigned int 
             match_t *m = new_match();
             m->start = str;
             m->end = str;
-            m->op = op;
+            m->pat = op;
             ADD_OWNER(m->child, after);
             return m;
         }
@@ -330,7 +330,7 @@ match_t *match(def_t *defs, file_t *f, const char *str, pat_t *op, unsigned int 
             match_t *m = new_match();
             m->start = str;
             m->end = p->end;
-            m->op = op;
+            m->pat = op;
             ADD_OWNER(m->child, p);
             return m;
         }
@@ -346,8 +346,8 @@ match_t *match(def_t *defs, file_t *f, const char *str, pat_t *op, unsigned int 
             match_t *m2;
             { // Push backrefs and run matching, then cleanup
                 def_t *defs2 = defs;
-                if (m1->op->type == VM_CAPTURE && m1->op->args.capture.name)
-                    defs2 = with_backref(defs2, f, m1->op->args.capture.name, m1);
+                if (m1->pat->type == VM_CAPTURE && m1->pat->args.capture.name)
+                    defs2 = with_backref(defs2, f, m1->pat->args.capture.name, m1);
                 // def_t *defs2 = with_backrefs(defs, f, m1);
                 m2 = match(defs2, f, m1->end, op->args.multiple.second, ignorecase);
                 free_defs(&defs2, defs);
@@ -360,7 +360,7 @@ match_t *match(def_t *defs, file_t *f, const char *str, pat_t *op, unsigned int 
             match_t *m = new_match();
             m->start = str;
             m->end = m2->end;
-            m->op = op;
+            m->pat = op;
             ADD_OWNER(m->child, m1);
             ADD_OWNER(m1->nextsibling, m2);
             return m;
@@ -387,7 +387,7 @@ match_t *match(def_t *defs, file_t *f, const char *str, pat_t *op, unsigned int 
             match_t *m = new_match();
             m->start = m1->start;
             m->end = m1->end;
-            m->op = op;
+            m->pat = op;
             ADD_OWNER(m->child, m1);
             if (op->type == VM_EQUAL) {
                 ADD_OWNER(m1->nextsibling, m2);
@@ -404,7 +404,7 @@ match_t *match(def_t *defs, file_t *f, const char *str, pat_t *op, unsigned int 
             }
             match_t *m = new_match();
             m->start = str;
-            m->op = op;
+            m->pat = op;
             if (p) {
                 ADD_OWNER(m->child, p);
                 m->end = p->end;
@@ -416,7 +416,7 @@ match_t *match(def_t *defs, file_t *f, const char *str, pat_t *op, unsigned int 
         case VM_REF: {
             def_t *def = lookup(defs, op->args.s);
             check(def != NULL, "Unknown identifier: '%s'", op->args.s);
-            pat_t *ref = def->op;
+            pat_t *ref = def->pat;
 
             pat_t rec_op = {
                 .type = VM_LEFTRECURSION,
@@ -434,7 +434,7 @@ match_t *match(def_t *defs, file_t *f, const char *str, pat_t *op, unsigned int 
                 .namelen = def->namelen,
                 .name = def->name,
                 .file = def->file,
-                .op = &rec_op,
+                .pat = &rec_op,
                 .next = defs,
             };
 
@@ -470,7 +470,7 @@ match_t *match(def_t *defs, file_t *f, const char *str, pat_t *op, unsigned int 
             // match results.
             // OPTIMIZE: remove this if necessary
             match_t *m2 = new_match();
-            m2->op = op;
+            m2->pat = op;
             m2->start = m->start;
             m2->end = m->end;
             ADD_OWNER(m2->child, m);
@@ -480,7 +480,7 @@ match_t *match(def_t *defs, file_t *f, const char *str, pat_t *op, unsigned int 
             const char *end = match_backref(str, op->args.backref, ignorecase);
             if (end == NULL) return NULL;
             match_t *m = new_match();
-            m->op = op;
+            m->pat = op;
             m->start = str;
             m->end = end;
             return m;
@@ -509,7 +509,7 @@ match_t *match(def_t *defs, file_t *f, const char *str, pat_t *op, unsigned int 
             match_t *m = new_match();
             m->start = start;
             m->end = &str[dents];
-            m->op = op;
+            m->pat = op;
             return m;
         }
         default: {
@@ -526,8 +526,8 @@ match_t *match(def_t *defs, file_t *f, const char *str, pat_t *op, unsigned int 
 static match_t *get_capture_by_num(match_t *m, int *n)
 {
     if (*n == 0) return m;
-    if (m->op->type == VM_CAPTURE && *n == 1) return m;
-    if (m->op->type == VM_CAPTURE) --(*n);
+    if (m->pat->type == VM_CAPTURE && *n == 1) return m;
+    if (m->pat->type == VM_CAPTURE) --(*n);
     for (match_t *c = m->child; c; c = c->nextsibling) {
         match_t *cap = get_capture_by_num(c, n);
         if (cap) return cap;
@@ -540,8 +540,8 @@ static match_t *get_capture_by_num(match_t *m, int *n)
 //
 static match_t *get_capture_by_name(match_t *m, const char *name)
 {
-    if (m->op->type == VM_CAPTURE && m->op->args.capture.name
-        && streq(m->op->args.capture.name, name))
+    if (m->pat->type == VM_CAPTURE && m->pat->args.capture.name
+        && streq(m->pat->args.capture.name, name))
         return m;
     for (match_t *c = m->child; c; c = c->nextsibling) {
         match_t *cap = get_capture_by_name(c, name);

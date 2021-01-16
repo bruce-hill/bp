@@ -13,7 +13,7 @@ typedef struct file_s {
     const char *filename;
     char *contents, **lines, *end;
     size_t nlines;
-    struct allocated_pat_s *ops;
+    struct allocated_pat_s *pats;
     unsigned int mmapped:1;
 } file_t;
 

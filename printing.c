@@ -60,8 +60,8 @@ static void _visualize_matches(match_node_t *firstmatch, int depth, const char *
     for (match_node_t *p = firstmatch; p; p = p->next)
         if (height_of_match(p->m) > height_of_match(viz))
             viz = p->m;
-    const char *viz_type = viz->op->start;
-    size_t viz_typelen = (size_t)(viz->op->end - viz->op->start);
+    const char *viz_type = viz->pat->start;
+    size_t viz_typelen = (size_t)(viz->pat->end - viz->pat->start);
 
     // Backrefs use added dim quote marks to indicate that the pattern is a
     // literal string being matched. (Backrefs have start/end inside the text
@@ -86,18 +86,15 @@ static void _visualize_matches(match_node_t *firstmatch, int depth, const char *
     match_node_t *children = NULL;
     match_node_t **nextchild = &children;
 
-#define RIGHT_TYPE(m) (m->m->op->end == m->m->op->start + viz_typelen && strncmp(m->m->op->start, viz_type, viz_typelen) == 0)
+#define RIGHT_TYPE(m) (m->m->pat->end == m->m->pat->start + viz_typelen && strncmp(m->m->pat->start, viz_type, viz_typelen) == 0)
     // Print nonzero-width first:
     for (match_node_t *m = firstmatch; m; m = m->next) {
-        //tree_text = byteslice(text, tree['start'], tree['end']).replace('\n', '↵')
         if (RIGHT_TYPE(m)) {
-            //if (m->m->op->op != VM_REF) {
-                for (match_t *c = m->m->child; c; c = c->nextsibling) {
-                    *nextchild = new(match_node_t);
-                    (*nextchild)->m = c;
-                    nextchild = &((*nextchild)->next);
-                }
-            //}
+            for (match_t *c = m->m->child; c; c = c->nextsibling) {
+                *nextchild = new(match_node_t);
+                (*nextchild)->m = c;
+                nextchild = &((*nextchild)->next);
+            }
             if (m->m->end == m->m->start) continue;
             printf("\033[%ldG\033[0;2m%s\033[0;7;%sm", 1+2*(m->m->start - text), V, color);
             for (const char *c = m->m->start; c < m->m->end; ++c) {
@@ -260,7 +257,7 @@ static const char *context_after(printer_t *pr, const char *pos)
 void _print_match(FILE *out, printer_t *pr, match_t *m)
 {
     pr->pos = m->start;
-    if (m->op->type == VM_REPLACE) {
+    if (m->pat->type == VM_REPLACE) {
         if (m->skip_replacement) {
             _print_match(out, pr, m->child);
             return;
@@ -270,8 +267,8 @@ void _print_match(FILE *out, printer_t *pr, match_t *m)
         size_t line = line_start;
 
         if (pr->use_color) fprintf(out, "%s", color_replace);
-        const char *text = m->op->args.replace.text;
-        const char *end = &text[m->op->args.replace.len];
+        const char *text = m->pat->args.replace.text;
+        const char *end = &text[m->pat->args.replace.len];
 
         // TODO: clean up the line numbering code
         for (const char *r = text; r < end; ) {
@@ -372,7 +369,7 @@ void print_match(FILE *out, printer_t *pr, match_t *m)
 int print_errors(printer_t *pr, match_t *m)
 {
     int ret = 0;
-    if (m->op->type == VM_CAPTURE && m->op->args.capture.name && streq(m->op->args.capture.name, "!")) {
+    if (m->pat->type == VM_CAPTURE && m->pat->args.capture.name && streq(m->pat->args.capture.name, "!")) {
         printf("\033[31;1m");
         print_match(stdout, pr, m);
         printf("\033[0m\n");

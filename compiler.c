@@ -30,12 +30,12 @@ static pat_t *new_range(file_t *f, const char *start, const char *end, ssize_t m
 pat_t *new_pat(file_t *f, const char *start, enum pattype_e type)
 {
     allocated_pat_t *tracker = new(allocated_pat_t);
-    tracker->next = f->ops;
-    f->ops = tracker;
-    tracker->op.type = type;
-    tracker->op.start = start;
-    tracker->op.len = -1;
-    return &tracker->op;
+    tracker->next = f->pats;
+    f->pats = tracker;
+    tracker->pat.type = type;
+    tracker->pat.start = start;
+    tracker->pat.len = -1;
+    return &tracker->pat;
 }
 
 //
@@ -609,7 +609,7 @@ def_t *bp_definition(file_t *f, const char *str)
     def->file = f;
     def->namelen = namelen;
     def->name = name;
-    def->op = pat;
+    def->pat = pat;
     return def;
 }
 

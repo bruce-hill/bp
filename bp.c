@@ -179,7 +179,7 @@ static void sig_handler(int sig) { (void)sig; cleanup(); }
 static void confirm_replacements(file_t *f, match_t *m, confirm_t *confirm)
 {
     if (*confirm == CONFIRM_ALL) return;
-    if (m->op->type == VM_REPLACE) {
+    if (m->pat->type == VM_REPLACE) {
         if (*confirm == CONFIRM_NONE) {
             m->skip_replacement = 1;
             goto check_children;
@@ -426,7 +426,7 @@ int main(int argc, char *argv[])
                 if (d) {
                     d->next = defs;
                     defs = d;
-                    str = d->op->end;
+                    str = d->pat->end;
                 } else {
                     pat_t *p = bp_pattern(arg_file, str);
                     check(p, "Pattern failed to compile: %s", flag);
