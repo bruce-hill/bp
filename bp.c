@@ -20,10 +20,14 @@
 #include "utils.h"
 #include "vm.h"
 
+#ifndef BP_NAME
+#define BP_NAME "bp"
+#endif
+
 static const char *usage = (
-    "BP - a Parsing Expression Grammar command line tool\n\n"
+    BP_NAME" - a Parsing Expression Grammar command line tool\n\n"
     "Usage:\n"
-    "  bp [flags] <pattern> [<input files>...]\n\n"
+    "  "BP_NAME" [flags] <pattern> [<input files>...]\n\n"
     "Flags:\n"
     " -h --help                        print the usage and quit\n"
     " -v --verbose                     print verbose debugging info\n"
@@ -370,9 +374,9 @@ int main(int argc, char *argv[])
     vm_op_t *replacement = bp_pattern(rep_file, rep_file->contents);
 
     // Load builtins:
-    file_t *xdg_file = load_file(&loaded_files, "/etc/xdg/bp/builtins.bp");
+    file_t *xdg_file = load_file(&loaded_files, "/etc/xdg/"BP_NAME"/builtins.bp");
     if (xdg_file) defs = load_grammar(defs, xdg_file);
-    file_t *local_file = load_file(&loaded_files, "%s/.config/bp/builtins.bp", getenv("HOME"));
+    file_t *local_file = load_file(&loaded_files, "%s/.config/"BP_NAME"/builtins.bp", getenv("HOME"));
     if (local_file) defs = load_grammar(defs, local_file);
 
     int i, npatterns = 0;
@@ -410,9 +414,9 @@ int main(int argc, char *argv[])
         } else if (FLAG("--grammar") || FLAG("-g")) {
             file_t *f = load_file(&loaded_files, flag);
             if (f == NULL)
-                f = load_file(&loaded_files, "%s/.config/bp/%s.bp", getenv("HOME"), flag);
+                f = load_file(&loaded_files, "%s/.config/"BP_NAME"/%s.bp", getenv("HOME"), flag);
             if (f == NULL)
-                f = load_file(&loaded_files, "/etc/xdg/bp/%s.bp", flag);
+                f = load_file(&loaded_files, "/etc/xdg/"BP_NAME"/%s.bp", flag);
             check(f != NULL, "Couldn't find grammar: %s", flag);
             defs = load_grammar(defs, f); // Keep in memory for debug output
         } else if (FLAG("--pattern") || FLAG("-p")) {
