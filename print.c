@@ -257,7 +257,7 @@ static const char *context_after(printer_t *pr, const char *pos)
 void _print_match(FILE *out, printer_t *pr, match_t *m)
 {
     pr->pos = m->start;
-    if (m->pat->type == VM_REPLACE) {
+    if (m->pat->type == BP_REPLACE) {
         if (m->skip_replacement) {
             _print_match(out, pr, m->child);
             return;
@@ -369,7 +369,7 @@ void print_match(FILE *out, printer_t *pr, match_t *m)
 int print_errors(printer_t *pr, match_t *m)
 {
     int ret = 0;
-    if (m->pat->type == VM_CAPTURE && m->pat->args.capture.name && streq(m->pat->args.capture.name, "!")) {
+    if (m->pat->type == BP_CAPTURE && m->pat->args.capture.name && streq(m->pat->args.capture.name, "!")) {
         printf("\033[31;1m");
         print_match(stdout, pr, m);
         printf("\033[0m\n");

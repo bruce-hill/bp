@@ -68,7 +68,7 @@ static inline const char *next_char(file_t *f, const char *str)
 //
 static const char *match_backref(const char *str, match_t *cap, unsigned int ignorecase)
 {
-    if (cap->pat->type == VM_REPLACE) {
+    if (cap->pat->type == BP_REPLACE) {
         const char *text = cap->pat->args.replace.text;
         const char *end = &text[cap->pat->args.replace.len];
         for (const char *r = text; r < end; ) {
@@ -147,7 +147,7 @@ match_t *next_match(def_t *defs, file_t *f, match_t *prev, pat_t *pat, unsigned 
 match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, unsigned int ignorecase)
 {
     switch (pat->type) {
-        case VM_LEFTRECURSION: {
+        case BP_LEFTRECURSION: {
             // Left recursion occurs when a pattern directly or indirectly
             // invokes itself at the same position in the text. It's handled as
             // a special case, but if a pattern invokes itself at a later
@@ -160,7 +160,7 @@ match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, unsigned int
                 return match(defs, f, str, pat->args.leftrec.fallback, ignorecase);
             }
         }
-        case VM_ANYCHAR: {
+        case BP_ANYCHAR: {
             if (str >= f->end || *str == '\n')
                 return NULL;
             match_t *m = new_match();
@@ -169,7 +169,7 @@ match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, unsigned int
             m->end = next_char(f, str);
             return m;
         }
-        case VM_STRING: {
+        case BP_STRING: {
             if (&str[pat->len] > f->end) return NULL;
             if (ignorecase ? memicmp(str, pat->args.s, (size_t)pat->len) != 0
                            : memcmp(str, pat->args.s, (size_t)pat->len) != 0)
@@ -180,7 +180,7 @@ match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, unsigned int
             m->end = str + pat->len;
             return m;
         }
-        case VM_RANGE: {
+        case BP_RANGE: {
             if (str >= f->end) return NULL;
             if ((unsigned char)*str < pat->args.range.low || (unsigned char)*str > pat->args.range.high)
                 return NULL;
@@ -190,7 +190,7 @@ match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, unsigned int
             m->end = str + 1;
             return m;
         }
-        case VM_NOT: {
+        case BP_NOT: {
             match_t *m = match(defs, f, str, pat->args.pat, ignorecase);
             if (m != NULL) {
                 recycle_if_unused(&m);
@@ -202,7 +202,7 @@ match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, unsigned int
             m->end = str;
             return m;
         }
-        case VM_UPTO_AND: {
+        case BP_UPTO_AND: {
             match_t *m = new_match();
             m->start = str;
             m->pat = pat;
@@ -246,7 +246,7 @@ match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, unsigned int
             recycle_if_unused(&m);
             return NULL;
         }
-        case VM_REPEAT: {
+        case BP_REPEAT: {
             match_t *m = new_match();
             m->start = str;
             m->end = str;
@@ -301,7 +301,7 @@ match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, unsigned int
             m->end = str;
             return m;
         }
-        case VM_AFTER: {
+        case BP_AFTER: {
             ssize_t backtrack = pat->args.pat->len;
             check(backtrack != -1, "'<' is only allowed for fixed-length operations");
             if (str - backtrack < f->contents) return NULL;
@@ -314,7 +314,7 @@ match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, unsigned int
             ADD_OWNER(m->child, before);
             return m;
         }
-        case VM_BEFORE: {
+        case BP_BEFORE: {
             match_t *after = match(defs, f, str, pat->args.pat, ignorecase);
             if (after == NULL) return NULL;
             match_t *m = new_match();
@@ -324,7 +324,7 @@ match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, unsigned int
             ADD_OWNER(m->child, after);
             return m;
         }
-        case VM_CAPTURE: {
+        case BP_CAPTURE: {
             match_t *p = match(defs, f, str, pat->args.pat, ignorecase);
             if (p == NULL) return NULL;
             match_t *m = new_match();
@@ -334,19 +334,19 @@ match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, unsigned int
             ADD_OWNER(m->child, p);
             return m;
         }
-        case VM_OTHERWISE: {
+        case BP_OTHERWISE: {
             match_t *m = match(defs, f, str, pat->args.multiple.first, ignorecase);
             if (m == NULL) m = match(defs, f, str, pat->args.multiple.second, ignorecase);
             return m;
         }
-        case VM_CHAIN: {
+        case BP_CHAIN: {
             match_t *m1 = match(defs, f, str, pat->args.multiple.first, ignorecase);
             if (m1 == NULL) return NULL;
 
             match_t *m2;
             { // Push backrefs and run matching, then cleanup
                 def_t *defs2 = defs;
-                if (m1->pat->type == VM_CAPTURE && m1->pat->args.capture.name)
+                if (m1->pat->type == BP_CAPTURE && m1->pat->args.capture.name)
                     defs2 = with_backref(defs2, f, m1->pat->args.capture.name, m1);
                 // def_t *defs2 = with_backrefs(defs, f, m1);
                 m2 = match(defs2, f, m1->end, pat->args.multiple.second, ignorecase);
@@ -365,7 +365,7 @@ match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, unsigned int
             ADD_OWNER(m1->nextsibling, m2);
             return m;
         }
-        case VM_EQUAL: case VM_NOT_EQUAL: {
+        case BP_EQUAL: case BP_NOT_EQUAL: {
             match_t *m1 = match(defs, f, str, pat->args.multiple.first, ignorecase);
             if (m1 == NULL) return NULL;
 
@@ -379,7 +379,7 @@ match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, unsigned int
                 .mmapped=f->mmapped,
             };
             match_t *m2 = match(defs, &inner, str, pat->args.multiple.second, ignorecase);
-            if ((m2 == NULL) == (pat->type == VM_EQUAL)) {
+            if ((m2 == NULL) == (pat->type == BP_EQUAL)) {
                 recycle_if_unused(&m1);
                 if (m2 != NULL) recycle_if_unused(&m2);
                 return NULL;
@@ -389,14 +389,14 @@ match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, unsigned int
             m->end = m1->end;
             m->pat = pat;
             ADD_OWNER(m->child, m1);
-            if (pat->type == VM_EQUAL) {
+            if (pat->type == BP_EQUAL) {
                 ADD_OWNER(m1->nextsibling, m2);
             } else {
                 recycle_if_unused(&m2);
             }
             return m;
         }
-        case VM_REPLACE: {
+        case BP_REPLACE: {
             match_t *p = NULL;
             if (pat->args.replace.pat) {
                 p = match(defs, f, str, pat->args.replace.pat, ignorecase);
@@ -413,13 +413,13 @@ match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, unsigned int
             }
             return m;
         }
-        case VM_REF: {
+        case BP_REF: {
             def_t *def = lookup(defs, pat->args.s);
             check(def != NULL, "Unknown identifier: '%s'", pat->args.s);
             pat_t *ref = def->pat;
 
             pat_t rec_op = {
-                .type = VM_LEFTRECURSION,
+                .type = BP_LEFTRECURSION,
                 .start = ref->start,
                 .end = ref->end,
                 .len = 0,
@@ -476,7 +476,7 @@ match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, unsigned int
             ADD_OWNER(m2->child, m);
             return m2;
         }
-        case VM_BACKREF: {
+        case BP_BACKREF: {
             const char *end = match_backref(str, pat->args.backref, ignorecase);
             if (end == NULL) return NULL;
             match_t *m = new_match();
@@ -485,7 +485,7 @@ match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, unsigned int
             m->end = end;
             return m;
         }
-        case VM_NODENT: {
+        case BP_NODENT: {
             if (*str != '\n') return NULL;
             const char *start = str;
 
@@ -526,8 +526,8 @@ match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, unsigned int
 static match_t *get_capture_by_num(match_t *m, int *n)
 {
     if (*n == 0) return m;
-    if (m->pat->type == VM_CAPTURE && *n == 1) return m;
-    if (m->pat->type == VM_CAPTURE) --(*n);
+    if (m->pat->type == BP_CAPTURE && *n == 1) return m;
+    if (m->pat->type == BP_CAPTURE) --(*n);
     for (match_t *c = m->child; c; c = c->nextsibling) {
         match_t *cap = get_capture_by_num(c, n);
         if (cap) return cap;
@@ -540,7 +540,7 @@ static match_t *get_capture_by_num(match_t *m, int *n)
 //
 static match_t *get_capture_by_name(match_t *m, const char *name)
 {
-    if (m->pat->type == VM_CAPTURE && m->pat->args.capture.name
+    if (m->pat->type == BP_CAPTURE && m->pat->args.capture.name
         && streq(m->pat->args.capture.name, name))
         return m;
     for (match_t *c = m->child; c; c = c->nextsibling) {

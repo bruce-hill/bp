@@ -179,7 +179,7 @@ static void sig_handler(int sig) { (void)sig; cleanup(); }
 static void confirm_replacements(file_t *f, match_t *m, confirm_t *confirm)
 {
     if (*confirm == CONFIRM_ALL) return;
-    if (m->pat->type == VM_REPLACE) {
+    if (m->pat->type == BP_REPLACE) {
         if (*confirm == CONFIRM_NONE) {
             m->skip_replacement = 1;
             goto check_children;
