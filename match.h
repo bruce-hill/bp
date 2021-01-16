@@ -1,8 +1,8 @@
 //
-// vm.h - Header file for BP virtual machine.
+// match.h - Header file for BP virtual machine.
 //
-#ifndef VM__H
-#define VM__H
+#ifndef MATCH__H
+#define MATCH__H
 
 #include <stdio.h>
 

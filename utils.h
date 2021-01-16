@@ -8,7 +8,7 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "vm.h"
+#include "match.h"
 
 #define streq(a, b) (strcmp(a, b) == 0)
 // TODO: better error reporting

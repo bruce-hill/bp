@@ -9,7 +9,7 @@
 #include "print.h"
 #include "types.h"
 #include "utils.h"
-#include "vm.h"
+#include "match.h"
 
 typedef struct match_node_s {
     match_t *m;

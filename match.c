@@ -1,5 +1,5 @@
 //
-// vm.c - Code for the BP virtual machine that performs the matching.
+// match.c - Code for the BP virtual machine that performs the matching.
 //
 
 #include <ctype.h>
@@ -10,7 +10,7 @@
 #include "grammar.h"
 #include "types.h"
 #include "utils.h"
-#include "vm.h"
+#include "match.h"
 
 #ifdef DEBUG_HEAP
 // Doubly-linked list operations:

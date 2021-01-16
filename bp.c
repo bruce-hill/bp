@@ -18,7 +18,7 @@
 #include "json.h"
 #include "print.h"
 #include "utils.h"
-#include "vm.h"
+#include "match.h"
 
 #ifndef BP_NAME
 #define BP_NAME "bp"
