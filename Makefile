@@ -22,6 +22,10 @@ $(NAME): $(OBJFILES) $(NAME).c
 clean:
 	rm -f $(NAME) $(OBJFILES)
 
+leaktest:
+	make G=-ggdb O=-O0 EXTRA_CFLAGS=-DDEBUG_HEAP clean bp
+	valgrind --leak-check=full ./bp -l -g grammars/bpeg.bp -p Grammar grammars/bpeg.bp
+
 install: $(NAME)
 	mkdir -p -m 755 "$(PREFIX)/share/man/man1" "$(PREFIX)/bin" "$(SYSCONFDIR)/xdg/bp"
 	cp -rv grammars/* "$(SYSCONFDIR)/xdg/bp/"
