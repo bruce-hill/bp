@@ -16,8 +16,8 @@ all: $(NAME)
 %.o: %.c %.h types.h
 	$(CC) -c $(CFLAGS) $(EXTRA_CFLAGS) $(CWARN) $(G) $(O) -o $@ $<
 
-$(NAME): $(OBJFILES) $(NAME).c
-	$(CC) $(CFLAGS) $(EXTRA_CFLAGS) $(CWARN) $(G) $(O) -o $@ $(OBJFILES) $(NAME).c
+$(NAME): $(OBJFILES) bp.c
+	$(CC) $(CFLAGS) $(EXTRA_CFLAGS) $(CWARN) $(G) $(O) -o $@ $(OBJFILES) bp.c
 
 clean:
 	rm -f $(NAME) $(OBJFILES)
@@ -29,7 +29,7 @@ leaktest:
 install: $(NAME)
 	mkdir -p -m 755 "$(PREFIX)/share/man/man1" "$(PREFIX)/bin" "$(SYSCONFDIR)/xdg/bp"
 	cp -rv grammars/* "$(SYSCONFDIR)/xdg/bp/"
-	cp -v $(NAME).1 "$(PREFIX)/share/man/man1/"
+	cp -v bp.1 "$(PREFIX)/share/man/man1/$(NAME).1"
 	rm -f "$(PREFIX)/bin/$(NAME)"
 	cp -v $(NAME) "$(PREFIX)/bin/"
 
