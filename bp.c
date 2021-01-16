@@ -208,9 +208,9 @@ static void confirm_replacements(file_t *f, match_t *m, confirm_t *confirm)
         char *answer = NULL;
         size_t len = 0;
         if (getline(&answer, &len, tty_in) > 0) {
-            if (strlen(answer) != 2 || answer[1] != '\n') goto retry;
+            if (strlen(answer) > 2) goto retry;
             switch (answer[0]) {
-                case 'y': break;
+                case 'y': case '\n': break;
                 case 'n': m->skip_replacement = 1; break;
                 case 'r': *confirm = CONFIRM_ALL; break;
                 case 'd': m->skip_replacement = 1; *confirm = CONFIRM_NONE; break;
