@@ -513,7 +513,7 @@ match_t *match(def_t *defs, file_t *f, const char *str, pat_t *op, unsigned int 
             return m;
         }
         default: {
-            fprintf(stderr, "Unknown opcode: %d", op->type);
+            fprintf(stderr, "Unknown pattern type: %d", op->type);
             exit(1);
             return NULL;
         }
