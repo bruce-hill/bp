@@ -263,8 +263,7 @@ static int inplace_modify_file(def_t *defs, file_t *f, pat_t *pattern)
         confirm_replacements(f, m, &confirm_file);
         if (!in_use_tempfile) { // signal interrupted, so abort
             fclose(inplace_file);
-            inplace_file = NULL;
-            break;
+            exit(1);
         }
         print_match(inplace_file, &pr, m);
     }
