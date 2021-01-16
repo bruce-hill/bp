@@ -1,5 +1,5 @@
 //
-// file_loader.c - Implementation of some file loading functionality.
+// files.c - Implementation of some file loading functionality.
 //
 
 #include <ctype.h>
@@ -12,7 +12,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-#include "file_loader.h"
+#include "files.h"
 #include "utils.h"
 
 __attribute__((nonnull))

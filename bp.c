@@ -13,10 +13,10 @@
 #include <unistd.h>
 
 #include "compiler.h"
-#include "file_loader.h"
+#include "files.h"
 #include "grammar.h"
 #include "json.h"
-#include "printing.h"
+#include "print.h"
 #include "utils.h"
 #include "vm.h"
 

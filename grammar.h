@@ -4,7 +4,7 @@
 #ifndef GRAMMAR__H
 #define GRAMMAR__H
 
-#include "file_loader.h"
+#include "files.h"
 #include "types.h"
 
 __attribute__((nonnull(2,4,5), returns_nonnull))

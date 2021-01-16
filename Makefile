@@ -9,7 +9,7 @@ G=
 O=-O3
 ALL_FLAGS=$(CFLAGS) -DBP_NAME="\"$(NAME)\"" $(EXTRA) $(CWARN) $(G) $(O)
 
-CFILES=compiler.c grammar.c utils.c vm.c file_loader.c printing.c json.c
+CFILES=compiler.c grammar.c utils.c vm.c files.c print.c json.c
 OBJFILES=$(CFILES:.c=.o)
 
 all: $(NAME)

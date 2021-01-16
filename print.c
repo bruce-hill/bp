@@ -1,12 +1,12 @@
 //
-// printing.c - Code for printing and visualizing matches.
+// print.c - Code for printing and visualizing matches.
 //
 
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include "printing.h"
+#include "print.h"
 #include "types.h"
 #include "utils.h"
 #include "vm.h"

@@ -1,8 +1,8 @@
 //
-// Header file for printing.c (printing/visualizing matches)
+// Header file for print.c (printing/visualizing matches)
 //
-#ifndef PRINTING__H
-#define PRINTING__H
+#ifndef PRINT__H
+#define PRINT__H
 
 #include "types.h"
 

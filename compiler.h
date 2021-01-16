@@ -4,7 +4,7 @@
 #ifndef COMPILER__H
 #define COMPILER__H
 
-#include "file_loader.h"
+#include "files.h"
 #include "types.h"
 
 __attribute__((nonnull))

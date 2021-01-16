@@ -6,7 +6,7 @@
 #include <string.h>
 
 #include "compiler.h"
-#include "file_loader.h"
+#include "files.h"
 #include "grammar.h"
 #include "utils.h"
 

@@ -6,7 +6,7 @@
 
 #include <sys/types.h>
 
-#include "file_loader.h"
+#include "files.h"
 
 // BP virtual machine pattern types
 enum pattype_e {

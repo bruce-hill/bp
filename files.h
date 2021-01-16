@@ -1,8 +1,8 @@
 //
-// file_loader.h - Definitions of an API for loading files.
+// files.h - Definitions of an API for loading files.
 //
-#ifndef FILE_LOADER__H
-#define FILE_LOADER__H
+#ifndef FILES__H
+#define FILES__H
 
 #include <stdio.h>
 
