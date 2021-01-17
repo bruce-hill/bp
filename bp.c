@@ -10,6 +10,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <unistd.h>
 
 #include "definitions.h"
@@ -379,8 +381,8 @@ int main(int argc, char *argv[])
     file_t *local_file = load_file(&loaded_files, "%s/.config/"BP_NAME"/builtins.bp", getenv("HOME"));
     if (local_file) defs = load_grammar(defs, local_file);
 
-    int i, npatterns = 0;
     check(argc > 1, "%s", usage);
+    int i, npatterns = 0, git = 0;
     for (i = 1; i < argc; i++) {
         if (streq(argv[i], "--")) {
             ++i;
@@ -399,6 +401,8 @@ int main(int argc, char *argv[])
             mode = MODE_INPLACE;
         } else if (streq(argv[i], "--confirm")) {
             confirm = CONFIRM_ASK;
+        } else if (streq(argv[i], "--git")) {
+            git = 1;
         } else if (streq(argv[i], "--ignore-case")) {
             ignorecase = 1;
         } else if (streq(argv[i], "--list-files")) {
@@ -460,6 +464,7 @@ int main(int argc, char *argv[])
                 switch (*c) {
                     case 'h': goto flag_help; // -h
                     case 'v': verbose = 1; break; // -v
+                    case 'G': git = 1; break; // -G
                     case 'e': mode = MODE_EXPLAIN; break; // -e
                     case 'j': mode = MODE_JSON; break; // -j
                     case 'I': mode = MODE_INPLACE; break; // -I
@@ -512,7 +517,37 @@ int main(int argc, char *argv[])
 
     int found = 0;
     if (mode == MODE_JSON) printf("[");
-    if (i < argc) {
+    if (git) {
+        int fds[2];
+        check(pipe(fds) == 0, "Failed to create pipe");
+        pid_t child = fork();
+        check(child != -1, "Failed to fork");
+        if (child == 0) {
+            char **git_args = calloc((size_t)(2+(argc-i)+1), sizeof(char*));
+            int g = 0;
+            git_args[g++] = "git";
+            git_args[g++] = "ls-files";
+            while (i < argc) git_args[g++] = argv[i++];
+            dup2(fds[STDOUT_FILENO], STDOUT_FILENO);
+            close(fds[STDIN_FILENO]);
+            execvp("git", git_args);
+            _exit(1);
+        }
+        close(fds[STDOUT_FILENO]);
+        char path[PATH_MAX+2] = {0}; // path + \n + \0
+        while (read(fds[STDIN_FILENO], path, PATH_MAX+1) > 0) { // Iterate over chunks
+            for (char *nl; (nl = strchr(path, '\n')); ) { // Iterate over nl-terminated lines
+                *nl = '\0';
+                found += process_file(defs, path, pattern);
+                memmove(path, nl+1, sizeof(path)-(size_t)(nl+1-path));
+            }
+        }
+        close(fds[STDIN_FILENO]);
+        int status;
+        waitpid(child, &status, 0);
+        check(WIFEXITED(status) && WEXITSTATUS(status) == 0,
+              "`git --ls-files` failed. Do you have git installed?");
+    } else if (i < argc) {
         // Files pass in as command line args:
         for (int nfiles = 0; i < argc; nfiles++, i++) {
             found += process_file(defs, argv[i], pattern);
