@@ -44,9 +44,9 @@ No: `! (__@pat / @!=(''=>"Expected a pattern after the exclamation mark"))
 Nodent: `\ `N
 Upto-and: ".." [__@first=simple-pat] [__`%__@second=simple-pat]
 Repeat: (
-        @min=(''=>'0') `* @max=''
+        @min=(''=>'0') (`*=>"-") @max=(''=>'∞')
       / @min=int __ `- __ @max=int
-      / @min=(int / ''=>'1') __ `+ @max=''
+      / @min=(int / ''=>'1') __ (`+=>"-") @max=(''=>'∞')
       / @min=@max=int
     ) __ @repeat-pat=pat [__`%__@sep=pat]
 Optional: `[ __ extended-pat (__`] / @!=(''=> "Expected closing square bracket here"))
