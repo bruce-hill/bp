@@ -523,7 +523,7 @@ int main(int argc, char *argv[])
 
     int found = 0;
     if (mode == MODE_JSON) printf("[");
-    if (git) {
+    if (git) { // Get the list of files from `git --ls-files ...`
         int fds[2];
         check(pipe(fds) == 0, "Failed to create pipe");
         pid_t child = fork();
