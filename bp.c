@@ -429,12 +429,17 @@ int main(int argc, char *argv[])
                     str = d->pat->end;
                 } else {
                     pat_t *p = bp_pattern(arg_file, str);
-                    check(p, "Pattern failed to compile: %s", flag);
+                    if (!p) {
+                        fprint_line(stdout, arg_file, str, arg_file->end,
+                                    "Failed to compile this part of the argument");
+                        return 1;
+                    }
                     check(npatterns == 0, "Cannot define multiple patterns");
                     defs = with_def(defs, arg_file, strlen("pattern"), "pattern", p);
                     ++npatterns;
                     str = p->end;
                 }
+                str = after_spaces(str);
                 str = strchr(str, ';') ? strchr(str, ';') + 1 : str;
             }
         } else if (FLAG("--pattern-string") || FLAG("-P")) {
