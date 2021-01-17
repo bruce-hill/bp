@@ -13,11 +13,10 @@
 //
 // Return a new list of definitions with one added to the front
 //
-def_t *with_def(def_t *defs, file_t *f, size_t namelen, const char *name, pat_t *pat)
+def_t *with_def(def_t *defs, size_t namelen, const char *name, pat_t *pat)
 {
     def_t *def = new(def_t);
     def->next = defs;
-    def->file = f;
     def->namelen = namelen;
     def->name = name;
     def->pat = pat;
@@ -40,7 +39,7 @@ def_t *load_grammar(def_t *defs, file_t *f)
         check(matchchar(&src, ':'), "Expected ':' in definition");
         pat_t *pat = bp_pattern(f, src);
         if (pat == NULL) break;
-        defs = with_def(defs, f, namelen, name, pat);
+        defs = with_def(defs, namelen, name, pat);
         src = pat->end;
         src = after_spaces(src);
         if (matchchar(&src, ';'))
@@ -74,7 +73,7 @@ def_t *with_backref(def_t *defs, file_t *f, const char *name, match_t *m)
     backref->end = m->end;
     backref->len = -1; // TODO: maybe calculate this? (nontrivial because of replacements)
     backref->args.backref = m;
-    return with_def(defs, f, strlen(name), name, backref);
+    return with_def(defs, strlen(name), name, backref);
 }
 
 //

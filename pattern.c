@@ -7,6 +7,7 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "definitions.h"
 #include "pattern.h"
 #include "utils.h"
 
@@ -18,8 +19,6 @@ __attribute__((nonnull))
 static pat_t *expand_choices(file_t *f, pat_t *first);
 __attribute__((nonnull))
 static pat_t *_bp_simplepattern(file_t *f, const char *str);
-__attribute__((nonnull(1)))
-static pat_t *chain_together(file_t *f,pat_t *first, pat_t *second);
 __attribute__((nonnull(1,2,3,6)))
 static pat_t *new_range(file_t *f, const char *start, const char *end, ssize_t min, ssize_t max, pat_t *repeating, pat_t *sep);
 
@@ -136,7 +135,7 @@ static pat_t *expand_choices(file_t *f, pat_t *first)
 // Given two patterns, return a new pattern for the first pattern followed by
 // the second. If either pattern is NULL, return the other.
 //
-static pat_t *chain_together(file_t *f, pat_t *first, pat_t *second)
+pat_t *chain_together(file_t *f, pat_t *first, pat_t *second)
 {
     if (first == NULL) return second;
     if (second == NULL) return first;
@@ -518,18 +517,18 @@ pat_t *bp_stringpattern(file_t *f, const char *str)
 
                 const char *after_escape;
                 unsigned char e = unescapechar(&str[1], &after_escape);
-                if (e != str[1]) {
-                    str = after_escape - 1;
-                    continue;
+                // If there is not a special escape sequence (\n, \x0A, etc.)
+                // or \\, \", \', \`, then check for an interpolated value:
+                // The special cases for single and double quotes aren't
+                // needed, but there's no known legitimate use case for
+                // interpolating a literal string, and users might escape
+                // quotes out of paranoia, and we want to support that. String
+                // literal interpolations can be done with \("...") anyways.
+                if (e == str[1] && e != '\'' && e != '"' && e != '\\' && e != '`') {
+                    interp = bp_simplepattern(f, str + 1);
+                    if (interp) break;
                 }
-                if (str[1] == '\\') {
-                    ++str;
-                    continue;
-                }
-                interp = bp_simplepattern(f, str + 1);
-                if (interp == NULL)
-                    file_err(f, str, str+1, "This isn't a valid escape sequence or pattern.");
-                break;
+                str = after_escape - 1; // Otherwise treat as a literal character
             }
         }
         // End of string
@@ -595,7 +594,7 @@ pat_t *bp_pattern(file_t *f, const char *str)
 //
 // Match a definition (id__`:__pattern)
 //
-def_t *bp_definition(file_t *f, const char *str)
+def_t *bp_definition(def_t *defs, file_t *f, const char *str)
 {
     const char *name = after_spaces(str);
     str = after_name(name);
@@ -605,12 +604,7 @@ def_t *bp_definition(file_t *f, const char *str)
     pat_t *defpat = bp_pattern(f, str);
     if (!defpat) return NULL;
     matchchar(&defpat->end, ';'); // TODO: verify this is safe to mutate
-    def_t *def = new(def_t);
-    def->file = f;
-    def->namelen = namelen;
-    def->name = name;
-    def->pat = defpat;
-    return def;
+    return with_def(defs, namelen, name, defpat);
 }
 
 //

@@ -100,7 +100,6 @@ typedef struct match_s {
 typedef struct def_s {
     size_t namelen;
     const char *name;
-    file_t *file;
     pat_t *pat;
     struct def_s *next;
 } def_t;

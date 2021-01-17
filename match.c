@@ -433,7 +433,6 @@ match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, unsigned int
             def_t defs2 = {
                 .namelen = def->namelen,
                 .name = def->name,
-                .file = def->file,
                 .pat = &rec_op,
                 .next = defs,
             };

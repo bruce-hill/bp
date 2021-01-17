@@ -40,7 +40,6 @@ static const char *usage = (
     " -C --confirm                     ask for confirmation on each replacement\n"
     " -l --list-files                  list filenames only\n"
     " -p --pattern <pat>               provide a pattern (equivalent to bp '\\(<pat>)')\n"
-    " -P --pattern-string <pat>        provide a string pattern (may be useful if '<pat>' begins with a '-')\n"
     " -r --replace <replacement>       replace the input pattern with the given replacement\n"
     " -c --context <context>           set number of lines of context to print (all: the whole file, 0: only the match, 1: the line, N: N lines of context)\n"
     " -g --grammar <grammar file>      use the specified file as a grammar\n");
@@ -387,14 +386,7 @@ int main(int argc, char *argv[])
 
     def_t *defs = NULL;
     file_t *loaded_files = NULL;
-
-    // Define a pattern that is just a reference to the rule `pattern`
-    file_t *pat_file = spoof_file(&loaded_files, "<pattern>", "pattern");
-    pat_t *pattern = bp_pattern(loaded_files, pat_file->contents);
-
-    // Define a pattern that is just a reference to the rule `replacement`
-    file_t *rep_file = spoof_file(&loaded_files, "<replacement>", "replacement");
-    pat_t *replacement = bp_pattern(rep_file, rep_file->contents);
+    pat_t *pattern = NULL;
 
     // Load builtins:
     file_t *xdg_file = load_file(&loaded_files, "/etc/xdg/"BP_NAME"/builtins.bp");
@@ -402,8 +394,7 @@ int main(int argc, char *argv[])
     file_t *local_file = load_file(&loaded_files, "%s/.config/"BP_NAME"/builtins.bp", getenv("HOME"));
     if (local_file) defs = load_grammar(defs, local_file);
 
-    check(argc > 1, "%s", usage);
-    int i, npatterns = 0, git = 0;
+    int i, git = 0;
     for (i = 1; i < argc; i++) {
         if (streq(argv[i], "--")) {
             ++i;
@@ -428,13 +419,12 @@ int main(int argc, char *argv[])
         } else if (BOOLFLAG("-l") || BOOLFLAG("--list-files")) {
             mode = MODE_LISTFILES;
         } else if (FLAG("-r")     || FLAG("--replace")) {
+            check(pattern, "No pattern has been defined for replacement to operate on");
             // TODO: spoof file as sprintf("pattern => '%s'", flag)
             // except that would require handling edge cases like quotation marks etc.
             file_t *replace_file = spoof_file(&loaded_files, "<replace argument>", flag);
-            pat_t *rep = bp_replacement(replace_file, pattern, replace_file->contents);
-            check(rep, "Replacement failed to compile: %s", flag);
-            defs = with_def(defs, replace_file, strlen("replacement"), "replacement", rep);
-            pattern = replacement;
+            pattern = bp_replacement(replace_file, pattern, replace_file->contents);
+            check(pattern, "Replacement failed to compile: %s", flag);
         } else if (FLAG("-g")     || FLAG("--grammar")) {
             file_t *f = load_file(&loaded_files, flag);
             if (f == NULL)
@@ -446,11 +436,10 @@ int main(int argc, char *argv[])
         } else if (FLAG("-p")     || FLAG("--pattern")) {
             file_t *arg_file = spoof_file(&loaded_files, "<pattern argument>", flag);
             for (const char *str = arg_file->contents; str < arg_file->end; ) {
-                def_t *d = bp_definition(arg_file, str);
+                def_t *d = bp_definition(defs, arg_file, str);
                 if (d) {
-                    d->next = defs;
                     defs = d;
-                    str = d->pat->end;
+                    str = after_spaces(d->pat->end);
                 } else {
                     pat_t *p = bp_pattern(arg_file, str);
                     if (!p) {
@@ -458,20 +447,10 @@ int main(int argc, char *argv[])
                                     "Failed to compile this part of the argument");
                         return 1;
                     }
-                    check(npatterns == 0, "Cannot define multiple patterns");
-                    defs = with_def(defs, arg_file, strlen("pattern"), "pattern", p);
-                    ++npatterns;
-                    str = p->end;
+                    pattern = chain_together(arg_file, pattern, p);
+                    str = after_spaces(p->end);
                 }
-                str = after_spaces(str);
-                str = strchr(str, ';') ? strchr(str, ';') + 1 : str;
             }
-        } else if (FLAG("-P")     || FLAG("--pattern-string")) {
-            file_t *arg_file = spoof_file(&loaded_files, "<pattern argument>", flag);
-            pat_t *p = bp_stringpattern(arg_file, arg_file->contents);
-            check(p, "Pattern failed to compile: %s", flag);
-            defs = with_def(defs, arg_file, strlen("pattern"), "pattern", p);
-            ++npatterns;
         } else if (FLAG("-c")     || FLAG("--context")) {
             if (streq(flag, "all"))
                 context_lines = ALL_CONTEXT;
@@ -483,13 +462,11 @@ int main(int argc, char *argv[])
             printf("Unrecognized flag: -%c\n\n%s\n", argv[i][1], usage);
             return 1;
         } else if (argv[i][0] != '-') {
-            if (npatterns > 0) break;
-            // TODO: spoof file with quotation marks for better debugging
+            if (pattern != NULL) break;
             file_t *arg_file = spoof_file(&loaded_files, "<pattern argument>", argv[i]);
             pat_t *p = bp_stringpattern(arg_file, arg_file->contents);
             check(p, "Pattern failed to compile: %s", argv[i]);
-            defs = with_def(defs, arg_file, strlen("pattern"), "pattern", p);
-            ++npatterns;
+            pattern = chain_together(arg_file, pattern, p);
         } else {
             printf("Unrecognized flag: %s\n\n%s\n", argv[i], usage);
             return 1;
@@ -516,10 +493,42 @@ int main(int argc, char *argv[])
 
     // User input/output is handled through /dev/tty so that normal unix pipes
     // can work properly while simultaneously asking for user input.
-    if (confirm == CONFIRM_ASK) {
+    if (confirm == CONFIRM_ASK || pattern == NULL) {
         tty_in = fopen("/dev/tty", "r");
         tty_out = fopen("/dev/tty", "w");
     }
+
+    if (pattern == NULL) { // If no pattern argument, then ask the user for a pattern
+        fprintf(tty_out, "\033[1mPattern> \033[0m");
+        fflush(tty_out);
+        char *patstr = NULL;
+        size_t len = 0;
+        check(getline(&patstr, &len, tty_in) > 0, "No pattern provided");
+        file_t *arg_file = spoof_file(&loaded_files, "<pattern argument>", patstr);
+        for (const char *str = arg_file->contents; str < arg_file->end; ) {
+            def_t *d = bp_definition(defs, arg_file, str);
+            if (d) {
+                defs = d;
+                str = after_spaces(d->pat->end);
+            } else {
+                pat_t *p = bp_pattern(arg_file, str);
+                if (!p) {
+                    fprint_line(stdout, arg_file, str, arg_file->end,
+                                "Failed to compile this part of the argument");
+                    return 1;
+                }
+                pattern = chain_together(arg_file, pattern, p);
+                str = after_spaces(p->end);
+            }
+        }
+        free(patstr);
+    }
+
+    // To ensure recursion (and left recursion in particular) works properly,
+    // we need to define a rule called "pattern" with the value of whatever
+    // pattern the args specified, and use `pattern` as the thing being matched.
+    defs = with_def(defs, strlen("pattern"), "pattern", pattern); // TODO: this is a bit hacky
+    pattern = bp_pattern(loaded_files, "pattern");
 
     int found = 0;
     if (mode == MODE_JSON) printf("[");

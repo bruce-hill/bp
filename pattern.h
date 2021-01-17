@@ -15,10 +15,12 @@ __attribute__((nonnull(1,2)))
 pat_t *bp_stringpattern(file_t *f, const char *str);
 __attribute__((nonnull(1,2)))
 pat_t *bp_replacement(file_t *f, pat_t *replacepat, const char *replacement);
+__attribute__((nonnull(1)))
+pat_t *chain_together(file_t *f, pat_t *first, pat_t *second);
 __attribute__((nonnull))
 pat_t *bp_pattern(file_t *f, const char *str);
 __attribute__((nonnull))
-def_t *bp_definition(file_t *f, const char *str);
+def_t *bp_definition(def_t *defs, file_t *f, const char *str);
 __attribute__((nonnull))
 void destroy_pat(pat_t *pat);
 
