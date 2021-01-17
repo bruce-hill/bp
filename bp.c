@@ -101,6 +101,26 @@ static char *getflag(const char *flag, char *argv[], int *i)
 }
 
 //
+// Return whether or not a boolean flag exists, and update i/argv to move past
+// it if it does.
+//
+__attribute__((nonnull))
+static int boolflag(const char *flag, char *argv[], int *i)
+{
+    check(argv[*i], "Attempt to get flag from NULL argument");
+    if (streq(argv[*i], flag)) return 1;
+    if (flag[0] == '-' && flag[1] != '-' && flag[2] == '\0' && argv[*i][0] == '-' && argv[*i][1] != '-') {
+        char *p = strchr(argv[*i], flag[1]);
+        if (p) {
+            --(*i); // Recheck this flag
+            memmove(p, p+1, strlen(p+1)+1);
+            return 1;
+        }
+    }
+    return 0;
+}
+
+//
 // Scan the first few dozen bytes of a file and return 1 if the contents all
 // look like printable text characters, otherwise return 0.
 //
@@ -359,6 +379,7 @@ static int process_file(def_t *defs, const char *filename, pat_t *pattern)
 }
 
 #define FLAG(f) (flag=getflag((f), argv, &i))
+#define BOOLFLAG(f) (boolflag((f), argv, &i))
 
 int main(int argc, char *argv[])
 {
@@ -387,27 +408,26 @@ int main(int argc, char *argv[])
         if (streq(argv[i], "--")) {
             ++i;
             break;
-        } else if (streq(argv[i], "--help")) {
-          flag_help:
+        } else if (BOOLFLAG("-h") || BOOLFLAG("--help")) {
             printf("%s\n", usage);
             return 0;
-        } else if (streq(argv[i], "--verbose")) {
+        } else if (BOOLFLAG("-v") || BOOLFLAG("--verbose")) {
             verbose = 1;
-        } else if (streq(argv[i], "--explain")) {
+        } else if (BOOLFLAG("-e") || BOOLFLAG("--explain")) {
             mode = MODE_EXPLAIN;
-        } else if (streq(argv[i], "--json")) {
+        } else if (BOOLFLAG("-j") || BOOLFLAG("--json")) {
             mode = MODE_JSON;
-        } else if (streq(argv[i], "--inplace")) {
+        } else if (BOOLFLAG("-I") || BOOLFLAG("--inplace")) {
             mode = MODE_INPLACE;
-        } else if (streq(argv[i], "--confirm")) {
+        } else if (BOOLFLAG("-C") || BOOLFLAG("--confirm")) {
             confirm = CONFIRM_ASK;
-        } else if (streq(argv[i], "--git")) {
+        } else if (BOOLFLAG("-G") || BOOLFLAG("--git")) {
             git = 1;
-        } else if (streq(argv[i], "--ignore-case")) {
+        } else if (BOOLFLAG("-i") || BOOLFLAG("--ignore-case")) {
             ignorecase = 1;
-        } else if (streq(argv[i], "--list-files")) {
+        } else if (BOOLFLAG("-l") || BOOLFLAG("--list-files")) {
             mode = MODE_LISTFILES;
-        } else if (FLAG("--replace") || FLAG("-r")) {
+        } else if (FLAG("-r")     || FLAG("--replace")) {
             // TODO: spoof file as sprintf("pattern => '%s'", flag)
             // except that would require handling edge cases like quotation marks etc.
             file_t *replace_file = spoof_file(&loaded_files, "<replace argument>", flag);
@@ -415,7 +435,7 @@ int main(int argc, char *argv[])
             check(rep, "Replacement failed to compile: %s", flag);
             defs = with_def(defs, replace_file, strlen("replacement"), "replacement", rep);
             pattern = replacement;
-        } else if (FLAG("--grammar") || FLAG("-g")) {
+        } else if (FLAG("-g")     || FLAG("--grammar")) {
             file_t *f = load_file(&loaded_files, flag);
             if (f == NULL)
                 f = load_file(&loaded_files, "%s/.config/"BP_NAME"/%s.bp", getenv("HOME"), flag);
@@ -423,7 +443,7 @@ int main(int argc, char *argv[])
                 f = load_file(&loaded_files, "/etc/xdg/"BP_NAME"/%s.bp", flag);
             check(f != NULL, "Couldn't find grammar: %s", flag);
             defs = load_grammar(defs, f); // Keep in memory for debug output
-        } else if (FLAG("--pattern") || FLAG("-p")) {
+        } else if (FLAG("-p")     || FLAG("--pattern")) {
             file_t *arg_file = spoof_file(&loaded_files, "<pattern argument>", flag);
             for (const char *str = arg_file->contents; str < arg_file->end; ) {
                 def_t *d = bp_definition(arg_file, str);
@@ -446,13 +466,13 @@ int main(int argc, char *argv[])
                 str = after_spaces(str);
                 str = strchr(str, ';') ? strchr(str, ';') + 1 : str;
             }
-        } else if (FLAG("--pattern-string") || FLAG("-P")) {
+        } else if (FLAG("-P")     || FLAG("--pattern-string")) {
             file_t *arg_file = spoof_file(&loaded_files, "<pattern argument>", flag);
             pat_t *p = bp_stringpattern(arg_file, arg_file->contents);
             check(p, "Pattern failed to compile: %s", flag);
             defs = with_def(defs, arg_file, strlen("pattern"), "pattern", p);
             ++npatterns;
-        } else if (FLAG("--context") || FLAG("-c")) {
+        } else if (FLAG("-c")     || FLAG("--context")) {
             if (streq(flag, "all"))
                 context_lines = ALL_CONTEXT;
             else if (streq(flag, "none"))
@@ -460,22 +480,8 @@ int main(int argc, char *argv[])
             else
                 context_lines = (int)strtol(flag, NULL, 10);
         } else if (argv[i][0] == '-' && argv[i][1] && argv[i][1] != '-') { // single-char flags
-            for (char *c = &argv[i][1]; *c; ++c) {
-                switch (*c) {
-                    case 'h': goto flag_help; // -h
-                    case 'v': verbose = 1; break; // -v
-                    case 'G': git = 1; break; // -G
-                    case 'e': mode = MODE_EXPLAIN; break; // -e
-                    case 'j': mode = MODE_JSON; break; // -j
-                    case 'I': mode = MODE_INPLACE; break; // -I
-                    case 'C': confirm = CONFIRM_ASK; break; // -C
-                    case 'i': ignorecase = 1; break; // -i
-                    case 'l': mode = MODE_LISTFILES; break; // -l
-                    default:
-                        printf("Unrecognized flag: -%c\n\n%s\n", *c, usage);
-                        return 1;
-                }
-            }
+            printf("Unrecognized flag: -%c\n\n%s\n", argv[i][1], usage);
+            return 1;
         } else if (argv[i][0] != '-') {
             if (npatterns > 0) break;
             // TODO: spoof file with quotation marks for better debugging
