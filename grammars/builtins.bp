@@ -40,12 +40,16 @@ brackets: `[..`] % (\n/brackets/string)
 braces: `{..`} % (\n/braces/string)
 parens: `(..`) % (\n/parens/string)
 string: `"..`" % (`\.) / `'..`' % (`\.)
-id: !<`a-z,A-Z,_,0-9 (`a-z,A-Z,_ *`a-z,A-Z,_,0-9)!=keyword
+id: | (!`0-9 id-char *id-char)!=keyword |
 id-char: `a-z,A-Z,_,0-9
+|: !id-char / (
+    !<(\x00-x7f==id-char)
+    !<((\xc0-xdf \x80-xbf)==id-char)
+    !<((\xe0-xef 2\x80-xbf)==id-char)
+    !<((\xf0-xf7 3\x80-xbf)==id-char))
 var: id
 keyword: !"" # No keywords defined by default
-word: !<`a-z,A-Z,_,0-9 +`a-z,A-Z !>`0-9,_
-|: !<`a-z,A-Z,_,0-9 / !>`a-z,A-Z,_,0-9
+word: |+`a-z,A-Z !`0-9,_
 HEX: `0-9,A-F
 Hex: `0-9,a-f,A-F
 hex: `0-9,a-f
