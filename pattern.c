@@ -103,15 +103,11 @@ static pat_t *expand_choices(file_t *f, pat_t *first)
         if (!matchchar(&str, quote))
             file_err(f, &repstr[-1], str, "This string doesn't have a closing quote.");
 
-        size_t replace_len = (size_t)(str-repstr-1);
-        const char *replacement = xcalloc(sizeof(char), replace_len+1);
-        memcpy((void*)replacement, repstr, replace_len);
-        
         pat_t *replacepat = first;
         first = new_pat(f, replacepat->start, BP_REPLACE);
         first->args.replace.pat = replacepat;
-        first->args.replace.text = replacement;
-        first->args.replace.len = replace_len;
+        first->args.replace.text = repstr;
+        first->args.replace.len = (size_t)(str-repstr-1);
         first->len = replacepat->len;
         first->end = str;
     }
@@ -619,10 +615,6 @@ void destroy_pat(pat_t *pat)
         case BP_CAPTURE:
             if (pat->args.capture.name)
                 xfree(&pat->args.capture.name);
-            break;
-        case BP_REPLACE:
-            if (pat->args.replace.text)
-                xfree(&pat->args.replace.text);
             break;
         default: break;
     }
