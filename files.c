@@ -41,7 +41,8 @@ static void populate_lines(file_t *f)
 }
 
 //
-// Read an entire file into memory.
+// Read an entire file into memory, using a printf-style formatting string to
+// construct the filename.
 //
 file_t *load_filef(file_t **files, const char *fmt, ...)
 {
