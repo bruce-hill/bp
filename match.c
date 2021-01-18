@@ -381,6 +381,7 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
                 .lines=f->lines, // I think this works, but am not 100% sure
                 .nlines=1 + get_line_number(f, m1->end)-get_line_number(f, m1->start),
                 .mmapped=f->mmapped,
+                .pats = NULL, .next = NULL,
             };
             match_t *m2 = match(defs, &inner, str, pat->args.multiple.second, ignorecase);
             if ((m2 == NULL || m2->end != m1->end) == (pat->type == BP_EQUAL)) {

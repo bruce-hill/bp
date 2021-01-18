@@ -20,7 +20,7 @@ static pat_t *expand_choices(file_t *f, pat_t *first);
 __attribute__((nonnull))
 static pat_t *_bp_simplepattern(file_t *f, const char *str);
 __attribute__((nonnull(1,2,3,6)))
-static pat_t *new_range(file_t *f, const char *start, const char *end, ssize_t min, ssize_t max, pat_t *repeating, pat_t *sep);
+static pat_t *new_range(file_t *f, const char *start, const char *end, size_t min, ssize_t max, pat_t *repeating, pat_t *sep);
 __attribute__((nonnull(1,2)))
 static pat_t *bp_simplepattern(file_t *f, const char *str);
 
@@ -42,11 +42,11 @@ pat_t *new_pat(file_t *f, const char *start, enum pattype_e type)
 //
 // Helper function to initialize a range object.
 //
-static pat_t *new_range(file_t *f, const char *start, const char *end, ssize_t min, ssize_t max, pat_t *repeating, pat_t *sep)
+static pat_t *new_range(file_t *f, const char *start, const char *end, size_t min, ssize_t max, pat_t *repeating, pat_t *sep)
 {
     pat_t *range = new_pat(f, start, BP_REPEAT);
-    if (repeating->len >= 0 && (sep == NULL || sep->len >= 0) && min == max && min >= 0)
-        range->len = repeating->len * min + (sep == NULL || min == 0 ? 0 : sep->len * (min-1));
+    if (repeating->len >= 0 && (sep == NULL || sep->len >= 0) && (ssize_t)min == max)
+        range->len = (ssize_t)repeating->len * (ssize_t)min + (sep == NULL || min == 0 ? 0 : (ssize_t)sep->len * (ssize_t)(min-1));
     else
         range->len = -1;
     range->args.repetitions.min = min;
@@ -346,19 +346,20 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
         // Number of repetitions: <N>(-<N> / - / + / "")
         case '0': case '1': case '2': case '3': case '4': case '5':
         case '6': case '7': case '8': case '9': {
-            ssize_t min = -1, max = -1;
+            size_t min = 0;
+            ssize_t max = -1;
             --str;
             long n1 = strtol(str, (char**)&str, 10);
             if (matchchar(&str, '-')) {
                 str = after_spaces(str);
                 const char *numstart = str;
                 long n2 = strtol(str, (char**)&str, 10);
-                if (str == numstart) min = 0, max = n1;
-                else min = n1, max = n2;
+                if (str == numstart) min = 0, max = (ssize_t)n1;
+                else min = (size_t)n1, max = (ssize_t)n2;
             } else if (matchchar(&str, '+')) {
-                min = n1, max = -1;
+                min = (size_t)n1, max = -1;
             } else {
-                min = n1, max = n1;
+                min = (size_t)n1, max = (ssize_t)n1;
             }
             pat_t *repeating = bp_simplepattern(f, str);
             if (!repeating)
@@ -431,7 +432,7 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
         }
         // Repeating
         case '*': case '+': {
-            ssize_t min = c == '*' ? 0 : 1;
+            size_t min = (size_t)(c == '*' ? 0 : 1);
             pat_t *repeating = bp_simplepattern(f, str);
             if (!repeating)
                 file_err(f, str, str, "There should be a valid pattern here after the '%c'", c);

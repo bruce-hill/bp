@@ -50,7 +50,8 @@ typedef struct pat_s {
             unsigned char low, high;
         } range;
         struct {
-            ssize_t min, max;
+            size_t min;
+            ssize_t max;
             struct pat_s *sep, *repeat_pat;
         } repetitions;
         // TODO: use a linked list instead of a binary tree
@@ -81,7 +82,7 @@ typedef struct pat_s {
 //
 // Pattern matching result object
 //
-typedef /*@refcounted@*/ struct match_s {
+typedef struct match_s {
     // Where the match starts and ends (end is after the last character)
     const char *start, *end;
     struct match_s *child, *nextsibling;
@@ -91,7 +92,7 @@ typedef /*@refcounted@*/ struct match_s {
 #ifdef DEBUG_HEAP
     struct match_s **atme;
 #endif
-    /*@refs@*/ int refcount;
+    int refcount;
     // If skip_replacement is set to 1, that means the user wants to not print
     // the replaced text when printing this match:
     // TODO: this is a bit hacky, there is probably a better way to go about

@@ -51,7 +51,7 @@ file_t *load_filef(file_t **files, const char *fmt, ...)
     char filename[PATH_MAX+1] = {0};
     va_list args;
     va_start(args, fmt);
-    check(vsnprintf(filename, PATH_MAX, fmt, args) <= PATH_MAX,
+    check(vsnprintf(filename, PATH_MAX, fmt, args) <= (int)PATH_MAX,
           "File name is too large");
     va_end(args);
     return load_file(files, filename);
@@ -217,7 +217,7 @@ void fprint_line(FILE *dest, file_t *f, const char *start, const char *end, cons
     size_t linenum = get_line_number(f, start);
     const char *line = get_line(f, linenum);
     size_t charnum = get_char_number(f, start);
-    fprintf(dest, "\033[1m%s:%ld:\033[0m ", f->filename[0] ? f->filename : "stdin", linenum);
+    fprintf(dest, "\033[1m%s:%lu:\033[0m ", f->filename[0] ? f->filename : "stdin", linenum);
 
     va_list args;
     va_start(args, fmt);
@@ -227,12 +227,12 @@ void fprint_line(FILE *dest, file_t *f, const char *start, const char *end, cons
 
     const char *eol = linenum == f->nlines ? strchr(line, '\0') : strchr(line, '\n');
     if (end == NULL || end > eol) end = eol;
-    fprintf(dest, "\033[2m% 5ld |\033[0m %.*s\033[41;30m%.*s\033[0m%.*s\n",
+    fprintf(dest, "\033[2m%5lu\033(0\x78\033(B\033[0m%.*s\033[41;30m%.*s\033[0m%.*s\n",
             linenum,
             (int)charnum - 1, line,
             (int)(end - &line[charnum-1]), &line[charnum-1],
             (int)(eol - end - 1), end);
-    fprintf(dest, "        \033[34;1m");
+    fprintf(dest, "      \033[34;1m");
     const char *p = line;
     for (; p < start; ++p) (void)fputc(*p == '\t' ? '\t' : ' ', dest);
     if (start == end) ++end;
