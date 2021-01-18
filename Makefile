@@ -12,13 +12,16 @@ ALL_FLAGS=$(CFLAGS) -DBP_NAME="\"$(NAME)\"" $(EXTRA) $(CWARN) $(G) $(O)
 CFILES=pattern.c definitions.c utils.c match.c files.c print.c json.c
 OBJFILES=$(CFILES:.c=.o)
 
-all: $(NAME)
+all: $(NAME) tags
 
 %.o: %.c %.h types.h
 	$(CC) -c $(ALL_FLAGS) -o $@ $<
 
 $(NAME): $(OBJFILES) bp.c
 	$(CC) $(ALL_FLAGS) -o $@ $(OBJFILES) bp.c
+
+tags: $(CFILES) bp.c
+	ctags *.c *.h
 
 clean:
 	rm -f $(NAME) $(OBJFILES)
