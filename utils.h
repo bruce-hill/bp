@@ -11,7 +11,7 @@
 #include "match.h"
 
 #define streq(a, b) (strcmp(a, b) == 0)
-#define check(cond, ...) do { if (!(cond)) { fprintf(stderr, __VA_ARGS__); fwrite("\n", 1, 1, stderr); exit(1); } } while(0)
+#define check(cond, ...) do { if (!(cond)) { (void)fprintf(stderr, __VA_ARGS__); (void)fwrite("\n", 1, 1, stderr); exit(1); } } while(0)
 #define new(t) memcheck(calloc(1, sizeof(t)))
 #define xcalloc(a,b) memcheck(calloc(a,b))
 #define xrealloc(a,b) memcheck(realloc(a,b))
@@ -28,7 +28,8 @@ __attribute__((nonnull))
 int matchstr(const char **str, const char *target);
 __attribute__((nonnull))
 size_t unescape_string(char *dest, const char *src, size_t bufsize);
-void *memcheck(void *p);
+__attribute__((returns_nonnull))
+void *memcheck(/*@null@*/ /*@out@*/ void *p);
 __attribute__((nonnull))
 int memicmp(const void *s1, const void *s2, size_t n);
 __attribute__((nonnull))

@@ -595,7 +595,7 @@ static match_t *new_match(void)
     if (unused_matches) {
         m = unused_matches;
         unused_matches = unused_matches->next;
-        memset(m, 0, sizeof(match_t));
+        (void)memset(m, 0, sizeof(match_t));
     } else {
         m = new(match_t);
     }
@@ -622,10 +622,10 @@ void recycle_if_unused(match_t **at_m)
 
 #ifdef DEBUG_HEAP
     DLL_REMOVE(m); // Remove from in_use_matches
-    memset(m, 0, sizeof(match_t));
+    (void)memset(m, 0, sizeof(match_t));
     DLL_PREPEND(unused_matches, m);
 #else
-    memset(m, 0, sizeof(match_t));
+    (void)memset(m, 0, sizeof(match_t));
     m->next = unused_matches;
     unused_matches = m;
 #endif

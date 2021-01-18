@@ -184,7 +184,7 @@ static int explain_matches(def_t *defs, file_t *f, pat_t *pattern)
 static void cleanup(void)
 {
     if (in_use_tempfile) {
-        remove(in_use_tempfile);
+        (void)remove(in_use_tempfile);
         in_use_tempfile = NULL;
     }
 }
@@ -195,7 +195,7 @@ static void cleanup(void)
 static void sig_handler(int sig)
 {
     cleanup();
-    kill(0, sig);
+    if (kill(0, sig)) _exit(1);
 }
 
 //
@@ -230,7 +230,7 @@ static void confirm_replacements(file_t *f, match_t *m, confirm_t *confirm)
 
       retry:
         fprintf(tty_out, "\033[1mReplace? (y)es (n)o (r)emaining (d)one\033[0m ");
-        fflush(tty_out);
+        (void)fflush(tty_out);
 
         char *answer = NULL;
         size_t len = 0;
@@ -297,7 +297,7 @@ static int inplace_modify_file(def_t *defs, file_t *f, pat_t *pattern)
         print_match(inplace_file, &pr, NULL);
         if (confirm == CONFIRM_ALL)
             printf("%s\n", f->filename);
-        fclose(inplace_file);
+        (void)fclose(inplace_file);
 
         // TODO: if I want to implement backup files then add a line like this:
         // if (backup) rename(f->filename, f->filename + ".bak");
@@ -381,7 +381,7 @@ static int process_file(def_t *defs, const char *filename, pat_t *pattern)
     check(recycle_all_matches() == 0, "Memory leak: there should no longer be any matches in use at this point.");
 #endif
     destroy_file(&f);
-    fflush(stdout);
+    (void)fflush(stdout);
     return matches;
 }
 
@@ -396,16 +396,20 @@ static int process_dir(def_t *defs, const char *dirname, pat_t *pattern)
     char globpath[PATH_MAX+1] = {0};
     check(snprintf(globpath, PATH_MAX, "%s/*", dirname) <= PATH_MAX,
           "Filename is too long: %s/*", dirname);
-    glob(globpath, 0, NULL, &globbuf);
-    struct stat statbuf;
-    for (size_t i = 0; i < globbuf.gl_pathc; i++) {
-        if (lstat(globbuf.gl_pathv[i], &statbuf) != 0) continue;
-        if (S_ISLNK(statbuf.st_mode))
-            continue; // Skip symbolic links
-        else if (S_ISDIR(statbuf.st_mode))
-            matches += process_dir(defs, globbuf.gl_pathv[i], pattern);
-        else if (is_text_file(globbuf.gl_pathv[i]))
-            matches += process_file(defs, globbuf.gl_pathv[i], pattern);
+    int status = glob(globpath, 0, NULL, &globbuf);
+    check(status != GLOB_ABORTED && status != GLOB_NOSPACE,
+          "Failed to get directory contents: %s", dirname);
+    if (status != GLOB_NOMATCH) {
+        struct stat statbuf;
+        for (size_t i = 0; i < globbuf.gl_pathc; i++) {
+            if (lstat(globbuf.gl_pathv[i], &statbuf) != 0) continue;
+            if (S_ISLNK(statbuf.st_mode))
+                continue; // Skip symbolic links
+            else if (S_ISDIR(statbuf.st_mode))
+                matches += process_dir(defs, globbuf.gl_pathv[i], pattern);
+            else if (is_text_file(globbuf.gl_pathv[i]))
+                matches += process_file(defs, globbuf.gl_pathv[i], pattern);
+        }
     }
     globfree(&globbuf);
     return matches;
@@ -522,10 +526,10 @@ int main(int argc, char *argv[])
     int signals[] = {SIGTERM, SIGINT, SIGXCPU, SIGXFSZ, SIGVTALRM, SIGPROF, SIGSEGV, SIGTSTP};
     struct sigaction sa = {.sa_handler = &sig_handler, .sa_flags = (int)(SA_NODEFER | SA_RESETHAND)};
     for (size_t i = 0; i < sizeof(signals)/sizeof(signals[0]); i++)
-        sigaction(signals[i], &sa, NULL);
+        check(!sigaction(signals[i], &sa, NULL), "Failed to set signal handler");
 
     // Handle exit() calls gracefully:
-    atexit(&cleanup);
+    check(!atexit(&cleanup), "Failed to set cleanup handler at exit");
 
     // User input/output is handled through /dev/tty so that normal unix pipes
     // can work properly while simultaneously asking for user input.
@@ -536,7 +540,7 @@ int main(int argc, char *argv[])
 
     if (pattern == NULL) { // If no pattern argument, then ask the user for a pattern
         fprintf(tty_out, "\033[1mPattern> \033[0m");
-        fflush(tty_out);
+        (void)fflush(tty_out);
         char *patstr = NULL;
         size_t len = 0;
         check(getline(&patstr, &len, tty_in) > 0, "No pattern provided");
@@ -579,12 +583,12 @@ int main(int argc, char *argv[])
             git_args[g++] = "git";
             git_args[g++] = "ls-files";
             while (i < argc) git_args[g++] = argv[i++];
-            dup2(fds[STDOUT_FILENO], STDOUT_FILENO);
-            close(fds[STDIN_FILENO]);
-            execvp("git", git_args);
+            check(dup2(fds[STDOUT_FILENO], STDOUT_FILENO), "Failed to hook up pipe to stdout");
+            check(!close(fds[STDIN_FILENO]), "Failed to close read end of pipe");
+            (void)execvp("git", git_args);
             _exit(1);
         }
-        close(fds[STDOUT_FILENO]);
+        check(!close(fds[STDOUT_FILENO]), "Failed to close write end of pipe");
         char path[PATH_MAX+2] = {0}; // path + \n + \0
         while (read(fds[STDIN_FILENO], path, PATH_MAX+1) > 0) { // Iterate over chunks
             for (char *nl; (nl = strchr(path, '\n')); ) { // Iterate over nl-terminated lines
@@ -593,9 +597,9 @@ int main(int argc, char *argv[])
                 memmove(path, nl+1, sizeof(path)-(size_t)(nl+1-path));
             }
         }
-        close(fds[STDIN_FILENO]);
+        check(!close(fds[STDIN_FILENO]), "Failed to close read end of pipe");
         int status;
-        waitpid(child, &status, 0);
+        while (waitpid(child, &status, 0) != child) continue;
         check(WIFEXITED(status) && WEXITSTATUS(status) == 0,
               "`git --ls-files` failed. Do you have git installed?");
     } else if (i < argc) {
@@ -616,8 +620,8 @@ int main(int argc, char *argv[])
     }
     if (mode == MODE_JSON) printf("]\n");
 
-    if (tty_out) { fclose(tty_out); tty_out = NULL; }
-    if (tty_in) { fclose(tty_in); tty_in = NULL; }
+    if (tty_out) { (void)fclose(tty_out); tty_out = NULL; }
+    if (tty_in) { (void)fclose(tty_in); tty_in = NULL; }
 
 #ifdef DEBUG_HEAP
     // This code frees up all residual heap-allocated memory. Since the program

@@ -304,20 +304,20 @@ static void _print_match(FILE *out, printer_t *pr, match_t *m)
             if (*r == '\\') {
                 ++r;
                 char c = unescapechar(r, &r);
-                fputc(c, out);
+                (void)fputc(c, out);
                 if (c == '\n') {
                     ++line;
                     pr->needs_line_number = 1;
                 }
                 continue;
             } else if (*r == '\n') {
-                fputc('\n', out);
+                (void)fputc('\n', out);
                 ++line;
                 pr->needs_line_number = 1;
                 ++r;
                 continue;
             } else {
-                fputc(*r, out);
+                (void)fputc(*r, out);
                 ++r;
                 continue;
             }

@@ -106,7 +106,7 @@ typedef struct def_s {
     size_t namelen;
     const char *name;
     pat_t *pat;
-    struct def_s *next;
+    /*@only@*/ struct def_s *next;
 } def_t;
 
 //
@@ -114,7 +114,7 @@ typedef struct def_s {
 // file is freed.
 //
 typedef struct allocated_pat_s {
-    struct allocated_pat_s *next;
+    /*@only@*/ struct allocated_pat_s *next;
     pat_t pat;
 } allocated_pat_t;
 

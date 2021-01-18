@@ -545,7 +545,7 @@ pat_t *bp_stringpattern(file_t *f, const char *str)
             ret = chain_together(f, ret, interp);
             str = interp->end;
             // allow terminating seq
-            matchchar(&str, ';');
+            (void)matchchar(&str, ';');
         }
     }
     return ret;
@@ -599,7 +599,7 @@ def_t *bp_definition(def_t *defs, file_t *f, const char *str)
     if (!matchchar(&str, ':')) return NULL;
     pat_t *defpat = bp_pattern(f, str);
     if (!defpat) return NULL;
-    matchchar(&defpat->end, ';'); // TODO: verify this is safe to mutate
+    (void)matchchar(&defpat->end, ';'); // TODO: verify this is safe to mutate
     return with_def(defs, namelen, name, defpat);
 }
 

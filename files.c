@@ -93,7 +93,7 @@ file_t *load_file(file_t **files, const char *filename)
     }
 
   finished_loading:
-    if (fd != STDIN_FILENO) close(fd);
+    if (fd != STDIN_FILENO) check(!close(fd), "Failed to close file");
     f->end = &f->contents[length];
     populate_lines(f);
     if (files != NULL) {
@@ -131,7 +131,8 @@ void intern_file(file_t *f)
     size_t size = (size_t)(f->end - f->contents);
     char *buf = xcalloc(sizeof(char), size + 1);
     memcpy(buf, f->contents, size);
-    munmap(f->contents, size);
+    check(!munmap(f->contents, size),
+          "Failure to un-memory-map some memory");
     f->contents = buf;
     f->end = buf + size;
     f->mmapped = 0;
@@ -155,7 +156,8 @@ void destroy_file(file_t **f)
 
     if ((*f)->contents) {
         if ((*f)->mmapped) {
-            munmap((*f)->contents, (size_t)((*f)->end - (*f)->contents));
+            check(!munmap((*f)->contents, (size_t)((*f)->end - (*f)->contents)),
+                  "Failure to un-memory-map some memory");
             (*f)->contents = NULL;
         } else {
             xfree(&((*f)->contents));
@@ -219,9 +221,9 @@ void fprint_line(FILE *dest, file_t *f, const char *start, const char *end, cons
 
     va_list args;
     va_start(args, fmt);
-    vfprintf(dest, fmt, args);
+    (void)vfprintf(dest, fmt, args);
     va_end(args);
-    fputc('\n', dest);
+    (void)fputc('\n', dest);
 
     const char *eol = linenum == f->nlines ? strchr(line, '\0') : strchr(line, '\n');
     if (end == NULL || end > eol) end = eol;
@@ -232,14 +234,14 @@ void fprint_line(FILE *dest, file_t *f, const char *start, const char *end, cons
             (int)(eol - end - 1), end);
     fprintf(dest, "        \033[34;1m");
     const char *p = line;
-    for (; p < start; ++p) fputc(*p == '\t' ? '\t' : ' ', dest);
+    for (; p < start; ++p) (void)fputc(*p == '\t' ? '\t' : ' ', dest);
     if (start == end) ++end;
     for (; p < end; ++p)
         if (*p == '\t')
             // Some janky hacks: 8 ^'s, backtrack 8 spaces, move forward a tab stop, clear any ^'s that overshot
             fprintf(dest, "^^^^^^^^\033[8D\033[I\033[K");
         else
-            fputc('^', dest);
+            (void)fputc('^', dest);
     fprintf(dest, "\033[0m\n");
 }
 
