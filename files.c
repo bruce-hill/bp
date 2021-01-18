@@ -228,11 +228,16 @@ void fprint_line(FILE *dest, file_t *f, const char *start, const char *end, cons
             (int)charnum - 1, line,
             (int)(end - &line[charnum-1]), &line[charnum-1],
             (int)(eol - end - 1), end);
-    fprintf(dest, "       \033[34;1m");
-    const char *p = line - 1;
-    for (; p < start; ++p) fputc(' ', dest);
+    fprintf(dest, "        \033[34;1m");
+    const char *p = line;
+    for (; p < start; ++p) fputc(*p == '\t' ? '\t' : ' ', dest);
     if (start == end) ++end;
-    for (; p < end; ++p) fputc('^', dest);
+    for (; p < end; ++p)
+        if (*p == '\t')
+            // Some janky hacks: 8 ^'s, backtrack 8 spaces, move forward a tab stop, clear any ^'s that overshot
+            fprintf(dest, "^^^^^^^^\033[8D\033[I\033[K");
+        else
+            fputc('^', dest);
     fprintf(dest, "\033[0m\n");
 }
 
