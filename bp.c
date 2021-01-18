@@ -192,7 +192,11 @@ static void cleanup(void)
 //
 // Signal handler to ensure cleanup happens.
 //
-static void sig_handler(int sig) { (void)sig; cleanup(); }
+static void sig_handler(int sig)
+{
+    cleanup();
+    kill(0, sig);
+}
 
 //
 // Present the user with a prompt to confirm replacements before they happen.
@@ -285,10 +289,6 @@ static int inplace_modify_file(def_t *defs, file_t *f, pat_t *pattern)
                 fprint_filename(tty_out, f->filename);
         }
         confirm_replacements(f, m, &confirm_file);
-        if (!in_use_tempfile) { // signal interrupted, so abort
-            fclose(inplace_file);
-            exit(1);
-        }
         print_match(inplace_file, &pr, m);
     }
 
