@@ -9,12 +9,12 @@
 
 __attribute__((nonnull(3,4), returns_nonnull))
 def_t *with_def(def_t *defs, size_t namelen, const char *name, pat_t *pat);
-__attribute__((nonnull(2,3,4), returns_nonnull))
-def_t *with_backref(def_t *defs, file_t *f, const char *name, match_t *m);
+__attribute__((nonnull(2,4,5), returns_nonnull))
+def_t *with_backref(def_t *defs, file_t *f, size_t namelen, const char *name, match_t *m);
 __attribute__((nonnull(2)))
 def_t *load_grammar(def_t *defs, file_t *f);
-__attribute__((pure, nonnull(2)))
-def_t *lookup(def_t *defs, const char *name);
+__attribute__((pure, nonnull(3)))
+def_t *lookup(def_t *defs, size_t namelen, const char *name);
 __attribute__((nonnull(1)))
 void free_defs(def_t **defs, def_t *stop);
 

@@ -41,7 +41,11 @@ typedef struct pat_s {
     // Length of the match, if constant, otherwise -1
     ssize_t len;
     union {
-        const char *s;
+        const char *string;
+        struct {
+            const char *name;
+            size_t len;
+        } name;
         struct {
             unsigned char low, high;
         } range;
@@ -60,7 +64,8 @@ typedef struct pat_s {
         } replace;
         struct {
             struct pat_s *capture_pat;
-            char *name;
+            const char *name;
+            size_t namelen;
         } capture;
         struct match_s *backref;
         struct {

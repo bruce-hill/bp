@@ -55,10 +55,10 @@ def_t *load_grammar(def_t *defs, file_t *f)
 //
 // Look up a backreference or grammar definition by name
 //
-def_t *lookup(def_t *defs, const char *name)
+def_t *lookup(def_t *defs, size_t namelen, const char *name)
 {
     for ( ; defs; defs = defs->next) {
-        if (strlen(name) == defs->namelen && strncmp(defs->name, name, defs->namelen) == 0)
+        if (namelen == defs->namelen && strncmp(defs->name, name, namelen) == 0)
             return defs;
     }
     return NULL;
@@ -67,13 +67,13 @@ def_t *lookup(def_t *defs, const char *name)
 //
 // Push a backreference onto the backreference stack
 //
-def_t *with_backref(def_t *defs, file_t *f, const char *name, match_t *m)
+def_t *with_backref(def_t *defs, file_t *f, size_t namelen, const char *name, match_t *m)
 {
     pat_t *backref = new_pat(f, m->start, BP_BACKREF);
     backref->end = m->end;
     backref->len = -1; // TODO: maybe calculate this? (nontrivial because of replacements)
     backref->args.backref = m;
-    return with_def(defs, strlen(name), name, backref);
+    return with_def(defs, namelen, name, backref);
 }
 
 //

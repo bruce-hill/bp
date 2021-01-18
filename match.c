@@ -171,8 +171,8 @@ match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, unsigned int
         }
         case BP_STRING: {
             if (&str[pat->len] > f->end) return NULL;
-            if (ignorecase ? memicmp(str, pat->args.s, (size_t)pat->len) != 0
-                           : memcmp(str, pat->args.s, (size_t)pat->len) != 0)
+            if (ignorecase ? memicmp(str, pat->args.string, (size_t)pat->len) != 0
+                           : memcmp(str, pat->args.string, (size_t)pat->len) != 0)
                 return NULL;
             match_t *m = new_match();
             m->pat = pat;
@@ -347,7 +347,7 @@ match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, unsigned int
             { // Push backrefs and run matching, then cleanup
                 def_t *defs2 = defs;
                 if (m1->pat->type == BP_CAPTURE && m1->pat->args.capture.name)
-                    defs2 = with_backref(defs2, f, m1->pat->args.capture.name, m1);
+                    defs2 = with_backref(defs2, f, m1->pat->args.capture.namelen, m1->pat->args.capture.name, m1);
                 // def_t *defs2 = with_backrefs(defs, f, m1);
                 m2 = match(defs2, f, m1->end, pat->args.multiple.second, ignorecase);
                 free_defs(&defs2, defs);
@@ -414,8 +414,8 @@ match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, unsigned int
             return m;
         }
         case BP_REF: {
-            def_t *def = lookup(defs, pat->args.s);
-            check(def != NULL, "Unknown identifier: '%s'", pat->args.s);
+            def_t *def = lookup(defs, pat->args.name.len, pat->args.name.name);
+            check(def != NULL, "Unknown identifier: '%.*s'", (int)pat->args.name.len, pat->args.name.name);
             pat_t *ref = def->pat;
 
             pat_t rec_op = {
@@ -540,7 +540,7 @@ static match_t *get_capture_by_num(match_t *m, int *n)
 static match_t *get_capture_by_name(match_t *m, const char *name)
 {
     if (m->pat->type == BP_CAPTURE && m->pat->args.capture.name
-        && streq(m->pat->args.capture.name, name))
+        && strncmp(m->pat->args.capture.name, name, m->pat->args.capture.namelen) == 0)
         return m;
     for (match_t *c = m->child; c; c = c->nextsibling) {
         match_t *cap = get_capture_by_name(c, name);

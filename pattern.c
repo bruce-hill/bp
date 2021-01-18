@@ -246,7 +246,7 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
                     pat = new_pat(f, opstart, BP_STRING);
                     char *s = xcalloc(sizeof(char), 2);
                     s[0] = c;
-                    pat->args.s = s;
+                    pat->args.string = s;
                 }
 
                 pat->len = 1;
@@ -296,7 +296,7 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
                 esc = new_pat(f, opstart, BP_STRING);
                 char *s = xcalloc(sizeof(char), 2);
                 s[0] = (char)e;
-                esc->args.s = s;
+                esc->args.string = s;
             }
             esc->len = 1;
             esc->end = str;
@@ -323,7 +323,7 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
 
             pat_t *pat = new_pat(f, start, BP_STRING);
             pat->len = (ssize_t)len;
-            pat->args.s = literal;
+            pat->args.string = literal;
 
             if (!matchchar(&str, endquote))
                 file_err(f, start, str, "This string doesn't have a closing quote.");
@@ -448,7 +448,8 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
             pat_t *capture = new_pat(f, start, BP_CAPTURE);
             const char *a = *str == '!' ? &str[1] : after_name(str);
             if (a > str && after_spaces(a)[0] == '=' && after_spaces(a)[1] != '>') {
-                capture->args.capture.name = strndup(str, (size_t)(a-str));
+                capture->args.capture.name = str;
+                capture->args.capture.namelen = (size_t)(a-str);
                 str = after_spaces(a) + 1;
             }
             pat_t *captured = bp_simplepattern(f, str);
@@ -461,17 +462,13 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
         }
         // Special rules:
         case '_': case '^': case '$': case '|': {
-            const char *name = NULL;
-            if (matchchar(&str, c)) { // double __, ^^, $$
-                if (matchchar(&str, ':')) return NULL; // Don't match definitions
-                char tmp[3] = {c, c, '\0'};
-                name = strdup(tmp);
-            } else {
-                if (matchchar(&str, ':')) return NULL; // Don't match definitions
-                name = strndup(&c, 1);
-            }
+            size_t namelen = 1;
+            if (matchchar(&str, c)) // double __, ^^, $$
+                ++namelen;
+            if (matchchar(&str, ':')) return NULL; // Don't match definitions
             pat_t *ref = new_pat(f, start, BP_REF);
-            ref->args.s = name;
+            ref->args.name.name = start;
+            ref->args.name.len = namelen;
             ref->end = str;
             return ref;
         }
@@ -484,7 +481,8 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
             if (matchchar(&str, ':')) // Don't match definitions
                 return NULL;
             pat_t *ref = new_pat(f, start, BP_REF);
-            ref->args.s = strndup(refname, (size_t)(str - refname));
+            ref->args.name.name = refname;
+            ref->args.name.len = (size_t)(str - refname);
             ref->end = str;
             return ref;
         }
@@ -537,7 +535,7 @@ pat_t *bp_stringpattern(file_t *f, const char *str)
         if (len > 0) {
             pat_t *strop = new_pat(f, str, BP_STRING);
             strop->len = (ssize_t)len;
-            strop->args.s = literal;
+            strop->args.string = literal;
             strop->end = str;
             ret = chain_together(f, ret, strop);
         }
@@ -608,16 +606,8 @@ def_t *bp_definition(def_t *defs, file_t *f, const char *str)
 //
 void destroy_pat(pat_t *pat)
 {
-    switch (pat->type) {
-        case BP_STRING: case BP_REF:
-            xfree(&pat->args.s);
-            break;
-        case BP_CAPTURE:
-            if (pat->args.capture.name)
-                xfree(&pat->args.capture.name);
-            break;
-        default: break;
-    }
+    if (pat->type == BP_STRING)
+        xfree(&pat->args.string);
 }
 
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1
