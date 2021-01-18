@@ -4,15 +4,17 @@
 #ifndef PRINT__H
 #define PRINT__H
 
+#include <stdbool.h>
+
 #include "types.h"
 
 typedef struct {
     file_t *file;
     const char *pos;
     int context_lines;
-    unsigned int needs_line_number:1;
-    unsigned int use_color:1;
-    unsigned int print_line_numbers:1;
+    bool needs_line_number:1;
+    bool use_color:1;
+    bool print_line_numbers:1;
 } printer_t;
 
 __attribute__((nonnull))

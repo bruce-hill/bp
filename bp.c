@@ -217,7 +217,7 @@ static void confirm_replacements(file_t *f, match_t *m, confirm_t *confirm)
 
         { // Print the original
             printer_t pr = {.file = f, .context_lines = context_lines,
-                .use_color = 1, .print_line_numbers = 1};
+                .use_color = true, .print_line_numbers = true};
             print_match(tty_out, &pr, m->child);
             // Print trailing context lines:
             print_match(tty_out, &pr, NULL);
@@ -225,7 +225,7 @@ static void confirm_replacements(file_t *f, match_t *m, confirm_t *confirm)
         if (context_lines > 1) fprintf(tty_out, "\n");
         { // Print the replacement
             printer_t pr = {.file = f, .context_lines = context_lines,
-                .use_color = 1, .print_line_numbers = 1};
+                .use_color = true, .print_line_numbers = true};
             print_match(tty_out, &pr, m);
             // Print trailing context lines:
             print_match(tty_out, &pr, NULL);
@@ -268,8 +268,8 @@ static int inplace_modify_file(def_t *defs, file_t *f, pat_t *pattern)
     printer_t pr = {
         .file = f,
         .context_lines = ALL_CONTEXT,
-        .use_color = 0,
-        .print_line_numbers = 0,
+        .use_color = false,
+        .print_line_numbers = false,
     };
 
     FILE *inplace_file = NULL; // Lazy-open this on the first match
@@ -277,7 +277,7 @@ static int inplace_modify_file(def_t *defs, file_t *f, pat_t *pattern)
     confirm_t confirm_file = confirm;
     for (match_t *m = NULL; (m = next_match(defs, f, m, pattern, ignorecase)); ) {
         ++matches;
-        printer_t err_pr = {.file = f, .context_lines = 1, .use_color = 1, .print_line_numbers = 1};
+        printer_t err_pr = {.file = f, .context_lines = true, .use_color = true, .print_line_numbers = true};
         if (print_errors(&err_pr, m) > 0)
             exit(EXIT_FAILURE);
         // Lazy-open file for writing upon first match:
@@ -329,7 +329,7 @@ static int print_matches(def_t *defs, file_t *f, pat_t *pattern)
 
     confirm_t confirm_file = confirm;
     for (match_t *m = NULL; (m = next_match(defs, f, m, pattern, ignorecase)); ) {
-        printer_t err_pr = {.file = f, .context_lines = 1, .use_color = 1, .print_line_numbers = 1};
+        printer_t err_pr = {.file = f, .context_lines = true, .use_color = true, .print_line_numbers = true};
         if (print_errors(&err_pr, m) > 0)
             exit(EXIT_FAILURE);
 
