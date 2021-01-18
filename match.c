@@ -3,6 +3,7 @@
 //
 
 #include <ctype.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -14,13 +15,13 @@
 
 #ifdef DEBUG_HEAP
 // Doubly-linked list operations:
-#define DLL_PREPEND(head, node) do { (node)->atme = &(head); (node)->next = head; if (head) (head)->atme = &(node)->next; head = node; } while(0)
-#define DLL_REMOVE(node) do { *(node)->atme = (node)->next; if ((node)->next) (node)->next->atme = (node)->atme; } while(0)
+#define DLL_PREPEND(head, node) do { (node)->atme = &(head); (node)->next = head; if (head) (head)->atme = &(node)->next; head = node; } while(false)
+#define DLL_REMOVE(node) do { *(node)->atme = (node)->next; if ((node)->next) (node)->next->atme = (node)->atme; } while(false)
 #endif
 
 // Refcounting ownership-setting macros:
-#define ADD_OWNER(owner, m) do { owner = m; ++(m)->refcount; } while(0)
-#define REMOVE_OWNERSHIP(owner) do { if (owner) { --(owner)->refcount; recycle_if_unused(&(owner)); owner = NULL; } } while(0)
+#define ADD_OWNER(owner, m) do { owner = m; ++(m)->refcount; } while(false)
+#define REMOVE_OWNERSHIP(owner) do { if (owner) { --(owner)->refcount; recycle_if_unused(&(owner)); owner = NULL; } } while(false)
 
 // New match objects are either recycled from unused match objects or allocated
 // from the heap. While it is in use, the match object is stored in the
