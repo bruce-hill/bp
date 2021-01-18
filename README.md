@@ -130,6 +130,23 @@ Testing for these grammar files (other than `builtins`) is iffy at this point,
 so use at your own risk! These grammar files are only approximations of syntax.
 
 
+## Performance
+
+Currently, `bp` is super slow compared to hyper-optimized regex tools like
+`grep` and `ripgrep`. `bp` is **not** matching regular expressions, so this is
+not strictly a fair comparison. By definition, regular expressions can be
+implemented using finite state machines, which are very efficient. Most regex
+tools also add the additional restriction that matches must be within a single
+line. `bp` on the other hand, uses parsing expression grammars, which can match
+arbitrarily complicated or nested structures, requiring a dynamic call stack
+and potentially unbounded memory use. This makes `bp` patterns much more
+expressive, but harder to optimize. At this point in time, `bp`'s
+implementation also uses a fairly naive virtual machine written in C, which is
+not very heavily optimized. As a result, `bp` runs quite fast over thousands of
+lines of code, reasonably fast over tens of thousands of lines of code, and
+pretty slow over millions of lines of code.
+
+
 ## License
 
 BP is provided under the MIT license with the [Commons Clause](https://commonsclause.com/)
