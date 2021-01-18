@@ -1,0 +1,14 @@
+# Syntax definitions for some Lisp-specific patterns
+#
+# NOTE: this is *NOT* intended to be a complete definition of the language's
+# syntax! Providing a full language grammar is overkill, because the intended
+# use case is finding/replacing string patterns. This task does not require a
+# full parse tree, and having one makes the task considerably more complicated.
+# See the accompanying README.md for more info.
+
+comment: ";" ..$
+string: `" .. `" % (`\.)
+list: parens
+function-def: `(__"defun"|__id
+function: function-def .. `) % parens
+id-char: `A-Z,a-z,0-9,!,$,%,&,*,+,-,.,/,:,<,=,>,?,@,^,_,~ 
