@@ -596,15 +596,17 @@ int main(int argc, char *argv[])
             _exit(EXIT_FAILURE);
         }
         check(close(fds[STDOUT_FILENO]) == 0, "Failed to close write end of pipe");
-        char path[PATH_MAX+2] = {'\0'}; // path + \n + \0
-        while (read(fds[STDIN_FILENO], path, PATH_MAX+1) > 0) { // Iterate over chunks
-            for (char *nl; (nl = strchr(path, '\n')); ) { // Iterate over nl-terminated lines
-                *nl = '\0';
-                found += process_file(defs, path, pattern);
-                memmove(path, nl+1, sizeof(path)-(size_t)(nl+1-path));
-            }
+        FILE *fp = fdopen(fds[STDIN_FILENO], "r");
+        check(fp != NULL, "Could not open file descriptor");
+        char *path = NULL;
+        size_t size = 0;
+        ssize_t len = 0;
+        while ((len = getline(&path, &size, fp)) > 0) {
+            if (path[len-1] == '\n') path[len-1] = '\0';
+            found += process_file(defs, path, pattern);
         }
-        check(close(fds[STDIN_FILENO]) == 0, "Failed to close read end of pipe");
+        if (path) xfree(&path);
+        check(fclose(fp) == 0, "Failed to close read end of pipe");
         int status;
         while (waitpid(child, &status, 0) != child) continue;
         check((WIFEXITED(status) == 1) && (WEXITSTATUS(status) == 0),
