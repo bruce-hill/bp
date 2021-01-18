@@ -48,6 +48,9 @@ static const char *usage = (
     " -c --context <context>           set number of lines of context to print (all: the whole file, 0: only the match, 1: the line, N: N lines of context)\n"
     " -g --grammar <grammar file>      use the specified file as a grammar\n");
 
+// Used as a heuristic to check if a file is binary or text:
+#define CHECK_FIRST_N_BYTES 128
+
 // Flag-configurable options:
 #define USE_DEFAULT_CONTEXT -2
 #define ALL_CONTEXT -1
@@ -132,7 +135,7 @@ static int is_text_file(const char *filename)
 {
     int fd = open(filename, O_RDONLY);
     if (fd < 0) return 0;
-    char buf[64];
+    char buf[CHECK_FIRST_N_BYTES];
     ssize_t len = read(fd, buf, sizeof(buf)/sizeof(char));
     if (len < 0) return 0;
     (void)close(fd);
