@@ -145,7 +145,7 @@ void *memcheck(void *p)
 {
     if (p == NULL) {
         fprintf(stderr, "memory allocation failure\n");
-        exit(1);
+        exit(EXIT_FAILURE);
     }
     return p;
 }
@@ -169,7 +169,7 @@ void xfree(void *p)
 {
     if (*(void**)p == NULL) {
         fprintf(stderr, "Attempt to free(NULL)\n");
-        exit(1);
+        exit(EXIT_FAILURE);
     }
     free(*(void**)p);
     p = NULL;

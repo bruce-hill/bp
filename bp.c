@@ -3,6 +3,7 @@
 //
 // See `man ./bp.1` for more details
 //
+
 #include <errno.h>
 #include <fcntl.h>
 #include <glob.h>
@@ -132,11 +133,11 @@ static int is_text_file(const char *filename)
     int fd = open(filename, O_RDONLY);
     if (fd < 0) return 0;
     unsigned char buf[64];
-    int len = read(fd, buf, sizeof(buf)/sizeof(unsigned char));
+    ssize_t len = read(fd, buf, sizeof(buf)/sizeof(unsigned char));
     if (len < 0) return 0;
     (void)close(fd);
 
-    for (int i = 0; i < len; i++) {
+    for (ssize_t i = 0; i < len; i++) {
         if (!(buf[i] == '\t' || buf[i] == '\n' || buf[i] == '\r'
             || buf[i] >= '\x20'))
             return 0;
@@ -281,7 +282,7 @@ static int inplace_modify_file(def_t *defs, file_t *f, pat_t *pattern)
             exit(EXIT_FAILURE);
         // Lazy-open file for writing upon first match:
         if (inplace_file == NULL) {
-            check(snprintf(tmp_filename, PATH_MAX, "%s.tmp.XXXXXX", f->filename) <= PATH_MAX,
+            check(snprintf(tmp_filename, PATH_MAX, "%s.tmp.XXXXXX", f->filename) <= (int)PATH_MAX,
                 "Failed to build temporary file template");
             int out_fd = mkstemp(tmp_filename);
             check(out_fd >= 0, "Failed to create temporary inplace file");
@@ -396,7 +397,7 @@ static int process_dir(def_t *defs, const char *dirname, pat_t *pattern)
     int matches = 0;
     glob_t globbuf;
     char globpath[PATH_MAX+1] = {0};
-    check(snprintf(globpath, PATH_MAX, "%s/*", dirname) <= PATH_MAX,
+    check(snprintf(globpath, PATH_MAX, "%s/*", dirname) <= (int)PATH_MAX,
           "Filename is too long: %s/*", dirname);
     int status = glob(globpath, 0, NULL, &globbuf);
     check(status != GLOB_ABORTED && status != GLOB_NOSPACE,

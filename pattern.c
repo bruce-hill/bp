@@ -3,6 +3,7 @@
 //
 
 #include <ctype.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -11,7 +12,7 @@
 #include "pattern.h"
 #include "utils.h"
 
-#define file_err(f, ...) do { fprint_line(stderr, f, __VA_ARGS__); exit(1); } while(0)
+#define file_err(f, ...) do { fprint_line(stderr, f, __VA_ARGS__); exit(EXIT_FAILURE); } while(0)
 
 __attribute__((nonnull))
 static pat_t *expand_chain(file_t *f, pat_t *first);
@@ -161,7 +162,7 @@ static pat_t *bp_simplepattern(file_t *f, const char *str)
     // Expand postfix operators (if any)
     str = after_spaces(pat->end);
     while (str+2 < f->end && (matchstr(&str, "!=") || matchstr(&str, "=="))) { // Equality <pat1>==<pat2> and inequality <pat1>!=<pat2>
-        int equal = str[-2] == '=';
+        bool equal = str[-2] == '=';
         pat_t *first = pat;
         pat_t *second = bp_simplepattern(f, str);
         if (!second)
@@ -224,7 +225,7 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
         case '`': {
             pat_t *all = NULL;
             do {
-                char c = *str;
+                c = *str;
                 if (!c || c == '\n')
                     file_err(f, str, str, "There should be a character here after the '`'");
                 const char *opstart = str-1;
@@ -490,7 +491,6 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
             return ref;
         }
     }
-    return NULL;
 }
 
 //

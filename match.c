@@ -518,7 +518,7 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
         }
         default: {
             fprintf(stderr, "Unknown pattern type: %d", pat->type);
-            exit(1);
+            exit(EXIT_FAILURE);
             return NULL;
         }
     }

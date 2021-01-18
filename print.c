@@ -68,9 +68,9 @@ static void _visualize_matches(match_node_t *firstmatch, int depth, const char *
     // literal string being matched. (Backrefs have start/end inside the text
     // input, instead of something the user typed in)
     if (viz_type >= text && viz_type <= &text[textlen])
-        printf("\033[%ldG\033[0;2m\"\033[%s;1m", 2*textlen+3, color);
+        printf("\033[%luG\033[0;2m\"\033[%s;1m", 2*textlen+3, color);
     else
-        printf("\033[%ldG\033[%s;1m", 2*textlen+3, color);
+        printf("\033[%luG\033[%s;1m", 2*textlen+3, color);
 
     for (size_t i = 0; i < viz_typelen; i++) {
         switch (viz_type[i]) {
@@ -192,8 +192,8 @@ static inline void print_line_number(FILE *out, printer_t *pr, size_t line_numbe
         if (color) fprintf(out, "\033[0;2m     \033(0\x78\033(B%s", color);
         else fprintf(out, "     |");
     } else {
-        if (color) fprintf(out, "\033[0;2m% 5ld\033(0\x78\033(B%s", line_number, color);
-        else fprintf(out, "% 5ld|", line_number);
+        if (color) fprintf(out, "\033[0;2m%5lu\033(0\x78\033(B%s", line_number, color);
+        else fprintf(out, "%5lu|", line_number);
     }
     pr->needs_line_number = 0;
     current_color = color;

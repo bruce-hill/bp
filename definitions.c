@@ -36,7 +36,7 @@ def_t *load_grammar(def_t *defs, file_t *f)
         src = after_name(name);
         if (src <= name) {
             fprint_line(stdout, f, name, src, "Invalid name for definition: %s", name);
-            exit(1);
+            exit(EXIT_FAILURE);
         }
         size_t namelen = (size_t)(src - name);
         check(matchchar(&src, ':'), "Expected ':' in definition");
@@ -50,7 +50,7 @@ def_t *load_grammar(def_t *defs, file_t *f)
     }
     if (src < f->end) {
         fprint_line(stderr, f, src, NULL, "Invalid BP pattern");
-        exit(1);
+        exit(EXIT_FAILURE);
     }
     return defs;
 }

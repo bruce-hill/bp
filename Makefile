@@ -28,7 +28,10 @@ leaktest:
 	valgrind --leak-check=full ./bp -l -g grammars/bp.bp -p Grammar grammars/bp.bp
 
 splint:
-	splint -posix-lib -weak -initallelements $(CFILES) bp.c
+	splint -posix-lib -standard -mustfreefresh -mustfreeonly -temptrans -immediatetrans -branchstate \
+		-compmempass -nullret -nullpass -nullderef -kepttrans -boolops -initallelements -fullinitblock \
+		-compdef -usereleased -unrecog -dependenttrans -predboolothers -ownedtrans -unqualifiedtrans \
+		-onlytrans $(CFILES) bp.c
 
 install: $(NAME)
 	mkdir -p -m 755 "$(PREFIX)/share/man/man1" "$(PREFIX)/bin" "$(SYSCONFDIR)/xdg/$(NAME)"
