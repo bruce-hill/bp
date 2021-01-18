@@ -1,0 +1,19 @@
+# Syntax definition for some Shell-specific patterns
+#
+# NOTE: this is *NOT* intended to be a complete definition of the language's
+# syntax! Providing a full language grammar is overkill, because the intended
+# use case is finding/replacing string patterns. This task does not require a
+# full parse tree, and having one makes the task considerably more complicated.
+# See the accompanying README.md for more info.
+
+comment: `#..$
+string: `"..`" % (`\./subcommand/\n) / `'..`' % \n / "<<" _ @delim=id _$ ..(^delim$)%\n
+subcommand: `` .. `` % \n / "$" parens
+keyword: |(
+    "echo" / "read" / "set" / "unset" / "readonly" / "shift" / "export" / "if" / "fi" /
+    "else" / "while" / "do" / "done" / "for" / "until" / "case" / "esac" / "break" /
+    "continue" / "exit" / "return" / "trap" / "wait" / "eval" / "exec" / "ulimit" / "umask"
+)|
+function-def: ^_ ["function"_] id _ `(_`) >(__`{)
+function: function-def __ braces
+var: `$ (id / braces)
