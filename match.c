@@ -379,7 +379,7 @@ match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, unsigned int
                 .mmapped=f->mmapped,
             };
             match_t *m2 = match(defs, &inner, str, pat->args.multiple.second, ignorecase);
-            if ((m2 == NULL) == (pat->type == BP_EQUAL)) {
+            if ((m2 == NULL || m2->end != m1->end) == (pat->type == BP_EQUAL)) {
                 recycle_if_unused(&m1);
                 if (m2 != NULL) recycle_if_unused(&m2);
                 return NULL;
