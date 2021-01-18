@@ -18,4 +18,4 @@ keyword: |(
 function-def: ^_ 2+(keyword / id / `*) % __ parens (__`; / >(__`{))
 function: function-def __ braces
 macro: ^"#define " ..$ *(<`\ \n..$)
-import: |"#include"| __ (string / `<..`>)
+import: ^"#include"| __ (string / `<..`>)

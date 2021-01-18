@@ -1,0 +1,29 @@
+# Syntax definition for some C++-specific patterns
+#
+# NOTE: this is *NOT* intended to be a complete definition of the language's
+# syntax! Providing a full language grammar is overkill, because the intended
+# use case is finding/replacing string patterns. This task does not require a
+# full parse tree, and having one makes the task considerably more complicated.
+# See the accompanying README.md for more info.
+
+comment: "//" .. $ / "/*" .. "*/" % \n
+string: `"..`" % (`\.)
+keyword: |(
+    "alignas" / "alignof" / "and" / "and_eq" / "asm" / "atomic_cancel" / "atomic_commit" /
+    "atomic_noexcept" / "auto" / "bitand" / "bitor" / "bool" / "break" / "case" / "catch" /
+    "char" / "char8_t" / "char16_t" / "char32_t" / "class" / "compl" / "concept" / "const" /
+    "consteval" / "constexpr" / "constinit" / "const_cast" / "continue" / "co_await" /
+    "co_return" / "co_yield" / "decltype" / "default" / "delete" / "do" / "double" /
+    "dynamic_cast" / "else" / "enum" / "explicit" / "export" / "extern" / "false" / "float" /
+    "for" / "friend" / "goto" / "if" / "inline" / "int" / "long" / "mutable" / "namespace" /
+    "new" / "noexcept" / "not" / "not_eq" / "nullptr" / "operator" / "or" / "or_eq" /
+    "private" / "protected" / "public" / "reflexpr" / "register" / "reinterpret_cast" /
+    "requires" / "return" / "short" / "signed" / "sizeof" / "static" / "static_assert" /
+    "static_cast" / "struct" / "switch" / "synchronized" / "template" / "this" /
+    "thread_local" / "throw" / "true" / "try" / "typedef" / "typeid" / "typename" / "union" /
+    "unsigned" / "using" / "virtual" / "void" / "volatile" / "wchar_t" / "while" / "xor" / "xor_eq"
+)|
+function-def: ^_ 2+(keyword / id / anglebraces / `*) % __ parens (__`; / >(__`{))
+function: function-def __ braces
+macro: ^"#define " ..$ *(<`\ \n..$)
+import: ^("#include"/"#import")| __ (string / `<..`>)
