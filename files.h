@@ -17,8 +17,10 @@ typedef struct file_s {
     unsigned int mmapped:1;
 } file_t;
 
+__attribute__((nonnull(2)))
+file_t *load_file(file_t **files, const char *filename);
 __attribute__((format(printf,2,3)))
-file_t *load_file(file_t **files, const char *fmt, ...);
+file_t *load_filef(file_t **files, const char *fmt, ...);
 __attribute__((nonnull(3), returns_nonnull))
 file_t *spoof_file(file_t **files, const char *filename, const char *text);
 __attribute__((nonnull))

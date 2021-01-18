@@ -3,6 +3,7 @@
 //
 // See `man ./bp.1` for more details
 //
+#include <errno.h>
 #include <fcntl.h>
 #include <glob.h>
 #include <limits.h>
@@ -350,7 +351,10 @@ static int print_matches(def_t *defs, file_t *f, pat_t *pattern)
 static int process_file(def_t *defs, const char *filename, pat_t *pattern)
 {
     file_t *f = load_file(NULL, filename);
-    check(f, "Could not open file: %s", filename);
+    if (f == NULL) {
+        fprintf(stderr, "Could not open file: %s\n%s\n", filename, strerror(errno));
+        return 0;
+    }
 
     int matches = 0;
     if (mode == MODE_EXPLAIN) {
@@ -415,9 +419,9 @@ int main(int argc, char *argv[])
     pat_t *pattern = NULL;
 
     // Load builtins:
-    file_t *xdg_file = load_file(&loaded_files, "/etc/xdg/"BP_NAME"/builtins.bp");
+    file_t *xdg_file = load_filef(&loaded_files, "/etc/xdg/"BP_NAME"/builtins.bp");
     if (xdg_file) defs = load_grammar(defs, xdg_file);
-    file_t *local_file = load_file(&loaded_files, "%s/.config/"BP_NAME"/builtins.bp", getenv("HOME"));
+    file_t *local_file = load_filef(&loaded_files, "%s/.config/"BP_NAME"/builtins.bp", getenv("HOME"));
     if (local_file) defs = load_grammar(defs, local_file);
 
     int i, git = 0;
@@ -454,9 +458,9 @@ int main(int argc, char *argv[])
         } else if (FLAG("-g")     || FLAG("--grammar")) {
             file_t *f = load_file(&loaded_files, flag);
             if (f == NULL)
-                f = load_file(&loaded_files, "%s/.config/"BP_NAME"/%s.bp", getenv("HOME"), flag);
+                f = load_filef(&loaded_files, "%s/.config/"BP_NAME"/%s.bp", getenv("HOME"), flag);
             if (f == NULL)
-                f = load_file(&loaded_files, "/etc/xdg/"BP_NAME"/%s.bp", flag);
+                f = load_filef(&loaded_files, "/etc/xdg/"BP_NAME"/%s.bp", flag);
             check(f != NULL, "Couldn't find grammar: %s", flag);
             defs = load_grammar(defs, f); // Keep in memory for debug output
         } else if (FLAG("-p")     || FLAG("--pattern")) {
@@ -592,9 +596,7 @@ int main(int argc, char *argv[])
         // Files pass in as command line args:
         struct stat statbuf;
         for (int nfiles = 0; i < argc; nfiles++, i++) {
-            check(stat(argv[i], &statbuf) == 0,
-                  "File does not exist: %s", argv[i]);
-            if (S_ISDIR(statbuf.st_mode)) // Symlinks are okay if manually specified
+            if (stat(argv[i], &statbuf) == 0 && S_ISDIR(statbuf.st_mode)) // Symlinks are okay if manually specified
                 found += process_dir(defs, argv[i], pattern);
             else
                 found += process_file(defs, argv[i], pattern);

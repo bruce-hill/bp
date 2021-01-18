@@ -43,7 +43,7 @@ static void populate_lines(file_t *f)
 //
 // Read an entire file into memory.
 //
-file_t *load_file(file_t **files, const char *fmt, ...)
+file_t *load_filef(file_t **files, const char *fmt, ...)
 {
     char filename[PATH_MAX+1] = {0};
     va_list args;
@@ -51,7 +51,14 @@ file_t *load_file(file_t **files, const char *fmt, ...)
     check(vsnprintf(filename, PATH_MAX, fmt, args) <= PATH_MAX,
           "File name is too large");
     va_end(args);
+    return load_file(files, filename);
+}
 
+//
+// Read an entire file into memory.
+//
+file_t *load_file(file_t **files, const char *filename)
+{
     int fd = filename[0] == '\0' ? STDIN_FILENO : open(filename, O_RDONLY);
     if (fd < 0) return NULL;
     size_t length;
@@ -81,9 +88,9 @@ file_t *load_file(file_t **files, const char *fmt, ...)
         if (length >= capacity)
             f->contents = xrealloc(f->contents, sizeof(char)*(capacity *= 2) + 1);
     }
-    if (fd != STDIN_FILENO) close(fd);
 
   finished_loading:
+    if (fd != STDIN_FILENO) close(fd);
     f->end = &f->contents[length];
     populate_lines(f);
     if (files != NULL) {
