@@ -53,8 +53,8 @@ static pat_t *new_range(file_t *f, const char *start, const char *end, ssize_t m
     range->args.repetitions.max = max;
     range->args.repetitions.repeat_pat = repeating;
     range->args.repetitions.sep = sep;
-    if (!range->start) range->start = repeating->start;
-    if (!range->end) range->end = repeating->end;
+    range->start = repeating->start;
+    range->end = repeating->end;
     if (sep) {
         if (sep->start < range->start) range->start = sep->start;
         if (sep->end > range->end) range->end = sep->end;
