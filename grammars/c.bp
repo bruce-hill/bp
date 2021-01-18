@@ -8,9 +8,6 @@
 
 comment: "//" .. $ / "/*" .. "*/" % \n
 string: `"..`" % (`\.)
-char: `' [`\] . `'
-array: `{..`} % (array/comment/\n)
-struct: array
 keyword: |(
     "auto" / "break" / "case" / "char" / "const" / "continue" / "default" / "do" /
     "double" / "else" / "enum" / "extern" / "float" / "for" / "goto" / "if" /
@@ -21,3 +18,4 @@ keyword: |(
 function-def: ^_ 2+(keyword / id / `*) % __ parens (__`; / >(__`{))
 function: function-def __ braces
 macro: ^"#define " ..$ *(<`\ \n..$)
+import: |"#include"| __ (string / `<..`>)

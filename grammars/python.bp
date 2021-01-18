@@ -7,24 +7,14 @@
 # See the accompanying README.md for more info.
 
 comment: `# ..$
-string: quoted-string / `b quoted-string / `f quoted-string
-quoted-string: "'''".."'''" % \n / '"""'..'"""' % \n / `"..`" % (`\.) / `'..`' % (`\.)
-dict: `{__`} / `{ __ +(expr__`:__expr) % (__`,__) __ `}
-set: `{ __ +expr % (__`,__) __ `}
-list: `[ __ +expr % (__`,__) __ `]
+string: "'''".."'''" % \n / '"""'..'"""' % \n / `"..`" % (`\.) / `'..`' % (`\.)
 keyword: |("and" / "as" / "assert" / "break" / "class" / "continue" / "def" /
     "del" / "elif" / "else" / "except" / "finally" / "for" / "from" /
     "global" / "if" / "import" / "in" / "is" / "lambda" / "None" / "nonlocal" /
     "not" / "or" / "pass" / "raise" / "return" / "try" / "while" /
     "with" / "yield")|
-expr: (function-call / lambda / string / dict / set / list / id / number / `(__expr__`)) *(method/attr/index)
-method: `. function-call
-attr: `. id
-index: `[__expr[__`:__expr [__`:__expr]]__`]
-tuple: `(__`) / +(__expr__`,) [__expr]
-empty-tuple: `(__`)
-class: |"class"|_id`: +(\N ..$)
+class: class-def +(\N ..$)
+class-def: ^_|"class"|_id[_parens]_`:
 function: function-def +(\N ..$)
-function-def: |"def"|_id parens `:
-function-call: !<"def " id parens
-lambda: |"lambda"| .. `:__expr
+function-def: ^_|"def"|_id parens `:
+import: |"import"| _ (parens / *id%(_`,__)) [_ |"as"| (parens / *id%(_`,__))]

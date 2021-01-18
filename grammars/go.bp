@@ -1,0 +1,18 @@
+# Syntax definitions for some Go-specific patterns
+#
+# NOTE: this is *NOT* intended to be a complete definition of the language's
+# syntax! Providing a full language grammar is overkill, because the intended
+# use case is finding/replacing string patterns. This task does not require a
+# full parse tree, and having one makes the task considerably more complicated.
+# See the accompanying README.md for more info.
+
+comment: "//" .. $ / "/*" .. "*/" % \n
+string: `"..`" % (`\.)
+keyword: |(
+    "break" / "default" / "func" / "interface" / "select" / "case" / "defer" / "go" /
+    "map" / "struct" / "chan" / "else" / "goto" / "package" / "switch" / "const" /
+    "fallthrough" / "if" / "range" / "type" / "continue" / "for" / "import" / "return" / "var"
+)|
+function-def: |"func"| __ id __ parens __ [id / parens] >(__`{)
+function: function-def __ braces
+import: |"import"| __ (parens / string)

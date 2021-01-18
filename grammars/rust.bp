@@ -1,0 +1,19 @@
+# Syntax definitions for some Rust-specific patterns
+#
+# NOTE: this is *NOT* intended to be a complete definition of the language's
+# syntax! Providing a full language grammar is overkill, because the intended
+# use case is finding/replacing string patterns. This task does not require a
+# full parse tree, and having one makes the task considerably more complicated.
+# See the accompanying README.md for more info.
+
+comment: "//" .. $ / "/*" .. "*/" % (comment / \n)
+string: `"..`" % (`\.)
+keyword: |(
+    "as" / "break" / "const" / "continue" / "crate" / "else" / "enum" / "extern" /
+    "false" / "fn" / "for" / "if" / "impl" / "in" / "let" / "loop" / "match" /
+    "mod" / "move" / "mut" / "pub" / "ref" / "return" / "self" / "Self" / "static" /
+    "struct" / "super" / "trait" / "true" / "type" / "unsafe" / "use" / "where" / "while"
+)|
+function-def: |"fn"| __ id __ parens __ ["->"__(id / parens)] >(__`{)
+function: function-def __ braces
+import: |"use"| _ *(id / braces) % "::" _ `;
