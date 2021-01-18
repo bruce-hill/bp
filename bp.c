@@ -65,10 +65,10 @@ static enum {
 } mode = MODE_NORMAL;
 
 // If a filename is put here, it will be deleted if a signal is received
-const char *in_use_tempfile = NULL;
+static const char *in_use_tempfile = NULL;
 
 // Used for user input/output that doesn't interfere with unix pipeline
-FILE *tty_out = NULL, *tty_in = NULL;
+static FILE *tty_out = NULL, *tty_in = NULL;
 
 //
 // Helper function to reduce code duplication
@@ -616,8 +616,8 @@ int main(int argc, char *argv[])
     }
     if (mode == MODE_JSON) printf("]\n");
 
-    if (tty_out) fclose(tty_out);
-    if (tty_in) fclose(tty_in);
+    if (tty_out) { fclose(tty_out); tty_out = NULL; }
+    if (tty_in) { fclose(tty_in); tty_in = NULL; }
 
 #ifdef DEBUG_HEAP
     // This code frees up all residual heap-allocated memory. Since the program

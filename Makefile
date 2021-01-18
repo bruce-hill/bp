@@ -27,6 +27,9 @@ leaktest:
 	make G=-ggdb O=-O0 EXTRA=-DDEBUG_HEAP clean bp
 	valgrind --leak-check=full ./bp -l -g grammars/bp.bp -p Grammar grammars/bp.bp
 
+splint:
+	splint +posixlib $(CFILES) bp.c
+
 install: $(NAME)
 	mkdir -p -m 755 "$(PREFIX)/share/man/man1" "$(PREFIX)/bin" "$(SYSCONFDIR)/xdg/$(NAME)"
 	cp -r grammars/* "$(SYSCONFDIR)/xdg/$(NAME)/"
@@ -42,4 +45,4 @@ uninstall:
 	  [ "$$confirm" != n ] && rm -rf ~/.config/$(NAME); \
 	fi
 
-.PHONY: all clean install uninstall
+.PHONY: all clean install uninstall leaktest splint

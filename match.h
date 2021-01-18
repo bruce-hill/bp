@@ -10,11 +10,8 @@
 
 __attribute__((nonnull(2,4)))
 match_t *next_match(def_t *defs, file_t *f, match_t *prev, pat_t *pat, unsigned int flags);
-__attribute__((hot, nonnull(2,3,4)))
-match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, unsigned int flags);
 __attribute__((nonnull))
 match_t *get_capture(match_t *m, const char **id);
-match_t *new_match(void);
 __attribute__((nonnull))
 void recycle_if_unused(match_t **at_m);
 #ifdef DEBUG_HEAP

@@ -265,7 +265,7 @@ static const char *context_after(printer_t *pr, const char *pos)
 //
 // Print the text of a match (no context).
 //
-void _print_match(FILE *out, printer_t *pr, match_t *m)
+static void _print_match(FILE *out, printer_t *pr, match_t *m)
 {
     pr->pos = m->start;
     if (m->pat->type == BP_REPLACE) {

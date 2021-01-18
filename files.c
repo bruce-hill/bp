@@ -18,6 +18,8 @@
 
 __attribute__((nonnull))
 static void populate_lines(file_t *f);
+__attribute__((pure, nonnull))
+static size_t get_char_number(file_t *f, const char *p);
 
 //
 // In the file object, populate the `lines` array with pointers to the
@@ -185,7 +187,7 @@ size_t get_line_number(file_t *f, const char *p)
 //
 // Given a pointer, determine which character offset within the line it points to.
 //
-size_t get_char_number(file_t *f, const char *p)
+static size_t get_char_number(file_t *f, const char *p)
 {
     size_t linenum = get_line_number(f, p);
     return 1 + (size_t)(p - f->lines[linenum-1]);

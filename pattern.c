@@ -21,6 +21,8 @@ __attribute__((nonnull))
 static pat_t *_bp_simplepattern(file_t *f, const char *str);
 __attribute__((nonnull(1,2,3,6)))
 static pat_t *new_range(file_t *f, const char *start, const char *end, ssize_t min, ssize_t max, pat_t *repeating, pat_t *sep);
+__attribute__((nonnull(1,2)))
+static pat_t *bp_simplepattern(file_t *f, const char *str);
 
 //
 // Allocate a new pattern for this file (ensuring it will be automatically
@@ -149,7 +151,7 @@ pat_t *chain_together(file_t *f, pat_t *first, pat_t *second)
 //
 // Wrapper for _bp_simplepattern() that expands any postfix operators
 //
-pat_t *bp_simplepattern(file_t *f, const char *str)
+static pat_t *bp_simplepattern(file_t *f, const char *str)
 {
     pat_t *pat = _bp_simplepattern(f, str);
     if (pat == NULL) return pat;
