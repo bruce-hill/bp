@@ -1,0 +1,24 @@
+# Syntax definition for some Javascript-specific patterns
+#
+# NOTE: this is *NOT* intended to be a complete definition of the language's
+# syntax! Providing a full language grammar is overkill, because the intended
+# use case is finding/replacing string patterns. This task does not require a
+# full parse tree, and having one makes the task considerably more complicated.
+# See the accompanying README.md for more info.
+
+comment: "//" .. $ / "/*" .. "*/" % \n
+string: `"..`" % (`\.) / `'..`' % (`\.) / `/ .. `/ % (`\.)
+keyword: |(
+    "abstract" / "arguments" / "await" / "boolean" / "break" / "byte" / "case" /
+    "catch" / "char" / "class" / "const" / "continue" / "debugger" / "default" /
+    "delete" / "do" / "double" / "else" / "enum" / "eval" / "export" / "extends" /
+    "false" / "final" / "finally" / "float" / "for" / "function" / "goto" / "if" /
+    "implements" / "import" / "in" / "instanceof" / "int" / "interface" / "let" /
+    "long" / "native" / "new" / "null" / "package" / "private" / "protected" /
+    "public" / "return" / "short" / "static" / "super" / "switch" / "synchronized" /
+    "this" / "throw" / "throws" / "transient" / "true" / "try" / "typeof" / "var" /
+    "void" / "volatile" / "while" / "with" / "yield"
+)|
+function-def: |"function"| __ [id__] parens / (id / parens) __ "=>"
+function: function-def __ braces
+import: |"import"| ..(`; / $) % braces

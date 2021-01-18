@@ -17,4 +17,4 @@ class: class-def +(\N ..$)
 class-def: ^_|"class"|_id[_parens]_`:
 function: function-def +(\N ..$)
 function-def: ^_|"def"|_id parens `:
-import: |"import"| _ (parens / *id%(_`,__)) [_ |"as"| (parens / *id%(_`,__))]
+import: ^_["from"| ..>(|"import"|)] (|"import"|)%parens ..$%parens
