@@ -2,6 +2,7 @@
 // print.c - Code for printing and visualizing matches.
 //
 
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -347,7 +348,7 @@ static void _print_match(FILE *out, printer_t *pr, match_t *m)
 void print_match(FILE *out, printer_t *pr, match_t *m)
 {
     current_color = color_normal;
-    int first = (pr->pos == NULL);
+    bool first = (pr->pos == NULL);
     if (first) { // First match printed:
         pr->pos = pr->file->contents;
         pr->needs_line_number = 1;

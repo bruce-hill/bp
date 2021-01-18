@@ -132,8 +132,8 @@ static int is_text_file(const char *filename)
 {
     int fd = open(filename, O_RDONLY);
     if (fd < 0) return 0;
-    unsigned char buf[64];
-    ssize_t len = read(fd, buf, sizeof(buf)/sizeof(unsigned char));
+    char buf[64];
+    ssize_t len = read(fd, buf, sizeof(buf)/sizeof(char));
     if (len < 0) return 0;
     (void)close(fd);
 
@@ -264,7 +264,7 @@ static void confirm_replacements(file_t *f, match_t *m, confirm_t *confirm)
 //
 static int inplace_modify_file(def_t *defs, file_t *f, pat_t *pattern)
 {
-    char tmp_filename[PATH_MAX+1] = {0};
+    char tmp_filename[PATH_MAX+1] = {'\0'};
     printer_t pr = {
         .file = f,
         .context_lines = ALL_CONTEXT,
@@ -396,7 +396,7 @@ static int process_dir(def_t *defs, const char *dirname, pat_t *pattern)
 {
     int matches = 0;
     glob_t globbuf;
-    char globpath[PATH_MAX+1] = {0};
+    char globpath[PATH_MAX+1] = {'\0'};
     check(snprintf(globpath, PATH_MAX, "%s/*", dirname) <= (int)PATH_MAX,
           "Filename is too long: %s/*", dirname);
     int status = glob(globpath, 0, NULL, &globbuf);

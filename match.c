@@ -271,7 +271,7 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
                 match_t *mp = match(defs, f, str, pat->args.repetitions.repeat_pat, ignorecase);
                 if (mp == NULL) {
                     str = start;
-                    recycle_if_unused(&msep);
+                    if (msep) recycle_if_unused(&msep);
                     break;
                 }
                 if (mp->end == start && reps > 0) {
@@ -281,7 +281,7 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
                     // the next loop either. We know that this will continue to
                     // loop until reps==max, so let's just cut to the chase
                     // instead of looping infinitely.
-                    recycle_if_unused(&msep);
+                    if (msep) recycle_if_unused(&msep);
                     recycle_if_unused(&mp);
                     if (pat->args.repetitions.max == -1)
                         reps = ~(size_t)0;
@@ -573,7 +573,6 @@ match_t *get_capture(match_t *m, const char **id)
         if (**id == ';') ++(*id);
         return cap;
     }
-    return NULL;
 }
 
 //

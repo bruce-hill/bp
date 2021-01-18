@@ -48,7 +48,7 @@ static void populate_lines(file_t *f)
 //
 file_t *load_filef(file_t **files, const char *fmt, ...)
 {
-    char filename[PATH_MAX+1] = {0};
+    char filename[PATH_MAX+1] = {'\0'};
     va_list args;
     va_start(args, fmt);
     check(vsnprintf(filename, PATH_MAX, fmt, args) <= (int)PATH_MAX,

@@ -31,7 +31,8 @@ splint:
 	splint -posix-lib -standard -mustfreefresh -mustfreeonly -temptrans -immediatetrans -branchstate \
 		-compmempass -nullret -nullpass -nullderef -kepttrans -boolops -initallelements -fullinitblock \
 		-compdef -usereleased -unrecog -dependenttrans -predboolothers -ownedtrans -unqualifiedtrans \
-		-onlytrans $(CFILES) bp.c
+		-onlytrans -usedef -nullassign -compdestroy -globstate -nullstate -statictrans -predboolint \
+		$(CFILES) bp.c
 
 install: $(NAME)
 	mkdir -p -m 755 "$(PREFIX)/share/man/man1" "$(PREFIX)/bin" "$(SYSCONFDIR)/xdg/$(NAME)"

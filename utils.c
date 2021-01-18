@@ -101,7 +101,7 @@ char unescapechar(const char *escaped, const char **end)
             break;
         }
         case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7': { // Octal
-            ret = (unsigned char)escaped[0] - '0';
+            ret = (unsigned char)(escaped[0] - '0');
             if ('0' <= escaped[1] && escaped[1] <= '7') {
                 ++len;
                 ret = (ret << 3) | (escaped[1] - '0');
