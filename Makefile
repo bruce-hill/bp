@@ -25,7 +25,7 @@ clean:
 
 leaktest:
 	make G=-ggdb O=-O0 EXTRA=-DDEBUG_HEAP clean bp
-	valgrind --leak-check=full ./bp -l -g grammars/bpeg.bp -p Grammar grammars/bpeg.bp
+	valgrind --leak-check=full ./bp -l -g grammars/bp.bp -p Grammar grammars/bp.bp
 
 install: $(NAME)
 	mkdir -p -m 755 "$(PREFIX)/share/man/man1" "$(PREFIX)/bin" "$(SYSCONFDIR)/xdg/$(NAME)"
