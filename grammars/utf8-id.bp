@@ -178,7 +178,7 @@ utf8-id-start: `A-Z / `a-z / !\x00-x7F (
 	/ \xad (\x80-x81 / \x83-x84 / \x86-xbf)
 	/ \xae\x80-xb1
 	/ \xaf\x93-xbf
-	/ \xb0-b3\x80-xbf
+	/ \xb0-xb3\x80-xbf
 	/ \xb4\x80-xbd
 	/ \xb5\x90-xbf
 	/ \xb6 (\x80-x8f / \x92-xbf)
