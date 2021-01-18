@@ -34,7 +34,10 @@ def_t *load_grammar(def_t *defs, file_t *f)
     while (src < f->end) {
         const char *name = src;
         src = after_name(name);
-        check(src > name, "Invalid name for definition: %s", name);
+        if (src <= name) {
+            fprint_line(stdout, f, name, src, "Invalid name for definition: %s", name);
+            exit(1);
+        }
         size_t namelen = (size_t)(src - name);
         check(matchchar(&src, ':'), "Expected ':' in definition");
         pat_t *pat = bp_pattern(f, src);
