@@ -111,6 +111,9 @@ Zero or more \fBwhitespace\fR characters (specifically, spaces and tabs)
 .B __
 Zero or more \fBwhitespace-or-newline\fR characters
 
+.B |
+A \fBword-boundary\fR
+
 .B `\fI<c>\fR
 The literal \fBcharacter-\fI<c>\fR
 
@@ -126,6 +129,10 @@ The \fBescape-sequence-\fI<esc>\fR (\fB\\n\fR, \fB\\x1F\fR, \fB\\033\fR, etc.)
 
 .B \\\\\fI<esc1>\fB-\fI<esc2>\fR
 The \fBescape-sequence-range-\fI<esc1>\fB-to-\fI<esc2>\fR
+
+.B \\\\\fIN\fR
+A special case escape that matches a "nodent", one or more newlines followed by
+the same indentation that occurs on the current line.
 
 .B !\fI<pat>\fR
 \fBNot-\fI<pat>\fR
@@ -190,10 +197,6 @@ exact same length. Pronounced \fI<pat1>\fB-assuming-it-doesn't-equal-\fI<pat2>\f
 
 .B \fI<name>\fB:\fI<pat>\fR
 \fBDefine-\fI<name>\fB-to-mean-\fI<pat>\fR (pattern definition)
-
-.B |
-This pattern matches the indentation at the beginning of a line that has the
-same indentation as the line before (or zero indentation on the first line).
 
 .B # \fI<comment>\fR
 A line comment
