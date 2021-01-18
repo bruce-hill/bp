@@ -75,6 +75,7 @@ static void _visualize_matches(match_node_t *firstmatch, int depth, const char *
     for (size_t i = 0; i < viz_typelen; i++) {
         switch (viz_type[i]) {
             case '\n': printf("↵"); break;
+            case '\t': printf("⇥"); break;
             default: printf("%c", viz_type[i]); break;
         }
     }
@@ -103,7 +104,12 @@ static void _visualize_matches(match_node_t *firstmatch, int depth, const char *
                 if (c > m->m->start) printf(" ");
                 // TODO: utf8
                 //while ((*c & 0xC0) != 0x80) printf("%c", *(c++));
-                printf("%c", *c);
+                if (*c == '\n')
+                    printf("↵");
+                else if (*c == '\t')
+                    printf("⇥");
+                else
+                    printf("%c", *c);
             }
             printf("\033[0;2m%s\033[0m", V);
         } else {
