@@ -81,7 +81,7 @@ typedef struct pat_s {
 //
 // Pattern matching result object
 //
-typedef struct match_s {
+typedef /*@refcounted@*/ struct match_s {
     // Where the match starts and ends (end is after the last character)
     const char *start, *end;
     struct match_s *child, *nextsibling;
@@ -91,7 +91,7 @@ typedef struct match_s {
 #ifdef DEBUG_HEAP
     struct match_s **atme;
 #endif
-    int refcount;
+    /*@refs@*/ int refcount;
     // If skip_replacement is set to 1, that means the user wants to not print
     // the replaced text when printing this match:
     // TODO: this is a bit hacky, there is probably a better way to go about
@@ -106,7 +106,7 @@ typedef struct def_s {
     size_t namelen;
     const char *name;
     pat_t *pat;
-    /*@only@*/ struct def_s *next;
+    struct def_s *next;
 } def_t;
 
 //
@@ -114,7 +114,7 @@ typedef struct def_s {
 // file is freed.
 //
 typedef struct allocated_pat_s {
-    /*@only@*/ struct allocated_pat_s *next;
+    struct allocated_pat_s *next;
     pat_t pat;
 } allocated_pat_t;
 

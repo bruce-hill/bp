@@ -4,12 +4,13 @@
 #ifndef MATCH__H
 #define MATCH__H
 
+#include <stdbool.h>
 #include <stdio.h>
 
 #include "types.h"
 
 __attribute__((nonnull(2,4)))
-match_t *next_match(def_t *defs, file_t *f, match_t *prev, pat_t *pat, unsigned int flags);
+match_t *next_match(def_t *defs, file_t *f, match_t *prev, pat_t *pat, bool ignorecase);
 __attribute__((nonnull))
 match_t *get_capture(match_t *m, const char **id);
 __attribute__((nonnull))

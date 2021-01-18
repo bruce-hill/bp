@@ -50,27 +50,27 @@ const char *after_name(const char *str)
 //
 // Check if a character is found and if so, move past it.
 //
-int matchchar(const char **str, char c)
+bool matchchar(const char **str, char c)
 {
     const char *next = after_spaces(*str);
     if (*next == c) {
         *str = &next[1];
-        return 1;
+        return true;
     }
-    return 0;
+    return false;
 }
 
 //
 // Check if a string is found and if so, move past it.
 //
-int matchstr(const char **str, const char *target)
+bool matchstr(const char **str, const char *target)
 {
     const char *next = after_spaces(*str);
     if (strncmp(next, target, strlen(target)) == 0) {
         *str = &next[strlen(target)];
-        return 1;
+        return true;
     }
-    return 0;
+    return false;
 }
 
 //

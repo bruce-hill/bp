@@ -33,17 +33,18 @@ static match_t *unused_matches = NULL;
 static match_t *in_use_matches = NULL;
 #endif
 
+__attribute__((returns_nonnull))
 static match_t *new_match(void);
 __attribute__((nonnull, pure))
 static inline const char *next_char(file_t *f, const char *str);
 __attribute__((nonnull))
-static const char *match_backref(const char *str, match_t *cap, unsigned int ignorecase);
+static const char *match_backref(const char *str, match_t *cap, bool ignorecase);
 __attribute__((nonnull))
 static match_t *get_capture_by_num(match_t *m, int *n);
 __attribute__((nonnull, pure))
 static match_t *get_capture_by_name(match_t *m, const char *name);
 __attribute__((hot, nonnull(2,3,4)))
-static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, unsigned int flags);
+static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool ignorecase);
 
 //
 // Return the location of the next character or UTF8 codepoint.
@@ -69,7 +70,7 @@ static inline const char *next_char(file_t *f, const char *str)
 // Attempt to match text against a previously captured value.
 // Return the character position after the backref has matched, or NULL if no match has occurred.
 //
-static const char *match_backref(const char *str, match_t *cap, unsigned int ignorecase)
+static const char *match_backref(const char *str, match_t *cap, bool ignorecase)
 {
     if (cap->pat->type == BP_REPLACE) {
         const char *text = cap->pat->args.replace.text;
@@ -126,7 +127,7 @@ static const char *match_backref(const char *str, match_t *cap, unsigned int ign
 //
 // Find the next match after prev (or the first match if prev is NULL)
 //
-match_t *next_match(def_t *defs, file_t *f, match_t *prev, pat_t *pat, unsigned int ignorecase)
+match_t *next_match(def_t *defs, file_t *f, match_t *prev, pat_t *pat, bool ignorecase)
 {
     const char *str;
     if (prev) {
@@ -147,7 +148,7 @@ match_t *next_match(def_t *defs, file_t *f, match_t *prev, pat_t *pat, unsigned 
 // match object, or NULL if no match is found.
 // The returned value should be free()'d to avoid memory leaking.
 //
-static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, unsigned int ignorecase)
+static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool ignorecase)
 {
     switch (pat->type) {
         case BP_LEFTRECURSION: {

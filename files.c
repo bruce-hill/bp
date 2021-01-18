@@ -93,7 +93,7 @@ file_t *load_file(file_t **files, const char *filename)
     }
 
   finished_loading:
-    if (fd != STDIN_FILENO) check(!close(fd), "Failed to close file");
+    if (fd != STDIN_FILENO) check(close(fd) == 0, "Failed to close file");
     f->end = &f->contents[length];
     populate_lines(f);
     if (files != NULL) {
@@ -131,7 +131,7 @@ void intern_file(file_t *f)
     size_t size = (size_t)(f->end - f->contents);
     char *buf = xcalloc(sizeof(char), size + 1);
     memcpy(buf, f->contents, size);
-    check(!munmap(f->contents, size),
+    check(munmap(f->contents, size) == 0,
           "Failure to un-memory-map some memory");
     f->contents = buf;
     f->end = buf + size;
@@ -156,7 +156,7 @@ void destroy_file(file_t **f)
 
     if ((*f)->contents) {
         if ((*f)->mmapped) {
-            check(!munmap((*f)->contents, (size_t)((*f)->end - (*f)->contents)),
+            check(munmap((*f)->contents, (size_t)((*f)->end - (*f)->contents)) == 0,
                   "Failure to un-memory-map some memory");
             (*f)->contents = NULL;
         } else {

@@ -8,6 +8,7 @@
 #include <glob.h>
 #include <limits.h>
 #include <signal.h>
+#include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -50,10 +51,11 @@ static const char *usage = (
 #define USE_DEFAULT_CONTEXT -2
 #define ALL_CONTEXT -1
 static int context_lines = USE_DEFAULT_CONTEXT;
-static unsigned int print_color = 0;
-static unsigned int print_line_numbers = 0;
-static unsigned int ignorecase = 0;
-static unsigned int verbose = 0;
+static bool print_color = false;
+static bool print_line_numbers = false;
+static bool ignorecase = false;
+static bool verbose = false;
+static bool git_mode = false;
 typedef enum { CONFIRM_ASK, CONFIRM_ALL, CONFIRM_NONE } confirm_t;
 static confirm_t confirm = CONFIRM_ALL;
 static enum {
@@ -195,7 +197,7 @@ static void cleanup(void)
 static void sig_handler(int sig)
 {
     cleanup();
-    if (kill(0, sig)) _exit(1);
+    if (kill(0, sig)) _exit(EXIT_FAILURE);
 }
 
 //
@@ -276,7 +278,7 @@ static int inplace_modify_file(def_t *defs, file_t *f, pat_t *pattern)
         ++matches;
         printer_t err_pr = {.file = f, .context_lines = 1, .use_color = 1, .print_line_numbers = 1};
         if (print_errors(&err_pr, m) > 0)
-            exit(1);
+            exit(EXIT_FAILURE);
         // Lazy-open file for writing upon first match:
         if (inplace_file == NULL) {
             check(snprintf(tmp_filename, PATH_MAX, "%s.tmp.XXXXXX", f->filename) <= PATH_MAX,
@@ -328,7 +330,7 @@ static int print_matches(def_t *defs, file_t *f, pat_t *pattern)
     for (match_t *m = NULL; (m = next_match(defs, f, m, pattern, ignorecase)); ) {
         printer_t err_pr = {.file = f, .context_lines = 1, .use_color = 1, .print_line_numbers = 1};
         if (print_errors(&err_pr, m) > 0)
-            exit(1);
+            exit(EXIT_FAILURE);
 
         if (++matches == 1) {
             if (printed_filenames++ > 0) printf("\n");
@@ -415,8 +417,8 @@ static int process_dir(def_t *defs, const char *dirname, pat_t *pattern)
     return matches;
 }
 
-#define FLAG(f) (flag=getflag((f), argv, &i))
-#define BOOLFLAG(f) (boolflag((f), argv, &i))
+#define FLAG(f) (flag=getflag((f), argv, &argi))
+#define BOOLFLAG(f) (boolflag((f), argv, &argi))
 
 int main(int argc, char *argv[])
 {
@@ -432,16 +434,16 @@ int main(int argc, char *argv[])
     file_t *local_file = load_filef(&loaded_files, "%s/.config/"BP_NAME"/builtins.bp", getenv("HOME"));
     if (local_file) defs = load_grammar(defs, local_file);
 
-    int i, git = 0;
-    for (i = 1; i < argc; i++) {
-        if (streq(argv[i], "--")) {
-            ++i;
+    int argi;
+    for (argi = 1; argi < argc; argi++) {
+        if (streq(argv[argi], "--")) {
+            ++argi;
             break;
         } else if (BOOLFLAG("-h") || BOOLFLAG("--help")) {
             printf("%s\n", usage);
             return 0;
         } else if (BOOLFLAG("-v") || BOOLFLAG("--verbose")) {
-            verbose = 1;
+            verbose = true;
         } else if (BOOLFLAG("-e") || BOOLFLAG("--explain")) {
             mode = MODE_EXPLAIN;
         } else if (BOOLFLAG("-j") || BOOLFLAG("--json")) {
@@ -451,9 +453,9 @@ int main(int argc, char *argv[])
         } else if (BOOLFLAG("-C") || BOOLFLAG("--confirm")) {
             confirm = CONFIRM_ASK;
         } else if (BOOLFLAG("-G") || BOOLFLAG("--git")) {
-            git = 1;
+            git_mode = true;
         } else if (BOOLFLAG("-i") || BOOLFLAG("--ignore-case")) {
-            ignorecase = 1;
+            ignorecase = true;
         } else if (BOOLFLAG("-l") || BOOLFLAG("--list-files")) {
             mode = MODE_LISTFILES;
         } else if (FLAG("-r")     || FLAG("--replace")) {
@@ -498,17 +500,17 @@ int main(int argc, char *argv[])
                 context_lines = 0;
             else
                 context_lines = (int)strtol(flag, NULL, 10);
-        } else if (argv[i][0] == '-' && argv[i][1] && argv[i][1] != '-') { // single-char flags
-            printf("Unrecognized flag: -%c\n\n%s\n", argv[i][1], usage);
+        } else if (argv[argi][0] == '-' && argv[argi][1] && argv[argi][1] != '-') { // single-char flags
+            printf("Unrecognized flag: -%c\n\n%s\n", argv[argi][1], usage);
             return 1;
-        } else if (argv[i][0] != '-') {
+        } else if (argv[argi][0] != '-') {
             if (pattern != NULL) break;
-            file_t *arg_file = spoof_file(&loaded_files, "<pattern argument>", argv[i]);
+            file_t *arg_file = spoof_file(&loaded_files, "<pattern argument>", argv[argi]);
             pat_t *p = bp_stringpattern(arg_file, arg_file->contents);
-            check(p, "Pattern failed to compile: %s", argv[i]);
+            check(p, "Pattern failed to compile: %s", argv[argi]);
             pattern = chain_together(arg_file, pattern, p);
         } else {
-            printf("Unrecognized flag: %s\n\n%s\n", argv[i], usage);
+            printf("Unrecognized flag: %s\n\n%s\n", argv[argi], usage);
             return 1;
         }
     }
@@ -517,8 +519,8 @@ int main(int argc, char *argv[])
     if (context_lines < 0 && context_lines != ALL_CONTEXT) context_lines = 0;
 
     if (isatty(STDOUT_FILENO)) {
-        print_color = 1;
-        print_line_numbers = 1;
+        print_color = true;
+        print_line_numbers = true;
     }
 
     // If any of these signals triggers, and there is a temporary file in use,
@@ -526,10 +528,10 @@ int main(int argc, char *argv[])
     int signals[] = {SIGTERM, SIGINT, SIGXCPU, SIGXFSZ, SIGVTALRM, SIGPROF, SIGSEGV, SIGTSTP};
     struct sigaction sa = {.sa_handler = &sig_handler, .sa_flags = (int)(SA_NODEFER | SA_RESETHAND)};
     for (size_t i = 0; i < sizeof(signals)/sizeof(signals[0]); i++)
-        check(!sigaction(signals[i], &sa, NULL), "Failed to set signal handler");
+        check(sigaction(signals[i], &sa, NULL) == 0, "Failed to set signal handler");
 
     // Handle exit() calls gracefully:
-    check(!atexit(&cleanup), "Failed to set cleanup handler at exit");
+    check(atexit(&cleanup) == 0, "Failed to set cleanup handler at exit");
 
     // User input/output is handled through /dev/tty so that normal unix pipes
     // can work properly while simultaneously asking for user input.
@@ -564,32 +566,36 @@ int main(int argc, char *argv[])
         free(patstr);
     }
 
+    check(pattern != NULL, "No pattern was given");
+
     // To ensure recursion (and left recursion in particular) works properly,
     // we need to define a rule called "pattern" with the value of whatever
     // pattern the args specified, and use `pattern` as the thing being matched.
-    defs = with_def(defs, strlen("pattern"), "pattern", pattern); // TODO: this is a bit hacky
-    pattern = bp_pattern(loaded_files, "pattern");
+    defs = with_def(defs, strlen("pattern"), "pattern", pattern);
+    file_t *patref_file = spoof_file(&loaded_files, "<pattern ref>", "pattern");
+    pattern = bp_pattern(patref_file, patref_file->contents);
 
     int found = 0;
     if (mode == MODE_JSON) printf("[");
-    if (git) { // Get the list of files from `git --ls-files ...`
+    if (git_mode) { // Get the list of files from `git --ls-files ...`
         int fds[2];
         check(pipe(fds) == 0, "Failed to create pipe");
         pid_t child = fork();
         check(child != -1, "Failed to fork");
         if (child == 0) {
-            char **git_args = calloc((size_t)(2+(argc-i)+1), sizeof(char*));
+            char **git_args = memcheck(calloc((size_t)(2+(argc-argi)+1), sizeof(char*)));
             int g = 0;
             git_args[g++] = "git";
             git_args[g++] = "ls-files";
-            while (i < argc) git_args[g++] = argv[i++];
-            check(dup2(fds[STDOUT_FILENO], STDOUT_FILENO), "Failed to hook up pipe to stdout");
-            check(!close(fds[STDIN_FILENO]), "Failed to close read end of pipe");
+            while (argi < argc) git_args[g++] = argv[argi++];
+            check(dup2(fds[STDOUT_FILENO], STDOUT_FILENO) == STDOUT_FILENO,
+                  "Failed to hook up pipe to stdout");
+            check(close(fds[STDIN_FILENO]) == 0, "Failed to close read end of pipe");
             (void)execvp("git", git_args);
-            _exit(1);
+            _exit(EXIT_FAILURE);
         }
-        check(!close(fds[STDOUT_FILENO]), "Failed to close write end of pipe");
-        char path[PATH_MAX+2] = {0}; // path + \n + \0
+        check(close(fds[STDOUT_FILENO]) == 0, "Failed to close write end of pipe");
+        char path[PATH_MAX+2] = {'\0'}; // path + \n + \0
         while (read(fds[STDIN_FILENO], path, PATH_MAX+1) > 0) { // Iterate over chunks
             for (char *nl; (nl = strchr(path, '\n')); ) { // Iterate over nl-terminated lines
                 *nl = '\0';
@@ -597,19 +603,19 @@ int main(int argc, char *argv[])
                 memmove(path, nl+1, sizeof(path)-(size_t)(nl+1-path));
             }
         }
-        check(!close(fds[STDIN_FILENO]), "Failed to close read end of pipe");
+        check(close(fds[STDIN_FILENO]) == 0, "Failed to close read end of pipe");
         int status;
         while (waitpid(child, &status, 0) != child) continue;
-        check(WIFEXITED(status) && WEXITSTATUS(status) == 0,
+        check((WIFEXITED(status) == 1) && (WEXITSTATUS(status) == 0),
               "`git --ls-files` failed. Do you have git installed?");
-    } else if (i < argc) {
+    } else if (argi < argc) {
         // Files pass in as command line args:
         struct stat statbuf;
-        for (int nfiles = 0; i < argc; nfiles++, i++) {
-            if (stat(argv[i], &statbuf) == 0 && S_ISDIR(statbuf.st_mode)) // Symlinks are okay if manually specified
-                found += process_dir(defs, argv[i], pattern);
+        for (int nfiles = 0; argi < argc; nfiles++, argi++) {
+            if (stat(argv[argi], &statbuf) == 0 && S_ISDIR(statbuf.st_mode)) // Symlinks are okay if manually specified
+                found += process_dir(defs, argv[argi], pattern);
             else
-                found += process_file(defs, argv[i], pattern);
+                found += process_file(defs, argv[argi], pattern);
         }
     } else if (isatty(STDIN_FILENO)) {
         // No files, no piped in input, so use files in current dir, recursively
@@ -636,7 +642,7 @@ int main(int argc, char *argv[])
     free_all_matches();
 #endif
 
-    return (found > 0) ? 0 : 1;
+    return (found > 0) ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1
