@@ -3,10 +3,14 @@
 BP is a parsing expression grammar (PEG) tool for the command line.
 It's written in pure C with no dependencies.
 
+
 ## Usage
+
 `bp [flags] <pattern> [<input files>...]`
 
+
 ### Flags
+
 * `-h` `--help` print the usage and quit
 * `-v` `--verbose` print verbose debugging info
 * `-i` `--ignore-case` perform a case-insensitive match
@@ -23,7 +27,9 @@ It's written in pure C with no dependencies.
 
 See `man ./bp.1` for more details.
 
+
 ## BP Patterns
+
 BP patterns are a mixture of Parsing Expression Grammar and Regular
 Expression syntax, with a preference for prefix operators instead of
 suffix operators.
@@ -67,7 +73,65 @@ Pattern            | Meaning
 
 See `man ./bp.1` for more details.
 
+
+## Grammar Files
+
+BP comes packaged with some pattern definitions that can be useful when parsing
+code of different languages. Firstly, there are a handful of general-purpose
+patterns like:
+
+Name          | Meaning
+--------------|--------------------
+`string`      | A string (either single- or double-quoted)
+`parens`      | A matched pair of parentheses (`()`)
+`braces`      | A matched pair of curly braces (`{}`)
+`brackets`    | A matched pair of square brackets (`[]`)
+`anglebraces` | A matched pair of angle braces (`<>`)
+`_`           | Zero or more whitespace characters (excluding newline)
+`__`          | Zero or more whitespace characters, including newlines and comments
+`Abc`         | The characters `a-z` and `A-Z`
+`Abc123`      | The characters `a-z`, `A-Z`, and `0-9`
+`int`         | 1 or more numeric characters
+`number`      | An integer or floating point number
+`Hex`         | A hexadecimal character
+`id`          | An identifier
+`|`           | A word boundary
+`^`           | Start of a line
+`^^`          | Start of a file
+`$`           | End of a line
+`$$`          | End of a file
+
+As well as these common definitions, BP also comes with a set of
+language-specific or domain-specific grammars. These are not full language
+grammars, but only implementation of some language-specific features, like
+identifier rules (`id`), string syntax, and comment syntax (which affects `__`
+and other rules). Some of the languages supported are:
+
+- BP
+- C++
+- C
+- Go
+- HTML
+- Javascript
+- Lisp
+- Lua
+- Python
+- Rust
+- shell script
+
+These grammar definitions can be found in [grammars](/grammars). To use a
+grammar file, use `bp -g <path-to-file>` or `bp --grammar=<path-to-file>`. Once
+BP is installed, however, you can use `bp -g <grammar-name>` directly, and BP
+will figure out which grammar you mean (e.g. `bp -g lua ...`). BP first
+searches `~/.config/bp/` for any grammar files you keep locally, then searches
+`/etc/xdg/bp/` for system-wide grammar files.
+
+Testing for these grammar files (other than `builtins`) is iffy at this point,
+so use at your own risk! These grammar files are only approximations of syntax.
+
+
 ## License
+
 BP is provided under the MIT license with the [Commons Clause](https://commonsclause.com/)
 (you can't sell this software without the developer's permission, but you're
 otherwise free to use, modify, and redistribute it free of charge).
