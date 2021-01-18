@@ -1,7 +1,12 @@
-# HTML grammar
-HTML: __ [doctype __] *html-element%__ __
+# Syntax definitions for some HTML-specific patterns
+#
+# NOTE: this is *NOT* intended to be a complete definition of the language's
+# syntax! Providing a full language grammar is overkill, because the intended
+# use case is finding/replacing string patterns. This task does not require a
+# full parse tree, and having one makes the task considerably more complicated.
+# See the accompanying README.md for more info.
 
-doctype: "<!DOCTYPE" ..`>
+doctype: "<!DOCTYPE" ..`> %\n
 
 html-element: void-element / raw-element / template-element / normal-element
 
@@ -16,5 +21,4 @@ normal-element: `< @tag=id __attributes__ `>..("</"tag`>) % (\n / comment / html
 comment: "<!--" .."-->" % \n
 
 attributes: *attribute%__
-attribute: (+id%`:)__`=__ (id / `" ..`" / `' ..`')
-attribute: (+id%`:)__`=__ (id / `" ..`" / `' ..`')
+attribute: (+id%`:)__`=__ (id / string)
