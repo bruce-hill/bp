@@ -213,7 +213,7 @@ void fprint_line(FILE *dest, file_t *f, const char *start, const char *end, cons
     size_t linenum = get_line_number(f, start);
     const char *line = get_line(f, linenum);
     size_t charnum = get_char_number(f, start);
-    fprintf(dest, "\033[1m%s:%ld:\033[0m ", f->filename, linenum);
+    fprintf(dest, "\033[1m%s:%ld:\033[0m ", f->filename[0] ? f->filename : "stdin", linenum);
 
     va_list args;
     va_start(args, fmt);
@@ -227,7 +227,7 @@ void fprint_line(FILE *dest, file_t *f, const char *start, const char *end, cons
             linenum,
             (int)charnum - 1, line,
             (int)(end - &line[charnum-1]), &line[charnum-1],
-            (int)(eol - end), end);
+            (int)(eol - end - 1), end);
     fprintf(dest, "       \033[34;1m");
     const char *p = line - 1;
     for (; p < start; ++p) fputc(' ', dest);
