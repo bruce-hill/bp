@@ -29,10 +29,10 @@ leaktest:
 
 install: $(NAME)
 	mkdir -p -m 755 "$(PREFIX)/share/man/man1" "$(PREFIX)/bin" "$(SYSCONFDIR)/xdg/$(NAME)"
-	cp -rv grammars/* "$(SYSCONFDIR)/xdg/$(NAME)/"
-	cp -v bp.1 "$(PREFIX)/share/man/man1/$(NAME).1"
+	cp -r grammars/* "$(SYSCONFDIR)/xdg/$(NAME)/"
+	cp bp.1 "$(PREFIX)/share/man/man1/$(NAME).1"
 	rm -f "$(PREFIX)/bin/$(NAME)"
-	cp -v $(NAME) "$(PREFIX)/bin/"
+	cp $(NAME) "$(PREFIX)/bin/"
 
 uninstall:
 	rm -rvf "$(PREFIX)/bin/$(NAME)" "$(PREFIX)/share/man/man1/$(NAME).1" "$(SYSCONFDIR)/xdg/$(NAME)";
