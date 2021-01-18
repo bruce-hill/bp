@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
@@ -377,6 +378,31 @@ static int process_file(def_t *defs, const char *filename, pat_t *pattern)
     return matches;
 }
 
+//
+// Recursively process all non-dotfile files in the given directory.
+//
+static int process_dir(def_t *defs, const char *dirname, pat_t *pattern)
+{
+    int matches = 0;
+    glob_t globbuf;
+    char globpath[PATH_MAX+1] = {0};
+    check(snprintf(globpath, PATH_MAX, "%s/*", dirname) <= PATH_MAX,
+          "Filename is too long: %s/*", dirname);
+    glob(globpath, 0, NULL, &globbuf);
+    struct stat statbuf;
+    for (size_t i = 0; i < globbuf.gl_pathc; i++) {
+        if (lstat(globbuf.gl_pathv[i], &statbuf) != 0) continue;
+        if (S_ISLNK(statbuf.st_mode))
+            continue; // Skip symbolic links
+        else if (S_ISDIR(statbuf.st_mode))
+            matches += process_dir(defs, globbuf.gl_pathv[i], pattern);
+        else if (is_text_file(globbuf.gl_pathv[i]))
+            matches += process_file(defs, globbuf.gl_pathv[i], pattern);
+    }
+    globfree(&globbuf);
+    return matches;
+}
+
 #define FLAG(f) (flag=getflag((f), argv, &i))
 #define BOOLFLAG(f) (boolflag((f), argv, &i))
 
@@ -564,19 +590,18 @@ int main(int argc, char *argv[])
               "`git --ls-files` failed. Do you have git installed?");
     } else if (i < argc) {
         // Files pass in as command line args:
+        struct stat statbuf;
         for (int nfiles = 0; i < argc; nfiles++, i++) {
-            found += process_file(defs, argv[i], pattern);
+            check(stat(argv[i], &statbuf) == 0,
+                  "File does not exist: %s", argv[i]);
+            if (S_ISDIR(statbuf.st_mode)) // Symlinks are okay if manually specified
+                found += process_dir(defs, argv[i], pattern);
+            else
+                found += process_file(defs, argv[i], pattern);
         }
     } else if (isatty(STDIN_FILENO)) {
-        // No files, no piped in input, so use * **/*:
-        glob_t globbuf;
-        glob("*", 0, NULL, &globbuf);
-        glob("**/*", GLOB_APPEND, NULL, &globbuf);
-        for (size_t i = 0; i < globbuf.gl_pathc; i++) {
-            if (is_text_file(globbuf.gl_pathv[i]))
-                found += process_file(defs, globbuf.gl_pathv[i], pattern);
-        }
-        globfree(&globbuf);
+        // No files, no piped in input, so use files in current dir, recursively
+        found += process_dir(defs, ".", pattern);
     } else {
         // Piped in input:
         found += process_file(defs, NULL, pattern);
