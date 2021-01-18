@@ -458,7 +458,9 @@ int main(int argc, char *argv[])
             pattern = bp_replacement(replace_file, pattern, replace_file->contents);
             check(pattern, "Replacement failed to compile: %s", flag);
         } else if (FLAG("-g")     || FLAG("--grammar")) {
-            file_t *f = load_file(&loaded_files, flag);
+            file_t *f = NULL;
+            if (strlen(flag) > 3 && strncmp(&flag[strlen(flag)-3], ".bp", 3) == 0)
+                f = load_file(&loaded_files, flag);
             if (f == NULL)
                 f = load_filef(&loaded_files, "%s/.config/"BP_NAME"/%s.bp", getenv("HOME"), flag);
             if (f == NULL)
