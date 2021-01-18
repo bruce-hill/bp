@@ -159,12 +159,18 @@ void destroy_file(file_t **f)
 //
 size_t get_line_number(file_t *f, const char *p)
 {
-    // TODO: binary search
-    for (size_t n = 1; n < f->nlines; n++) {
-        if (f->lines[n] > p)
-            return n;
+    // Binary search:
+    size_t lo = 0, hi = f->nlines-1;
+    while (lo <= hi) {
+        size_t mid = (lo + hi) / 2;
+        if (f->lines[mid] == p)
+            return mid + 1;
+        else if (f->lines[mid] < p)
+            lo = mid + 1;    
+        else if (f->lines[mid] > p)
+            hi = mid - 1;
     }
-    return f->nlines;
+    return lo; // Return the line number whose line starts closest before p
 }
 
 //
