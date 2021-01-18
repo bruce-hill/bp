@@ -348,6 +348,7 @@ static int print_matches(def_t *defs, file_t *f, pat_t *pattern)
 // For a given filename, open the file and attempt to match the given pattern
 // against it, printing any results according to the flags.
 //
+__attribute__((nonnull(2,3)))
 static int process_file(def_t *defs, const char *filename, pat_t *pattern)
 {
     file_t *f = load_file(NULL, filename);
@@ -385,6 +386,7 @@ static int process_file(def_t *defs, const char *filename, pat_t *pattern)
 //
 // Recursively process all non-dotfile files in the given directory.
 //
+__attribute__((nonnull(2,3)))
 static int process_dir(def_t *defs, const char *dirname, pat_t *pattern)
 {
     int matches = 0;
@@ -606,7 +608,7 @@ int main(int argc, char *argv[])
         found += process_dir(defs, ".", pattern);
     } else {
         // Piped in input:
-        found += process_file(defs, NULL, pattern);
+        found += process_file(defs, "", pattern);
     }
     if (mode == MODE_JSON) printf("]\n");
 
