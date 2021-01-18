@@ -4,6 +4,7 @@
 #ifndef FILES__H
 #define FILES__H
 
+#include <stdbool.h>
 #include <stdio.h>
 
 struct allocated_pat_s; // declared in types.h
@@ -14,7 +15,7 @@ typedef struct file_s {
     char *contents, **lines, *end;
     size_t nlines;
     struct allocated_pat_s *pats;
-    unsigned int mmapped:1;
+    bool mmapped:1;
 } file_t;
 
 __attribute__((nonnull(2)))

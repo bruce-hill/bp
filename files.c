@@ -76,12 +76,12 @@ file_t *load_file(file_t **files, const char *filename)
     if (f->contents == MAP_FAILED)
         goto skip_mmap;
 
-    f->mmapped = 1;
+    f->mmapped = true;
     length = (size_t)sb.st_size;
     goto finished_loading;
 
   skip_mmap:
-    f->mmapped = 0;
+    f->mmapped = false;
     size_t capacity = 1000;
     length = 0;
     f->contents = xcalloc(sizeof(char), capacity);
@@ -135,7 +135,7 @@ void intern_file(file_t *f)
           "Failure to un-memory-map some memory");
     f->contents = buf;
     f->end = buf + size;
-    f->mmapped = 0;
+    f->mmapped = false;
     xfree(&f->lines);
     populate_lines(f);
 }
