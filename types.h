@@ -4,6 +4,7 @@
 #ifndef TYPES__H
 #define TYPES__H
 
+#include <stdbool.h>
 #include <sys/types.h>
 
 #include "files.h"
@@ -97,7 +98,7 @@ typedef struct match_s {
     // the replaced text when printing this match:
     // TODO: this is a bit hacky, there is probably a better way to go about
     // this but it's less hacky that mutating the match objects more drastically
-    unsigned int skip_replacement:1;
+    bool skip_replacement:1;
 } match_t;
 
 //
