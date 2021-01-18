@@ -19,6 +19,7 @@ typedef struct match_node_s {
 static const char *color_match = "\033[0;31;1m";
 static const char *color_replace = "\033[0;34;1m";
 static const char *color_normal = "\033[0m";
+static const char *current_color = NULL;
 
 __attribute__((nonnull, pure))
 static int height_of_match(match_t *m);
@@ -189,6 +190,7 @@ static inline void print_line_number(FILE *out, printer_t *pr, size_t line_numbe
         else fprintf(out, "% 5ld|", line_number);
     }
     pr->needs_line_number = 0;
+    current_color = color;
 }
 
 // 
@@ -203,7 +205,10 @@ static void print_between(FILE *out, printer_t *pr, const char *start, const cha
         print_line_number(out, pr, line_num, color);
         const char *eol = get_line(pr->file, line_num + 1);
         if (!eol || eol > end) eol = end;
-        if (color) fprintf(out, "%s", color);
+        if (color && color != current_color) {
+            fprintf(out, "%s", color);
+            current_color = color;
+        }
         fprintf(out, "%.*s", (int)(eol - start), start);
         if (eol[-1] == '\n')
             pr->needs_line_number = 1;
@@ -266,7 +271,10 @@ void _print_match(FILE *out, printer_t *pr, match_t *m)
         size_t line_end = get_line_number(pr->file, m->end);
         size_t line = line_start;
 
-        if (pr->use_color) fprintf(out, "%s", color_replace);
+        if (pr->use_color && current_color != color_replace) {
+            fprintf(out, "%s", color_replace);
+            current_color = color_replace;
+        }
         const char *text = m->pat->args.replace.text;
         const char *end = &text[m->pat->args.replace.len];
 
@@ -332,6 +340,7 @@ void _print_match(FILE *out, printer_t *pr, match_t *m)
 //
 void print_match(FILE *out, printer_t *pr, match_t *m)
 {
+    current_color = color_normal;
     int first = (pr->pos == NULL);
     if (first) { // First match printed:
         pr->pos = pr->file->contents;
