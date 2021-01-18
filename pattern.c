@@ -284,11 +284,11 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
 
             pat_t *esc;
             const char *opstart = str;
-            unsigned char e = unescapechar(str, &str);
+            unsigned char e = (unsigned char)unescapechar(str, &str);
             if (*str == '-') { // Escape range (e.g. \x00-\xFF)
                 ++str;
                 const char *seqstart = str;
-                unsigned char e2 = unescapechar(str, &str);
+                unsigned char e2 = (unsigned char)unescapechar(str, &str);
                 if (str == seqstart)
                     file_err(f, seqstart, str+1, "This value isn't a valid escape sequence");
                 if (e2 < e)
@@ -516,7 +516,7 @@ pat_t *bp_stringpattern(file_t *f, const char *str)
                 }
 
                 const char *after_escape;
-                unsigned char e = unescapechar(&str[1], &after_escape);
+                char e = unescapechar(&str[1], &after_escape);
                 // If there is not a special escape sequence (\n, \x0A, etc.)
                 // or \\, \", \', \`, then check for an interpolated value:
                 // The special cases for single and double quotes aren't

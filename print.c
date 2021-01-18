@@ -297,7 +297,7 @@ void _print_match(FILE *out, printer_t *pr, match_t *m)
 
             if (*r == '\\') {
                 ++r;
-                unsigned char c = unescapechar(r, &r);
+                char c = unescapechar(r, &r);
                 fputc(c, out);
                 if (c == '\n') {
                     ++line;

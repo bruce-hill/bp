@@ -11,15 +11,13 @@
 #include "match.h"
 
 #define streq(a, b) (strcmp(a, b) == 0)
-// TODO: better error reporting
 #define check(cond, ...) do { if (!(cond)) { fprintf(stderr, __VA_ARGS__); fwrite("\n", 1, 1, stderr); exit(1); } } while(0)
-#define debug(...) do { if (verbose) fprintf(stderr, __VA_ARGS__); } while(0)
 #define new(t) memcheck(calloc(sizeof(t), 1))
 #define xcalloc(a,b) memcheck(calloc(a,b))
 #define xrealloc(a,b) memcheck(realloc(a,b))
 
 __attribute__((nonnull))
-unsigned char unescapechar(const char *escaped, const char **end);
+char unescapechar(const char *escaped, const char **end);
 __attribute__((pure, nonnull))
 const char *after_name(const char *str);
 __attribute__((pure, nonnull, returns_nonnull))
