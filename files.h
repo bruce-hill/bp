@@ -25,8 +25,6 @@ file_t *load_filef(file_t **files, const char *fmt, ...);
 __attribute__((nonnull(3), returns_nonnull))
 file_t *spoof_file(file_t **files, const char *filename, const char *text);
 __attribute__((nonnull))
-void intern_file(file_t *f);
-__attribute__((nonnull))
 void destroy_file(file_t **f);
 __attribute__((pure, nonnull))
 size_t get_line_number(file_t *f, const char *p);

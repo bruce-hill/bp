@@ -122,25 +122,6 @@ file_t *spoof_file(file_t **files, const char *filename, const char *text)
 }
 
 //
-// Ensure that the file's contents are held in memory, rather than being memory
-// mapped IO.
-//
-void intern_file(file_t *f)
-{
-    if (!f->mmapped) return;
-    size_t size = (size_t)(f->end - f->contents);
-    char *buf = xcalloc(sizeof(char), size + 1);
-    memcpy(buf, f->contents, size);
-    check(munmap(f->contents, size) == 0,
-          "Failure to un-memory-map some memory");
-    f->contents = buf;
-    f->end = buf + size;
-    f->mmapped = false;
-    xfree(&f->lines);
-    populate_lines(f);
-}
-
-//
 // Free a file and all memory contained inside its members, then set the input
 // pointer to NULL.
 //
