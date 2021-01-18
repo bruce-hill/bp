@@ -1,0 +1,23 @@
+# Syntax definition for some C-specific patterns
+#
+# NOTE: this is *NOT* intended to be a complete definition of the language's
+# syntax! Providing a full language grammar is overkill, because the intended
+# use case is finding/replacing string patterns. This task does not require a
+# full parse tree, and having one makes the task considerably more complicated.
+# See the accompanying README.md for more info.
+
+comment: "//" .. $ / "/*" .. "*/" % \n
+string: `"..`" % (`\.)
+char: `' [`\] . `'
+array: `{..`} % (array/comment/\n)
+struct: array
+keyword: |(
+    "auto" / "break" / "case" / "char" / "const" / "continue" / "default" / "do" /
+    "double" / "else" / "enum" / "extern" / "float" / "for" / "goto" / "if" /
+    "int" / "long" / "register" / "return" / "short" / "signed" / "sizeof" /
+    "static" / "struct" / "switch" / "typedef" / "union" / "unsigned" / "void" /
+    "volatile" / "while"
+)|
+function-def: ^_ 2+(keyword / id / `*) % __ parens (__`; / >(__`{))
+function: function-def __ braces
+macro: ^"#define " ..$ *(<`\ \n..$)

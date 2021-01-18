@@ -1,4 +1,9 @@
 # This is a file defining the BP grammar using BP syntax
+#
+# This is a complete definition of the grammar of BP grammar files, but it's
+# mainly intended to be used as a proof-of-concept, and a stress-test for BP.
+# The grammar files provided with BP are not otherwise intended to be full
+# language grammars.
 
 Grammar: __ *(Def [__`;])%__ __ ($$ / @!=(..$$%\n => "Could not parse this code"))
 Def: @name=id __ `: __ (

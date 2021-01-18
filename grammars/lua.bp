@@ -1,0 +1,19 @@
+# Syntax definitions for some Lua-specific patterns
+#
+# NOTE: this is *NOT* intended to be a complete definition of the language's
+# syntax! Providing a full language grammar is overkill, because the intended
+# use case is finding/replacing string patterns. This task does not require a
+# full parse tree, and having one makes the task considerably more complicated.
+# See the accompanying README.md for more info.
+
+comment: "--" (`[ @eqs=*`= `[ ..(`]eqs`]) % \n / ..$)
+string: `"..`" % (`\.) / `'..`' % (`\.) / `[ @eqs=*`= `[ .. (`]eqs`]) % \n
+table: `{..`} % (table/string/comment/\n)
+keyword: |(
+ "and" / "break" / "do" / "else" / "elseif" / "end" / "false" / "for" /
+ "function" / "goto" / "if" / "in" / "local" / "nil" / "not" / "or" /
+ "repeat" / "return" / "then" / "true" / "until" / "while"
+)|
+function-def: |"function"|[_id (*(`.id)[`:id])]_ parens
+block: function / |("do"/"then")| .. (|"end"|) % (comment/string/block/\n)
+function: function-def .. (|"end"|) % (comment/string/block/\n)
