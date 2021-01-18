@@ -24,8 +24,8 @@ suffixed-pat: (
     / Not-eq-pat
 )
 
-Eq-pat: @first=pat__"=="__@second=pat
-Not-eq-pat: @first=pat__"!="__@second=pat
+Eq-pat: @first=(suffixed-pat / simple-pat)__"=="__@second=pat
+Not-eq-pat: @first=(suffixed-pat / simple-pat)__"!="__@second=pat
 
 Dot: `. !`.
 String: (
