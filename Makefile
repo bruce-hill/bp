@@ -35,7 +35,7 @@ install: $(NAME)
 	cp $(NAME) "$(PREFIX)/bin/"
 
 uninstall:
-	rm -rvf "$(PREFIX)/bin/$(NAME)" "$(PREFIX)/share/man/man1/$(NAME).1" "$(SYSCONFDIR)/xdg/$(NAME)";
+	rm -rf "$(PREFIX)/bin/$(NAME)" "$(PREFIX)/share/man/man1/$(NAME).1" "$(SYSCONFDIR)/xdg/$(NAME)"
 	@if [ -d ~/.config/$(NAME) ]; then \
 	  printf 'Config files exist in ~/.config/$(NAME) Do you want to delete them? [Y/n] '; \
 	  read confirm; \
