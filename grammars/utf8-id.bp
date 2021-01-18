@@ -1,5 +1,11 @@
 # Definitions of UTF8-compliant identifiers
-utf8-id: utf8-id-start *utf8-id-cont
+id: | utf8-id-start *utf8-id-cont
+id-char: utf8-id-cont / utf8-id-start
+|: !id-char / (
+    !<(\x00-x7f==id-char)
+    !<((\xc0-xdf \x80-xbf)==id-char)
+    !<((\xe0-xef 2\x80-xbf)==id-char)
+    !<((\xf0-xf7 3\x80-xbf)==id-char))
 
 utf8-id-start: `A-Z / `a-z / !\x00-x7F (
   \xc2 (\xaa / \xb5 / \xba)
