@@ -295,7 +295,10 @@ static void _print_match(FILE *out, printer_t *pr, match_t *m)
                 match_t *cap = get_capture(m, &r);
                 if (cap != NULL) {
                     _print_match(out, pr, cap);
-                    if (pr->use_color) fprintf(out, "%s", color_replace);
+                    if (pr->use_color && current_color != color_replace) {
+                        fprintf(out, "%s", color_replace);
+                        current_color = color_replace;
+                    }
                     continue;
                 } else {
                     --r;
