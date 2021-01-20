@@ -114,28 +114,8 @@ char unescapechar(const char *escaped, const char **end)
         }
         default: break;
     }
-    *end = &escaped[len];
+    if (end) *end = &escaped[len];
     return (char)ret;
-}
-
-//
-// Write an unescaped version of `src` to `dest` (at most bufsize-1 chars,
-// terminated by a null byte)
-//
-size_t unescape_string(char *dest, const char *src, size_t bufsize)
-{
-    size_t len = 0;
-    while (*src && len < bufsize) {
-        if (*src == '\\') {
-            ++src;
-            *(dest++) = unescapechar(src, &src);
-        } else {
-            *(dest++) = *(src++);
-        }
-        ++len;
-    }
-    *dest = '\0';
-    return len;
 }
 
 //

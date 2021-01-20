@@ -225,6 +225,7 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
         case '`': {
             pat_t *all = NULL;
             do {
+                const char *charloc = str;
                 c = *str;
                 if (!c || c == '\n')
                     file_err(f, str, str, "There should be a character here after the '`'");
@@ -247,9 +248,7 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
                     ++str;
                 } else {
                     pat = new_pat(f, opstart, BP_STRING);
-                    char *s = xcalloc(sizeof(char), 2);
-                    s[0] = c;
-                    pat->args.string = s;
+                    pat->args.string = charloc;
                 }
 
                 pat->len = 1;
@@ -309,28 +308,14 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
         case '"': case '\'': case '\002': {
             char endquote = c == '\002' ? '\003' : c;
             char *litstart = (char*)str;
-            for (; *str && *str != endquote; str++) {
-                if (*str == '\\') {
-                    if (!str[1] || str[1] == '\n')
-                        file_err(f, str, str+1,
-                                 "There should be an escape sequence after this backslash.");
-                    ++str;
-                }
-            }
-            size_t len = (size_t)(str - litstart);
-            char *literal = xcalloc(sizeof(char), len+1);
-            memcpy(literal, litstart, len);
-            // Note: an unescaped string is guaranteed to be no longer than the
-            // escaped string, so this is safe to do inplace.
-            len = unescape_string(literal, literal, len);
+            for (; *str != endquote; ++str)
+                if (str >= f->end)
+                    file_err(f, start, str, "This string doesn't have a closing %c-quote.", endquote);
+            ++str;
 
             pat_t *pat = new_pat(f, start, BP_STRING);
-            pat->len = (ssize_t)len;
-            pat->args.string = literal;
-
-            if (!matchchar(&str, endquote))
-                file_err(f, start, str, "This string doesn't have a closing quote.");
-
+            pat->len = (ssize_t)((str - 1) - litstart);
+            pat->args.string = litstart;
             pat->end = str;
             return pat;
         }
@@ -502,43 +487,28 @@ pat_t *bp_stringpattern(file_t *f, const char *str)
     while (*str) {
         char *start = (char*)str;
         pat_t *interp = NULL;
-        for (; *str; str++) {
-            if (*str == '\\') {
-                if (!str[1] || str[1] == '\n')
-                    file_err(f, str, str, "There should be an escape sequence or pattern here after this backslash.");
-                
-                if (matchchar(&str, 'N')) { // \N (nodent)
-                    interp = new_pat(f, str-2, BP_NODENT);
+        for (; str < f->end; str++) {
+            if (*str == '\\' && str+1 < f->end) {
+                char e = unescapechar(&str[1], NULL);
+                // If there is not a special escape sequence (\n, \x0A, \N,
+                // etc.) or \\, then check for an interpolated value:
+                if (e != str[1] || e == '\\' || e == 'N') {
+                    interp = bp_simplepattern(f, str);
+                    check(interp, "Failed to match pattern %.*s", 2, str);
                     break;
-                }
-
-                const char *after_escape;
-                char e = unescapechar(&str[1], &after_escape);
-                // If there is not a special escape sequence (\n, \x0A, etc.)
-                // or \\, \", \', \`, then check for an interpolated value:
-                // The special cases for single and double quotes aren't
-                // needed, but there's no known legitimate use case for
-                // interpolating a literal string, and users might escape
-                // quotes out of paranoia, and we want to support that. String
-                // literal interpolations can be done with \("...") anyways.
-                if (e == str[1] && e != '\'' && e != '"' && e != '\\' && e != '`') {
+                } else {
                     interp = bp_simplepattern(f, str + 1);
                     if (interp) break;
+                    // If there is no interpolated value, this is just a plain ol' regular backslash
                 }
-                str = after_escape - 1; // Otherwise treat as a literal character
             }
         }
         // End of string
-        size_t len = (size_t)(str - start);
-        char *literal = xcalloc(sizeof(char), len+1);
-        memcpy(literal, start, len);
-        // Note: an unescaped string is guaranteed to be no longer than the
-        // escaped string, so this is safe to do inplace.
-        len = unescape_string(literal, literal, len);
+        ssize_t len = (ssize_t)(str - start);
         if (len > 0) {
             pat_t *strop = new_pat(f, str, BP_STRING);
-            strop->len = (ssize_t)len;
-            strop->args.string = literal;
+            strop->len = len;
+            strop->args.string = start;
             strop->end = str;
             ret = chain_together(f, ret, strop);
         }
@@ -602,15 +572,6 @@ def_t *bp_definition(def_t *defs, file_t *f, const char *str)
     if (!defpat) return NULL;
     (void)matchchar(&defpat->end, ';'); // TODO: verify this is safe to mutate
     return with_def(defs, namelen, name, defpat);
-}
-
-//
-// Deallocate memory referenced inside a pattern struct
-//
-void destroy_pat(pat_t *pat)
-{
-    if (pat->type == BP_STRING)
-        xfree(&pat->args.string);
 }
 
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1

@@ -18,7 +18,7 @@
 #define xcalloc(a,b) memcheck(calloc(a,b))
 #define xrealloc(a,b) memcheck(realloc(a,b))
 
-__attribute__((nonnull))
+__attribute__((nonnull(1)))
 char unescapechar(const char *escaped, const char **end);
 __attribute__((pure, nonnull))
 const char *after_name(const char *str);
@@ -28,8 +28,6 @@ __attribute__((nonnull))
 bool matchchar(const char **str, char c);
 __attribute__((nonnull))
 bool matchstr(const char **str, const char *target);
-__attribute__((nonnull))
-size_t unescape_string(char *dest, const char *src, size_t bufsize);
 __attribute__((returns_nonnull))
 void *memcheck(/*@null@*/ /*@out@*/ void *p);
 __attribute__((nonnull))
