@@ -6,8 +6,8 @@
 # full parse tree, and having one makes the task considerably more complicated.
 # See the accompanying README.md for more info.
 
-comment: "//" .. $ / "/*" .. "*/" % \n
-string: `"..`" % (`\.)
+comment: "//" .. $ / "/*" ..%\n "*/"
+string: `" ..%(`\.) `"
 keyword: |(
     "break" / "default" / "func" / "interface" / "select" / "case" / "defer" / "go" /
     "map" / "struct" / "chan" / "else" / "goto" / "package" / "switch" / "const" /

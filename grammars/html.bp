@@ -6,19 +6,19 @@
 # full parse tree, and having one makes the task considerably more complicated.
 # See the accompanying README.md for more info.
 
-doctype: "<!DOCTYPE" ..`> %\n
+doctype: "<!DOCTYPE" ..%\n `>
 
 html-element: void-element / raw-element / template-element / normal-element
 
 void-element: `< ("area"/"base"/"br"/"col"/"embed"/"hr"/"img"/"input"/"link"/"meta"/"param"/"source"/"track"/"wbr") __attributes__ [`/] __ `>
 
-template-element: "<template>".."</template>" % (\n / comment / html-element)
+template-element: "<template>" ..%(\n / comment / html-element) "</template>"
 
-raw-element: `< @tag=("script"/"style"/"textarea"/"title") __attributes__ `>..("</"tag__`>)%\n
+raw-element: `< @tag=("script"/"style"/"textarea"/"title") __attributes__ `> ..%\n ("</"tag__`>)
 
-normal-element: `< @tag=id __attributes__ `>..("</"tag`>) % (\n / comment / html-element)
+normal-element: `< @tag=id __attributes__ `> ..%(\n / comment / html-element) ("</"tag`>)
 
-comment: "<!--" .."-->" % \n
+comment: "<!--" ..%\n "-->"
 
 attributes: *attribute%__
 attribute: (+id%`:)__`=__ (id / string)

@@ -6,8 +6,8 @@
 # full parse tree, and having one makes the task considerably more complicated.
 # See the accompanying README.md for more info.
 
-comment: "//" .. $ / "/*" .. "*/" % \n
-string: `"..`" % (`\.) / `'..`' % (`\.) / `/ .. `/ % (`\.)
+comment: "//" .. $ / "/*" ..%\n "*/"
+string: `" ..%(`\.) `" / `' ..%(`\.) `' / `/ ..%(`\.) `/
 keyword: |(
     "abstract" / "arguments" / "await" / "boolean" / "break" / "byte" / "case" /
     "catch" / "char" / "class" / "const" / "continue" / "debugger" / "default" /
@@ -21,4 +21,4 @@ keyword: |(
 )|
 function-def: |"function"| __ [id__] parens / (id / parens) __ "=>"
 function: function-def __ braces
-import: |"import"| ..(`; / $) % braces
+import: |"import"| ..%braces (`; / $)
