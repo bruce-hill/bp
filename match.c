@@ -207,7 +207,7 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
             m->end = str;
             return m;
         }
-        case BP_UPTO_AND: {
+        case BP_UPTO: {
             match_t *m = new_match();
             m->start = str;
             m->pat = pat;
@@ -225,8 +225,8 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
                 if (target) {
                     match_t *p = match(defs, f, str, target, ignorecase);
                     if (p != NULL) {
-                        ADD_OWNER(*dest, p);
-                        m->end = p->end;
+                        recycle_if_unused(&p);
+                        m->end = str;
                         return m;
                     }
                 } else if (str == f->end) {

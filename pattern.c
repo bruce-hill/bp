@@ -146,6 +146,19 @@ pat_t *chain_together(file_t *f, pat_t *first, pat_t *second)
     chain->end = second->end;
     chain->args.multiple.first = first;
     chain->args.multiple.second = second;
+
+    // If `first` is an UPTO operator (..) or contains one, then let it know
+    // that `second` is what it's up *to*.
+    for (pat_t *p = first; p; ) {
+        if (p->type == BP_UPTO) {
+            p->args.multiple.first = second;
+            break;
+        } else if (p->type == BP_CAPTURE) {
+            p = p->args.capture.capture_pat;
+        } else if (p->type == BP_EQUAL || p->type == BP_NOT_EQUAL) {
+            p = p->args.pat;
+        } else break;
+    }
     return chain;
 }
 
@@ -199,12 +212,8 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
         // Any char (dot)
         case '.': {
             if (*str == '.') { // ".."
-                pat_t *upto = new_pat(f, start, BP_UPTO_AND);
+                pat_t *upto = new_pat(f, start, BP_UPTO);
                 ++str;
-                pat_t *till = bp_simplepattern(f, str);
-                upto->args.multiple.first = till;
-                if (till)
-                    str = till->end;
                 if (matchchar(&str, '%')) {
                     pat_t *skip = bp_simplepattern(f, str);
                     if (!skip)

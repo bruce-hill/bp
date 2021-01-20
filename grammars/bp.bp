@@ -5,14 +5,14 @@
 # The grammar files provided with BP are not otherwise intended to be full
 # language grammars.
 
-Grammar: __ *(Def [__`;])%__ __ ($$ / @!=(..$$%\n => "Could not parse this code"))
+Grammar: __ *(Def [__`;])%__ __ ($$ / @!=(..%\n$$ => "Could not parse this code"))
 Def: @name=id __ `: __ (
       @definition=extended-pat
     / $$ @!=(''=>"No definition for rule")
-    / @!=(..>(`;/id_`:/$)%\n => "Invalid definition: @0"))
+    / @!=(..%\n>(`;/id_`:/$) => "Invalid definition: @0"))
 
 # This is used for command line arguments:
-String-pattern: ..$$ % (\n / Nodent / Escape / `\ pat [`;])
+String-pattern: ..%(\n / Nodent / Escape / `\ pat [`;])$$
 
 pat: simple-pat !(__("!="/"==")) / suffixed-pat
 simple-pat: Upto-and / Dot / String / Chars / Nodent / Escape-range
@@ -47,7 +47,7 @@ escape-sequence: (
     )
 No: `! (__@pat / @!=(''=>"Expected a pattern after the exclamation mark"))
 Nodent: `\ `N
-Upto-and: ".." [__@first=simple-pat] [__`%__@second=simple-pat]
+Upto-and: ".." [__`%__@second=simple-pat] [__@first=simple-pat] 
 Repeat: (
         @min=(''=>'0') (`*=>"-") @max=(''=>'∞')
       / @min=int __ `- __ @max=int

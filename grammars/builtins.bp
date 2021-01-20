@@ -11,11 +11,11 @@ utf8-codepoint: (
 )
 crlf: \r\n
 cr: \r
-anglebraces: `<..`> % (\n/anglebraces/string)
-brackets: `[..`] % (\n/brackets/string)
-braces: `{..`} % (\n/braces/string)
-parens: `(..`) % (\n/parens/string)
-string: `"..`" % (`\.) / `'..`' % (`\.)
+anglebraces: `< ..%(\n/anglebraces/string) `>
+brackets: `[ ..%(\n/brackets/string) `]
+braces: `{ ..%(\n/braces/string) `}
+parens: `( ..%(\n/parens/string) `)
+string: `" ..%(`\.) `" / `' ..%(`\.) `'
 id: !<`a-z,A-Z,_,0-9 (`a-z,A-Z,_ *`a-z,A-Z,_,0-9)!=keyword |
 id-char: `a-z,A-Z,_,0-9
 |: !<`a-z,A-Z,_,0-9 / !`a-z,A-Z,_,0-9 

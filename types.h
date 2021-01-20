@@ -15,7 +15,7 @@ enum pattype_e {
     BP_STRING,
     BP_RANGE,
     BP_NOT,
-    BP_UPTO_AND,
+    BP_UPTO,
     BP_REPEAT,
     BP_BEFORE,
     BP_AFTER,
