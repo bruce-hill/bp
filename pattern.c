@@ -120,14 +120,7 @@ static pat_t *expand_choices(file_t *f, pat_t *first)
     if (!second)
         file_err(f, str, str, "There should be a pattern here after a '/'");
     second = expand_choices(f, second);
-    pat_t *choice = new_pat(f, first->start, BP_OTHERWISE);
-    if (first->len == second->len)
-        choice->len = first->len;
-    else choice->len = -1;
-    choice->end = second->end;
-    choice->args.multiple.first = first;
-    choice->args.multiple.second = second;
-    return choice;
+    return either_pat(f, first, second);
 }
 
 //
@@ -139,7 +132,6 @@ pat_t *chain_together(file_t *f, pat_t *first, pat_t *second)
     if (first == NULL) return second;
     if (second == NULL) return first;
     pat_t *chain = new_pat(f, first->start, BP_CHAIN);
-    chain->start = first->start;
     if (first->len >= 0 && second->len >= 0)
         chain->len = first->len + second->len;
     else chain->len = -1;
@@ -160,6 +152,24 @@ pat_t *chain_together(file_t *f, pat_t *first, pat_t *second)
         } else break;
     }
     return chain;
+}
+
+//
+// Given two patterns, return a new pattern for matching either the first
+// pattern or the second. If either pattern is NULL, return the other.
+//
+pat_t *either_pat(file_t *f, pat_t *first, pat_t *second)
+{
+    if (first == NULL) return second;
+    if (second == NULL) return first;
+    pat_t *either = new_pat(f, first->start, BP_OTHERWISE);
+    if (first->len == second->len)
+        either->len = first->len;
+    else either->len = -1;
+    either->end = second->end;
+    either->args.multiple.first = first;
+    either->args.multiple.second = second;
+    return either;
 }
 
 //
@@ -262,17 +272,7 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
 
                 pat->len = 1;
                 pat->end = str;
-
-                if (all == NULL) {
-                    all = pat;
-                } else {
-                    pat_t *either = new_pat(f, all->start, BP_OTHERWISE);
-                    either->end = pat->end;
-                    either->args.multiple.first = all;
-                    either->args.multiple.second = pat;
-                    either->len = 1;
-                    all = either;
-                }
+                all = either_pat(f, all, pat);
                 pat = NULL;
             } while (matchchar(&str, ','));
 

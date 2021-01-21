@@ -128,7 +128,7 @@ static const char *match_backref(const char *str, match_t *cap, bool ignorecase)
 //
 // Find the next match after prev (or the first match if prev is NULL)
 //
-match_t *next_match(def_t *defs, file_t *f, match_t *prev, pat_t *pat, bool ignorecase)
+match_t *next_match(def_t *defs, file_t *f, match_t *prev, pat_t *pat, pat_t *skip, bool ignorecase)
 {
     const char *str;
     if (prev) {
@@ -137,9 +137,14 @@ match_t *next_match(def_t *defs, file_t *f, match_t *prev, pat_t *pat, bool igno
     } else {
         str = f->contents;
     }
-    for (; str < f->end; ++str) {
+    while (str < f->end) {
         match_t *m = match(defs, f, str, pat, ignorecase);
         if (m) return m;
+        match_t *s;
+        if (skip && (s = match(defs, f, str, skip, ignorecase))) {
+            str = s->end > str ? s->end : str + 1;
+            recycle_if_unused(&s);
+        } else ++str;
     }
     return NULL;
 }

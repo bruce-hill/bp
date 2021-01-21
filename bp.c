@@ -45,6 +45,7 @@ static const char *usage = (
     " -l --list-files                  list filenames only\n"
     " -p --pattern <pat>               provide a pattern (equivalent to bp '\\(<pat>)')\n"
     " -r --replace <replacement>       replace the input pattern with the given replacement\n"
+    " -s --skip <skip pattern>         skip over the given pattern when looking for matches\n"
     " -c --context <context>           set number of lines of context to print (all: the whole file, 0: only the match, 1: the line, N: N lines of context)\n"
     " -g --grammar <grammar file>      use the specified file as a grammar\n");
 
@@ -60,6 +61,7 @@ static bool print_line_numbers = false;
 static bool ignorecase = false;
 static bool verbose = false;
 static bool git_mode = false;
+static pat_t *skip = NULL;
 typedef enum { CONFIRM_ASK, CONFIRM_ALL, CONFIRM_NONE } confirm_t;
 static confirm_t confirm = CONFIRM_ALL;
 static enum {
@@ -154,7 +156,7 @@ static int is_text_file(const char *filename)
 static int print_matches_as_json(def_t *defs, file_t *f, pat_t *pattern)
 {
     int matches = 0;
-    for (match_t *m = NULL; (m = next_match(defs, f, m, pattern, ignorecase)); ) {
+    for (match_t *m = NULL; (m = next_match(defs, f, m, pattern, skip, ignorecase)); ) {
         if (++matches > 1)
             printf(",\n");
         printf("{\"filename\":\"%s\",", f->filename);
@@ -172,7 +174,7 @@ static int print_matches_as_json(def_t *defs, file_t *f, pat_t *pattern)
 static int explain_matches(def_t *defs, file_t *f, pat_t *pattern)
 {
     int matches = 0;
-    for (match_t *m = NULL; (m = next_match(defs, f, m, pattern, ignorecase)); ) {
+    for (match_t *m = NULL; (m = next_match(defs, f, m, pattern, skip, ignorecase)); ) {
         if (++matches == 1) {
             fprint_filename(stdout, f->filename);
         } else {
@@ -278,7 +280,7 @@ static int inplace_modify_file(def_t *defs, file_t *f, pat_t *pattern)
     FILE *inplace_file = NULL; // Lazy-open this on the first match
     int matches = 0;
     confirm_t confirm_file = confirm;
-    for (match_t *m = NULL; (m = next_match(defs, f, m, pattern, ignorecase)); ) {
+    for (match_t *m = NULL; (m = next_match(defs, f, m, pattern, skip, ignorecase)); ) {
         ++matches;
         printer_t err_pr = {.file = f, .context_lines = true, .use_color = true, .print_line_numbers = true};
         if (print_errors(&err_pr, m) > 0)
@@ -331,7 +333,7 @@ static int print_matches(def_t *defs, file_t *f, pat_t *pattern)
     };
 
     confirm_t confirm_file = confirm;
-    for (match_t *m = NULL; (m = next_match(defs, f, m, pattern, ignorecase)); ) {
+    for (match_t *m = NULL; (m = next_match(defs, f, m, pattern, skip, ignorecase)); ) {
         printer_t err_pr = {.file = f, .context_lines = true, .use_color = true, .print_line_numbers = true};
         if (print_errors(&err_pr, m) > 0)
             exit(EXIT_FAILURE);
@@ -369,7 +371,7 @@ static int process_file(def_t *defs, const char *filename, pat_t *pattern)
     if (mode == MODE_EXPLAIN) {
         matches += explain_matches(defs, f, pattern);
     } else if (mode == MODE_LISTFILES) {
-        match_t *m = next_match(defs, f, NULL, pattern, ignorecase);
+        match_t *m = next_match(defs, f, NULL, pattern, skip, ignorecase);
         if (m) {
             recycle_if_unused(&m);
             printf("%s\n", f->filename);
@@ -497,6 +499,17 @@ int main(int argc, char *argv[])
                     str = after_spaces(p->end);
                 }
             }
+        } else if (FLAG("-s")     || FLAG("--skip")) {
+            file_t *arg_file = spoof_file(&loaded_files, "<skip argument>", flag);
+            pat_t *s = bp_pattern(arg_file, arg_file->contents);
+            if (!s) {
+                fprint_line(stdout, arg_file, arg_file->contents, arg_file->end,
+                            "Failed to compile the skip argument");
+            } else if (after_spaces(s->end) < arg_file->end) {
+                fprint_line(stdout, arg_file, s->end, arg_file->end,
+                            "Failed to compile part of the skip argument");
+            }
+            skip = either_pat(arg_file, skip, s);
         } else if (FLAG("-c")     || FLAG("--context")) {
             if (streq(flag, "all"))
                 context_lines = ALL_CONTEXT;

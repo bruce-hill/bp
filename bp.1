@@ -15,6 +15,7 @@ bp \- Bruce's Parsing Expression Grammar tool
 [\fI-C\fR|\fI--confirm\fR]
 [\fI-p\fR|\fI--pattern\fR \fI<pattern>\fR]
 [\fI-r\fR|\fI--replace\fR \fI<replacement>\fR]
+[\fI-s\fR|\fI--skip\fR \fI<skip pattern>\fR]
 [\fI-g\fR|\fI--grammar\fR \fI<grammar file>\fR]
 [\fI-G\fR|\fI--git\fR]
 [\fI-c\fR|\fI--conntext\fR \fI<N>\fR]
@@ -46,6 +47,11 @@ During in-place modification of a file, confirm before each modification.
 
 .B \-r\fR, \fB--replace \fI<replacement>\fR
 Replace all occurrences of the main pattern with the given string.
+
+.B \-s\fR, \fB--skip \fI<skip pattern>\fR
+While looking for matches, skip over \fB<skip pattern>\fR occurrences. This can
+be useful for behavior like \fBbp -s string\fR (avoiding matches inside string
+literals).
 
 .B \-g\fR, \fB--grammar \fI<grammar file>\fR
 Load the grammar from the given file.

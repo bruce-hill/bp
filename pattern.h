@@ -15,6 +15,8 @@ __attribute__((nonnull(1,2)))
 pat_t *bp_replacement(file_t *f, pat_t *replacepat, const char *replacement);
 __attribute__((nonnull(1)))
 pat_t *chain_together(file_t *f, pat_t *first, pat_t *second);
+__attribute__((nonnull(1)))
+pat_t *either_pat(file_t *f, pat_t *first, pat_t *second);
 __attribute__((nonnull))
 pat_t *bp_pattern(file_t *f, const char *str);
 __attribute__((nonnull))
