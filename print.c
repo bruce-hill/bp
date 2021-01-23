@@ -307,6 +307,24 @@ static void _print_match(FILE *out, printer_t *pr, match_t *m)
 
             if (*r == '\\') {
                 ++r;
+                if (*r == 'N') { // \N (nodent)
+                    ++r;
+                    // Mildly hacky: nodents here are based on the *first line*
+                    // of the match. If the match spans multiple lines, or if
+                    // the replacement text contains newlines, this may get weird.
+                    const char *line_start = get_line(
+                        pr->file, get_line_number(pr->file, m->start));
+                    char denter = *line_start;
+                    fputc('\n', out);
+                    ++line;
+                    pr->needs_line_number = 1;
+                    print_line_number(out, pr, 0, pr->use_color ? color_replace : NULL);
+                    if (denter == ' ' || denter == '\t') {
+                        for (const char *p = line_start; *p == denter && p < m->start; ++p)
+                            fputc(denter, out);
+                    }
+                    continue;
+                }
                 char c = unescapechar(r, &r);
                 (void)fputc(c, out);
                 if (c == '\n') {
