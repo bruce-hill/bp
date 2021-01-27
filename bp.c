@@ -429,6 +429,54 @@ static int process_dir(def_t *defs, const char *dirname, pat_t *pattern)
     return matches;
 }
 
+//
+// Process git files using `git ls-files ...`
+//
+__attribute__((nonnull(2)))
+static int process_git_files(def_t *defs, pat_t *pattern, int argc, char *argv[])
+{
+    int fds[2];
+    if (pipe(fds) != 0)
+        err(EXIT_FAILURE, "Failed to create pipe");
+    pid_t child = fork();
+    if (child == -1)
+        err(EXIT_FAILURE, "Failed to fork");
+    if (child == 0) {
+        char **git_args = memcheck(calloc((size_t)(2+argc+1), sizeof(char*)));
+        int g = 0;
+        git_args[g++] = "git";
+        git_args[g++] = "ls-files";
+        while (*argv) git_args[g++] = *(argv++);
+        if (dup2(fds[STDOUT_FILENO], STDOUT_FILENO) != STDOUT_FILENO)
+            err(EXIT_FAILURE, "Failed to hook up pipe to stdout");
+        if (close(fds[STDIN_FILENO]) != 0)
+            err(EXIT_FAILURE, "Failed to close read end of pipe");
+        (void)execvp("git", git_args);
+        _exit(EXIT_FAILURE);
+    }
+    if (close(fds[STDOUT_FILENO]) != 0)
+        err(EXIT_FAILURE, "Failed to close write end of pipe");
+    FILE *fp = fdopen(fds[STDIN_FILENO], "r");
+    if (fp == NULL)
+        err(EXIT_FAILURE, "Could not open file descriptor");
+    char *path = NULL;
+    size_t size = 0;
+    ssize_t len = 0;
+    int found = 0;
+    while ((len = getline(&path, &size, fp)) > 0) {
+        if (path[len-1] == '\n') path[len-1] = '\0';
+        found += process_file(defs, path, pattern);
+    }
+    if (path) xfree(&path);
+    if (fclose(fp) != 0)
+        err(EXIT_FAILURE, "Failed to close read end of pipe");
+    int status;
+    while (waitpid(child, &status, 0) != child) continue;
+    if (!((WIFEXITED(status) == 1) && (WEXITSTATUS(status) == 0)))
+        errx(EXIT_FAILURE, "`git --ls-files` failed. Do you have git installed?");
+    return found;
+}
+
 #define FLAG(f) (flag=getflag((f), argv, &argi))
 #define BOOLFLAG(f) (boolflag((f), argv, &argi))
 
@@ -603,44 +651,7 @@ int main(int argc, char *argv[])
     int found = 0;
     if (mode == MODE_JSON) printf("[");
     if (git_mode) { // Get the list of files from `git --ls-files ...`
-        int fds[2];
-        if (pipe(fds) != 0)
-            err(EXIT_FAILURE, "Failed to create pipe");
-        pid_t child = fork();
-        if (child == -1)
-            err(EXIT_FAILURE, "Failed to fork");
-        if (child == 0) {
-            char **git_args = memcheck(calloc((size_t)(2+(argc-argi)+1), sizeof(char*)));
-            int g = 0;
-            git_args[g++] = "git";
-            git_args[g++] = "ls-files";
-            while (argi < argc) git_args[g++] = argv[argi++];
-            if (dup2(fds[STDOUT_FILENO], STDOUT_FILENO) != STDOUT_FILENO)
-                err(EXIT_FAILURE, "Failed to hook up pipe to stdout");
-            if (close(fds[STDIN_FILENO]) != 0)
-                err(EXIT_FAILURE, "Failed to close read end of pipe");
-            (void)execvp("git", git_args);
-            _exit(EXIT_FAILURE);
-        }
-        if (close(fds[STDOUT_FILENO]) != 0)
-            err(EXIT_FAILURE, "Failed to close write end of pipe");
-        FILE *fp = fdopen(fds[STDIN_FILENO], "r");
-        if (fp == NULL)
-            err(EXIT_FAILURE, "Could not open file descriptor");
-        char *path = NULL;
-        size_t size = 0;
-        ssize_t len = 0;
-        while ((len = getline(&path, &size, fp)) > 0) {
-            if (path[len-1] == '\n') path[len-1] = '\0';
-            found += process_file(defs, path, pattern);
-        }
-        if (path) xfree(&path);
-        if (fclose(fp) != 0)
-            err(EXIT_FAILURE, "Failed to close read end of pipe");
-        int status;
-        while (waitpid(child, &status, 0) != child) continue;
-        if (!((WIFEXITED(status) == 1) && (WEXITSTATUS(status) == 0)))
-            errx(EXIT_FAILURE, "`git --ls-files` failed. Do you have git installed?");
+        found = process_git_files(defs, pattern, (argc-argi), &argv[argi]);
     } else if (argi < argc) {
         // Files pass in as command line args:
         struct stat statbuf;
