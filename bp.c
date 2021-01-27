@@ -453,7 +453,7 @@ int main(int argc, char *argv[])
             break;
         } else if (BOOLFLAG("-h") || BOOLFLAG("--help")) {
             printf("%s\n", usage);
-            return EXIT_SUCCESS;
+            exit(EXIT_SUCCESS);
         } else if (BOOLFLAG("-v") || BOOLFLAG("--verbose")) {
             verbose = true;
         } else if (BOOLFLAG("-e") || BOOLFLAG("--explain")) {
@@ -675,7 +675,7 @@ int main(int argc, char *argv[])
     free_all_matches();
 #endif
 
-    return (found > 0) ? EXIT_SUCCESS : EXIT_FAILURE;
+    exit(found > 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 }
 
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1
