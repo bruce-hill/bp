@@ -453,7 +453,7 @@ int main(int argc, char *argv[])
             break;
         } else if (BOOLFLAG("-h") || BOOLFLAG("--help")) {
             printf("%s\n", usage);
-            return 0;
+            return EXIT_SUCCESS;
         } else if (BOOLFLAG("-v") || BOOLFLAG("--verbose")) {
             verbose = true;
         } else if (BOOLFLAG("-e") || BOOLFLAG("--explain")) {
@@ -499,11 +499,9 @@ int main(int argc, char *argv[])
                     str = after_spaces(d->pat->end);
                 } else {
                     pat_t *p = bp_pattern(arg_file, str);
-                    if (!p) {
-                        fprint_line(stdout, arg_file, str, arg_file->end,
-                                    "Failed to compile this part of the argument");
-                        return 1;
-                    }
+                    if (!p)
+                        file_err(arg_file, str, arg_file->end,
+                                 "Failed to compile this part of the argument");
                     pattern = chain_together(arg_file, pattern, p);
                     str = after_spaces(p->end);
                 }
@@ -527,8 +525,7 @@ int main(int argc, char *argv[])
             else
                 context_lines = (int)strtol(flag, NULL, 10);
         } else if (argv[argi][0] == '-' && argv[argi][1] && argv[argi][1] != '-') { // single-char flags
-            printf("Unrecognized flag: -%c\n\n%s\n", argv[argi][1], usage);
-            return 1;
+            errx(EXIT_FAILURE, "Unrecognized flag: -%c\n\n%s", argv[argi][1], usage);
         } else if (argv[argi][0] != '-') {
             if (pattern != NULL) break;
             file_t *arg_file = spoof_file(&loaded_files, "<pattern argument>", argv[argi]);
@@ -537,8 +534,7 @@ int main(int argc, char *argv[])
                 errx(EXIT_FAILURE, "Pattern failed to compile: %s", argv[argi]);
             pattern = chain_together(arg_file, pattern, p);
         } else {
-            printf("Unrecognized flag: %s\n\n%s\n", argv[argi], usage);
-            return 1;
+            errx(EXIT_FAILURE, "Unrecognized flag: %s\n\n%s", argv[argi], usage);
         }
     }
 
@@ -584,11 +580,9 @@ int main(int argc, char *argv[])
                 str = after_spaces(d->pat->end);
             } else {
                 pat_t *p = bp_pattern(arg_file, str);
-                if (!p) {
-                    fprint_line(stdout, arg_file, str, arg_file->end,
-                                "Failed to compile this part of the argument");
-                    return 1;
-                }
+                if (!p)
+                    file_err(arg_file, str, arg_file->end,
+                             "Failed to compile this part of the argument");
                 pattern = chain_together(arg_file, pattern, p);
                 str = after_spaces(p->end);
             }
