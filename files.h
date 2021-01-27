@@ -6,6 +6,9 @@
 
 #include <stdbool.h>
 #include <stdio.h>
+#include <unistd.h>
+
+#define file_err(f, ...) do { fprint_line(stderr, f, __VA_ARGS__); exit(EXIT_FAILURE); } while(false)
 
 struct allocated_pat_s; // declared in types.h
 

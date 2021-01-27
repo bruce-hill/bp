@@ -10,10 +10,9 @@
 #include <unistd.h>
 
 #include "definitions.h"
+#include "files.h"
 #include "pattern.h"
 #include "utils.h"
-
-#define file_err(f, ...) do { fprint_line(stderr, f, __VA_ARGS__); exit(EXIT_FAILURE); } while(false)
 
 __attribute__((nonnull))
 static pat_t *expand_chain(file_t *f, pat_t *first);

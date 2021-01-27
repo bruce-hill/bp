@@ -35,10 +35,8 @@ def_t *load_grammar(def_t *defs, file_t *f)
     while (src < f->end) {
         const char *name = src;
         src = after_name(name);
-        if (src <= name) {
-            fprint_line(stdout, f, name, src, "Invalid name for definition: %s", name);
-            exit(EXIT_FAILURE);
-        }
+        if (src <= name)
+            file_err(f, name, src, "Invalid name for definition: %s", name);
         size_t namelen = (size_t)(src - name);
         if (!matchchar(&src, ':'))
             errx(EXIT_FAILURE, "Expected ':' in definition");
@@ -50,10 +48,8 @@ def_t *load_grammar(def_t *defs, file_t *f)
         if (matchchar(&src, ';'))
             src = after_spaces(src);
     }
-    if (src < f->end) {
-        fprint_line(stderr, f, src, NULL, "Invalid BP pattern");
-        exit(EXIT_FAILURE);
-    }
+    if (src < f->end)
+        file_err(f, src, NULL, "Invalid BP pattern");
     return defs;
 }
 
