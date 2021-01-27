@@ -41,14 +41,14 @@ splint:
 #		$(CFILES) bp.c
 
 install: $(NAME)
-	mkdir -p -m 755 "$(PREFIX)/share/man/man1" "$(PREFIX)/bin" "$(SYSCONFDIR)/xdg/$(NAME)"
+	mkdir -p -m 755 "$(PREFIX)/man/man1" "$(PREFIX)/bin" "$(SYSCONFDIR)/xdg/$(NAME)"
 	cp -r grammars/* "$(SYSCONFDIR)/xdg/$(NAME)/"
-	cp bp.1 "$(PREFIX)/share/man/man1/$(NAME).1"
+	cp bp.1 "$(PREFIX)/man/man1/$(NAME).1"
 	rm -f "$(PREFIX)/bin/$(NAME)"
 	cp $(NAME) "$(PREFIX)/bin/"
 
 uninstall:
-	rm -rf "$(PREFIX)/bin/$(NAME)" "$(PREFIX)/share/man/man1/$(NAME).1" "$(SYSCONFDIR)/xdg/$(NAME)"
+	rm -rf "$(PREFIX)/bin/$(NAME)" "$(PREFIX)/man/man1/$(NAME).1" "$(SYSCONFDIR)/xdg/$(NAME)"
 	@if [ -d ~/.config/$(NAME) ]; then \
 	  printf 'Config files exist in ~/.config/$(NAME) Do you want to delete them? [Y/n] '; \
 	  read confirm; \
