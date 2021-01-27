@@ -3,6 +3,7 @@
 //
 
 #include <ctype.h>
+#include <err.h>
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
@@ -180,7 +181,8 @@ static pat_t *bp_simplepattern(file_t *f, const char *str)
     pat_t *pat = _bp_simplepattern(f, str);
     if (pat == NULL) return pat;
 
-    check(pat->end != NULL, "pat->end is uninitialized!");
+    if (pat->end == NULL)
+        errx(EXIT_FAILURE, "pat->end is uninitialized!");
 
     // Expand postfix operators (if any)
     str = after_spaces(pat->end);
@@ -503,7 +505,8 @@ pat_t *bp_stringpattern(file_t *f, const char *str)
                 // etc.) or \\, then check for an interpolated value:
                 if (e != str[1] || e == '\\' || e == 'N') {
                     interp = bp_simplepattern(f, str);
-                    check(interp, "Failed to match pattern %.*s", 2, str);
+                    if (!interp)
+                        errx(EXIT_FAILURE, "Failed to match pattern %.*s", 2, str);
                     break;
                 } else {
                     interp = bp_simplepattern(f, str + 1);

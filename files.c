@@ -3,6 +3,7 @@
 //
 
 #include <ctype.h>
+#include <err.h>
 #include <fcntl.h>
 #include <limits.h>
 #include <stdarg.h>
@@ -51,8 +52,8 @@ file_t *load_filef(file_t **files, const char *fmt, ...)
     char filename[PATH_MAX+1] = {'\0'};
     va_list args;
     va_start(args, fmt);
-    check(vsnprintf(filename, PATH_MAX, fmt, args) <= (int)PATH_MAX,
-          "File name is too large");
+    if (vsnprintf(filename, PATH_MAX, fmt, args) > (int)PATH_MAX)
+        errx(EXIT_FAILURE, "File name is too large");
     va_end(args);
     return load_file(files, filename);
 }
@@ -93,7 +94,10 @@ file_t *load_file(file_t **files, const char *filename)
     }
 
   finished_loading:
-    if (fd != STDIN_FILENO) check(close(fd) == 0, "Failed to close file");
+    if (fd != STDIN_FILENO) {
+        if (close(fd) != 0)
+            err(EXIT_FAILURE, "Failed to close file");
+    }
     f->end = &f->contents[length];
     populate_lines(f);
     if (files != NULL) {
@@ -137,8 +141,8 @@ void destroy_file(file_t **f)
 
     if ((*f)->contents) {
         if ((*f)->mmapped) {
-            check(munmap((*f)->contents, (size_t)((*f)->end - (*f)->contents)) == 0,
-                  "Failure to un-memory-map some memory");
+            if (munmap((*f)->contents, (size_t)((*f)->end - (*f)->contents)) != 0)
+                err(EXIT_FAILURE, "Failure to un-memory-map some memory");
             (*f)->contents = NULL;
         } else {
             xfree(&((*f)->contents));

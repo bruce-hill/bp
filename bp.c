@@ -4,6 +4,7 @@
 // See `man ./bp.1` for more details
 //
 
+#include <err.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <glob.h>
@@ -96,12 +97,14 @@ __attribute__((nonnull))
 static char *getflag(const char *flag, char *argv[], int *i)
 {
     size_t n = strlen(flag);
-    check(argv[*i], "Attempt to get flag from NULL argument");
+    if (!argv[*i])
+        errx(EXIT_FAILURE, "Attempt to get flag from NULL argument");
     if (strncmp(argv[*i], flag, n) == 0) {
         if (argv[*i][n] == '=') {
             return &argv[*i][n+1];
         } else if (argv[*i][n] == '\0') {
-            check(argv[*i+1], "Expected argument after '%s'\n\n%s", flag, usage);
+            if (!argv[*i+1])
+                errx(EXIT_FAILURE, "Expected argument after '%s'\n\n%s", flag, usage);
             ++(*i);
             return argv[*i];
         }
@@ -116,7 +119,8 @@ static char *getflag(const char *flag, char *argv[], int *i)
 __attribute__((nonnull))
 static int boolflag(const char *flag, char *argv[], int *i)
 {
-    check(argv[*i], "Attempt to get flag from NULL argument");
+    if (!argv[*i])
+        errx(EXIT_FAILURE, "Attempt to get flag from NULL argument");
     if (streq(argv[*i], flag)) return 1;
     if (flag[0] == '-' && flag[1] != '-' && flag[2] == '\0' && argv[*i][0] == '-' && argv[*i][1] != '-') {
         char *p = strchr(argv[*i], flag[1]);
@@ -287,10 +291,11 @@ static int inplace_modify_file(def_t *defs, file_t *f, pat_t *pattern)
             exit(EXIT_FAILURE);
         // Lazy-open file for writing upon first match:
         if (inplace_file == NULL) {
-            check(snprintf(tmp_filename, PATH_MAX, "%s.tmp.XXXXXX", f->filename) <= (int)PATH_MAX,
-                "Failed to build temporary file template");
+            if (snprintf(tmp_filename, PATH_MAX, "%s.tmp.XXXXXX", f->filename) > (int)PATH_MAX)
+                errx(EXIT_FAILURE, "Failed to build temporary file template");
             int out_fd = mkstemp(tmp_filename);
-            check(out_fd >= 0, "Failed to create temporary inplace file");
+            if (out_fd < 0)
+                err(EXIT_FAILURE, "Failed to create temporary inplace file");
             in_use_tempfile = tmp_filename;
             inplace_file = fdopen(out_fd, "w");
             if (confirm == CONFIRM_ASK && f->filename)
@@ -309,8 +314,8 @@ static int inplace_modify_file(def_t *defs, file_t *f, pat_t *pattern)
 
         // TODO: if I want to implement backup files then add a line like this:
         // if (backup) rename(f->filename, f->filename + ".bak");
-        check(rename(tmp_filename, f->filename) == 0,
-              "Failed to write file replacement for %s", f->filename);
+        if (rename(tmp_filename, f->filename) != 0)
+            err(EXIT_FAILURE, "Failed to write file replacement for %s", f->filename);
 
         in_use_tempfile = NULL;
     }
@@ -386,7 +391,8 @@ static int process_file(def_t *defs, const char *filename, pat_t *pattern)
     }
 
 #ifdef DEBUG_HEAP
-    check(recycle_all_matches() == 0, "Memory leak: there should no longer be any matches in use at this point.");
+    if (recycle_all_matches() != 0)
+        errx("Memory leak: there should no longer be any matches in use at this point.");
 #endif
     destroy_file(&f);
     (void)fflush(stdout);
@@ -402,11 +408,11 @@ static int process_dir(def_t *defs, const char *dirname, pat_t *pattern)
     int matches = 0;
     glob_t globbuf;
     char globpath[PATH_MAX+1] = {'\0'};
-    check(snprintf(globpath, PATH_MAX, "%s/*", dirname) <= (int)PATH_MAX,
-          "Filename is too long: %s/*", dirname);
+    if (snprintf(globpath, PATH_MAX, "%s/*", dirname) > (int)PATH_MAX)
+        errx(EXIT_FAILURE, "Filename is too long: %s/*", dirname);
     int status = glob(globpath, 0, NULL, &globbuf);
-    check(status != GLOB_ABORTED && status != GLOB_NOSPACE,
-          "Failed to get directory contents: %s", dirname);
+    if (status == GLOB_ABORTED || status == GLOB_NOSPACE)
+        err(EXIT_FAILURE, "Failed to get directory contents: %s", dirname);
     if (status != GLOB_NOMATCH) {
         struct stat statbuf;
         for (size_t i = 0; i < globbuf.gl_pathc; i++) {
@@ -465,12 +471,14 @@ int main(int argc, char *argv[])
         } else if (BOOLFLAG("-l") || BOOLFLAG("--list-files")) {
             mode = MODE_LISTFILES;
         } else if (FLAG("-r")     || FLAG("--replace")) {
-            check(pattern, "No pattern has been defined for replacement to operate on");
+            if (!pattern)
+                errx(EXIT_FAILURE, "No pattern has been defined for replacement to operate on");
             // TODO: spoof file as sprintf("pattern => '%s'", flag)
             // except that would require handling edge cases like quotation marks etc.
             file_t *replace_file = spoof_file(&loaded_files, "<replace argument>", flag);
             pattern = bp_replacement(replace_file, pattern, replace_file->contents);
-            check(pattern, "Replacement failed to compile: %s", flag);
+            if (!pattern)
+                errx(EXIT_FAILURE, "Replacement failed to compile: %s", flag);
         } else if (FLAG("-g")     || FLAG("--grammar")) {
             file_t *f = NULL;
             if (strlen(flag) > 3 && strncmp(&flag[strlen(flag)-3], ".bp", 3) == 0)
@@ -479,7 +487,8 @@ int main(int argc, char *argv[])
                 f = load_filef(&loaded_files, "%s/.config/"BP_NAME"/%s.bp", getenv("HOME"), flag);
             if (f == NULL)
                 f = load_filef(&loaded_files, "/etc/xdg/"BP_NAME"/%s.bp", flag);
-            check(f != NULL, "Couldn't find grammar: %s", flag);
+            if (f == NULL)
+                errx(EXIT_FAILURE, "Couldn't find grammar: %s", flag);
             defs = load_grammar(defs, f); // Keep in memory for debug output
         } else if (FLAG("-p")     || FLAG("--pattern")) {
             file_t *arg_file = spoof_file(&loaded_files, "<pattern argument>", flag);
@@ -524,7 +533,8 @@ int main(int argc, char *argv[])
             if (pattern != NULL) break;
             file_t *arg_file = spoof_file(&loaded_files, "<pattern argument>", argv[argi]);
             pat_t *p = bp_stringpattern(arg_file, arg_file->contents);
-            check(p, "Pattern failed to compile: %s", argv[argi]);
+            if (!p)
+                errx(EXIT_FAILURE, "Pattern failed to compile: %s", argv[argi]);
             pattern = chain_together(arg_file, pattern, p);
         } else {
             printf("Unrecognized flag: %s\n\n%s\n", argv[argi], usage);
@@ -545,10 +555,12 @@ int main(int argc, char *argv[])
     int signals[] = {SIGTERM, SIGINT, SIGXCPU, SIGXFSZ, SIGVTALRM, SIGPROF, SIGSEGV, SIGTSTP};
     struct sigaction sa = {.sa_handler = &sig_handler, .sa_flags = (int)(SA_NODEFER | SA_RESETHAND)};
     for (size_t i = 0; i < sizeof(signals)/sizeof(signals[0]); i++)
-        check(sigaction(signals[i], &sa, NULL) == 0, "Failed to set signal handler");
+        if (sigaction(signals[i], &sa, NULL) != 0)
+            err(EXIT_FAILURE, "Failed to set signal handler");
 
     // Handle exit() calls gracefully:
-    check(atexit(&cleanup) == 0, "Failed to set cleanup handler at exit");
+    if (atexit(&cleanup) != 0)
+        err(EXIT_FAILURE, "Failed to set cleanup handler at exit");
 
     // User input/output is handled through /dev/tty so that normal unix pipes
     // can work properly while simultaneously asking for user input.
@@ -562,7 +574,8 @@ int main(int argc, char *argv[])
         (void)fflush(tty_out);
         char *patstr = NULL;
         size_t len = 0;
-        check(getline(&patstr, &len, tty_in) > 0, "No pattern provided");
+        if (getline(&patstr, &len, tty_in) <= 0)
+            err(EXIT_FAILURE, "No pattern provided");
         file_t *arg_file = spoof_file(&loaded_files, "<pattern argument>", patstr);
         for (const char *str = arg_file->contents; str < arg_file->end; ) {
             def_t *d = bp_definition(defs, arg_file, str);
@@ -583,7 +596,8 @@ int main(int argc, char *argv[])
         free(patstr);
     }
 
-    check(pattern != NULL, "No pattern was given");
+    if (pattern == NULL)
+        errx(EXIT_FAILURE, "No pattern was given");
 
     // To ensure recursion (and left recursion in particular) works properly,
     // we need to define a rule called "pattern" with the value of whatever
@@ -596,24 +610,29 @@ int main(int argc, char *argv[])
     if (mode == MODE_JSON) printf("[");
     if (git_mode) { // Get the list of files from `git --ls-files ...`
         int fds[2];
-        check(pipe(fds) == 0, "Failed to create pipe");
+        if (pipe(fds) != 0)
+            err(EXIT_FAILURE, "Failed to create pipe");
         pid_t child = fork();
-        check(child != -1, "Failed to fork");
+        if (child == -1)
+            err(EXIT_FAILURE, "Failed to fork");
         if (child == 0) {
             char **git_args = memcheck(calloc((size_t)(2+(argc-argi)+1), sizeof(char*)));
             int g = 0;
             git_args[g++] = "git";
             git_args[g++] = "ls-files";
             while (argi < argc) git_args[g++] = argv[argi++];
-            check(dup2(fds[STDOUT_FILENO], STDOUT_FILENO) == STDOUT_FILENO,
-                  "Failed to hook up pipe to stdout");
-            check(close(fds[STDIN_FILENO]) == 0, "Failed to close read end of pipe");
+            if (dup2(fds[STDOUT_FILENO], STDOUT_FILENO) != STDOUT_FILENO)
+                err(EXIT_FAILURE, "Failed to hook up pipe to stdout");
+            if (close(fds[STDIN_FILENO]) != 0)
+                err(EXIT_FAILURE, "Failed to close read end of pipe");
             (void)execvp("git", git_args);
             _exit(EXIT_FAILURE);
         }
-        check(close(fds[STDOUT_FILENO]) == 0, "Failed to close write end of pipe");
+        if (close(fds[STDOUT_FILENO]) != 0)
+            err(EXIT_FAILURE, "Failed to close write end of pipe");
         FILE *fp = fdopen(fds[STDIN_FILENO], "r");
-        check(fp != NULL, "Could not open file descriptor");
+        if (fp == NULL)
+            err(EXIT_FAILURE, "Could not open file descriptor");
         char *path = NULL;
         size_t size = 0;
         ssize_t len = 0;
@@ -622,11 +641,12 @@ int main(int argc, char *argv[])
             found += process_file(defs, path, pattern);
         }
         if (path) xfree(&path);
-        check(fclose(fp) == 0, "Failed to close read end of pipe");
+        if (fclose(fp) != 0)
+            err(EXIT_FAILURE, "Failed to close read end of pipe");
         int status;
         while (waitpid(child, &status, 0) != child) continue;
-        check((WIFEXITED(status) == 1) && (WEXITSTATUS(status) == 0),
-              "`git --ls-files` failed. Do you have git installed?");
+        if (!((WIFEXITED(status) == 1) && (WEXITSTATUS(status) == 0)))
+            errx(EXIT_FAILURE, "`git --ls-files` failed. Do you have git installed?");
     } else if (argi < argc) {
         // Files pass in as command line args:
         struct stat statbuf;

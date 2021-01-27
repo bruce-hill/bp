@@ -3,6 +3,7 @@
 //
 
 #include <ctype.h>
+#include <err.h>
 #include <stdlib.h>
 #include <unistd.h>
 
@@ -123,10 +124,8 @@ char unescapechar(const char *escaped, const char **end)
 //
 void *memcheck(void *p)
 {
-    if (p == NULL) {
-        fprintf(stderr, "memory allocation failure\n");
-        exit(EXIT_FAILURE);
-    }
+    if (p == NULL)
+        err(EXIT_FAILURE, "memory allocation failure");
     return p;
 }
 
@@ -147,10 +146,8 @@ int memicmp(const void *v1, const void *v2, size_t n)
 //
 void xfree(void *p)
 {
-    if (*(void**)p == NULL) {
-        fprintf(stderr, "Attempt to free(NULL)\n");
-        exit(EXIT_FAILURE);
-    }
+    if (*(void**)p == NULL)
+        errx(EXIT_FAILURE, "attempt to free(NULL)");
     free(*(void**)p);
     p = NULL;
 }

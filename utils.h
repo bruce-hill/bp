@@ -13,7 +13,6 @@
 #include "match.h"
 
 #define streq(a, b) (strcmp(a, b) == 0)
-#define check(cond, ...) do { if (!(cond)) { (void)fprintf(stderr, __VA_ARGS__); (void)fwrite("\n", 1, 1, stderr); exit(EXIT_FAILURE); } } while(false)
 #define new(t) memcheck(calloc(1, sizeof(t)))
 #define xcalloc(a,b) memcheck(calloc(a,b))
 #define xrealloc(a,b) memcheck(realloc(a,b))

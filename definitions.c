@@ -2,6 +2,7 @@
 // definitions.c - Code for defining named pattern rules
 //
 
+#include <err.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -39,7 +40,8 @@ def_t *load_grammar(def_t *defs, file_t *f)
             exit(EXIT_FAILURE);
         }
         size_t namelen = (size_t)(src - name);
-        check(matchchar(&src, ':'), "Expected ':' in definition");
+        if (!matchchar(&src, ':'))
+            errx(EXIT_FAILURE, "Expected ':' in definition");
         pat_t *pat = bp_pattern(f, src);
         if (pat == NULL) break;
         defs = with_def(defs, namelen, name, pat);

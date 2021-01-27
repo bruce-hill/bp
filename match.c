@@ -3,6 +3,7 @@
 //
 
 #include <ctype.h>
+#include <err.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -313,7 +314,8 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
         }
         case BP_AFTER: {
             ssize_t backtrack = pat->args.pat->len;
-            check(backtrack != -1, "'<' is only allowed for fixed-length operations");
+            if (backtrack == -1)
+                errx(EXIT_FAILURE, "'<' is only allowed for fixed-length operations");
             if (str - backtrack < f->contents) return NULL;
             match_t *before = match(defs, f, str - backtrack, pat->args.pat, ignorecase);
             if (before == NULL) return NULL;
@@ -426,7 +428,8 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
         }
         case BP_REF: {
             def_t *def = lookup(defs, pat->args.name.len, pat->args.name.name);
-            check(def != NULL, "Unknown identifier: '%.*s'", (int)pat->args.name.len, pat->args.name.name);
+            if (def == NULL)
+                errx(EXIT_FAILURE, "Unknown identifier: '%.*s'", (int)pat->args.name.len, pat->args.name.name);
             pat_t *ref = def->pat;
 
             pat_t rec_op = {
@@ -474,7 +477,8 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
                 --m->refcount;
             }
 
-            check(m, "Match should be non-null at this point");
+            if (!m)
+                errx(EXIT_FAILURE, "Match should be non-null at this point");
             // This match wrapper mainly exists for record-keeping purposes and
             // does not affect correctness. It also helps with visualization of
             // match results.
