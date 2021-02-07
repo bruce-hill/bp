@@ -90,47 +90,51 @@ static inline void fprint_filename(FILE *out, const char *filename)
 }
 
 //
-// Return a pointer to the value part of a flag, if present, otherwise NULL.
-// This works for --foo=value or --foo value
+// Look for a key/value flag at the first position in the given argument list.
+// If the flag is found, update `next` to point to the next place to check for a flag.
+// The contents of argv[0] may be modified for single-char flags.
+// Return the flag's value.
 //
 __attribute__((nonnull))
-static char *getflag(const char *flag, char *argv[], int *i)
+static char *get_flag(char *argv[], const char *flag, char ***next)
 {
     size_t n = strlen(flag);
-    if (!argv[*i])
-        errx(EXIT_FAILURE, "Attempt to get flag from NULL argument");
-    if (strncmp(argv[*i], flag, n) == 0) {
-        if (argv[*i][n] == '=') {
-            return &argv[*i][n+1];
-        } else if (argv[*i][n] == '\0') {
-            if (!argv[*i+1])
-                errx(EXIT_FAILURE, "Expected argument after '%s'\n\n%s", flag, usage);
-            ++(*i);
-            return argv[*i];
-        }
+    if (strncmp(argv[0], flag, n) != 0) return NULL;
+    if (argv[0][n] == '=') { // --foo=baz, -f=baz
+        *next = &argv[1];
+        return &argv[0][n+1];
+    } else if (argv[0][n] == '\0') { // --foo baz, -f baz
+        if (!argv[1])
+            errx(EXIT_FAILURE, "Expected argument after '%s'\n\n%s", flag, usage);
+        *next = &argv[2];
+        return argv[1];
+    } else if (flag[0] == '-' && flag[1] != '-' && flag[2] == '\0') { // -f...
+        *next = &argv[1];
+        return &argv[0][n];
     }
     return NULL;
 }
 
 //
-// Return whether or not a boolean flag exists, and update i/argv to move past
-// it if it does.
+// Look for a flag at the first position in the given argument list.
+// If the flag is found, update `next` to point to the next place to check for a flag.
+// The contents of argv[0] may be modified for single-char flags.
+// Return a boolean for whether or not the flag was found.
 //
 __attribute__((nonnull))
-static int boolflag(const char *flag, char *argv[], int *i)
+static bool get_boolflag(char *argv[], const char *flag, char ***next)
 {
-    if (!argv[*i])
-        errx(EXIT_FAILURE, "Attempt to get flag from NULL argument");
-    if (streq(argv[*i], flag)) return 1;
-    if (flag[0] == '-' && flag[1] != '-' && flag[2] == '\0' && argv[*i][0] == '-' && argv[*i][1] != '-') {
-        char *p = strchr(argv[*i], flag[1]);
-        if (p) {
-            --(*i); // Recheck this flag
-            memmove(p, p+1, strlen(p+1)+1);
-            return 1;
-        }
+    size_t n = strlen(flag);
+    if (strncmp(argv[0], flag, n) != 0) return false;
+    if (argv[0][n] == '\0') { // --foo, -f
+        *next = &argv[1];
+        return true;
+    } else if (flag[0] == '-' && flag[1] != '-' && flag[2] == '\0') { // -f...
+        memmove(&argv[0][1], &argv[0][2], 1+strlen(&argv[0][2])); // Shift the flags down
+        *next = argv;
+        return true;
     }
-    return 0;
+    return false;
 }
 
 //
@@ -477,8 +481,8 @@ static int process_git_files(def_t *defs, pat_t *pattern, int argc, char *argv[]
     return found;
 }
 
-#define FLAG(f) (flag=getflag((f), argv, &argi))
-#define BOOLFLAG(f) (boolflag((f), argv, &argi))
+#define FLAG(f) (flag = get_flag(argv, f, &argv))
+#define BOOLFLAG(f) get_boolflag(argv, f, &argv)
 
 int main(int argc, char *argv[])
 {
@@ -494,10 +498,10 @@ int main(int argc, char *argv[])
     file_t *local_file = load_filef(&loaded_files, "%s/.config/"BP_NAME"/builtins.bp", getenv("HOME"));
     if (local_file) defs = load_grammar(defs, local_file);
 
-    int argi;
-    for (argi = 1; argi < argc; argi++) {
-        if (streq(argv[argi], "--")) {
-            ++argi;
+    ++argv; // skip program name
+    while (argv[0]) {
+        if (streq(argv[0], "--")) {
+            ++argv;
             break;
         } else if (BOOLFLAG("-h") || BOOLFLAG("--help")) {
             printf("%s\n", usage);
@@ -566,25 +570,31 @@ int main(int argc, char *argv[])
             }
             skip = either_pat(arg_file, skip, s);
         } else if (FLAG("-c")     || FLAG("--context")) {
-            if (streq(flag, "all"))
+            if (streq(flag, "all")) {
                 context_lines = ALL_CONTEXT;
-            else if (streq(flag, "none"))
+            } else if (streq(flag, "none")) {
                 context_lines = 0;
-            else
-                context_lines = (int)strtol(flag, NULL, 10);
-        } else if (argv[argi][0] == '-' && argv[argi][1] && argv[argi][1] != '-') { // single-char flags
-            errx(EXIT_FAILURE, "Unrecognized flag: -%c\n\n%s", argv[argi][1], usage);
-        } else if (argv[argi][0] != '-') {
+            } else {
+                context_lines = (int)strtol(flag, &flag, 10);
+                if (flag && flag[0])
+                    errx(EXIT_FAILURE, "Unsupported flags after --context: %s", flag);
+            }
+        } else if (argv[0][0] == '-' && argv[0][1] && argv[0][1] != '-') { // single-char flags
+            errx(EXIT_FAILURE, "Unrecognized flag: -%c\n\n%s", argv[0][1], usage);
+        } else if (argv[0][0] != '-') {
             if (pattern != NULL) break;
-            file_t *arg_file = spoof_file(&loaded_files, "<pattern argument>", argv[argi]);
+            file_t *arg_file = spoof_file(&loaded_files, "<pattern argument>", argv[0]);
             pat_t *p = bp_stringpattern(arg_file, arg_file->contents);
             if (!p)
-                errx(EXIT_FAILURE, "Pattern failed to compile: %s", argv[argi]);
+                errx(EXIT_FAILURE, "Pattern failed to compile: %s", argv[0]);
             pattern = chain_together(arg_file, pattern, p);
+            ++argv;
         } else {
-            errx(EXIT_FAILURE, "Unrecognized flag: %s\n\n%s", argv[argi], usage);
+            errx(EXIT_FAILURE, "Unrecognized flag: %s\n\n%s", argv[0], usage);
         }
     }
+
+    for (argc = 0; argv[argc]; ++argc) ; // update argc
 
     if (context_lines == USE_DEFAULT_CONTEXT) context_lines = 1;
     if (context_lines < 0 && context_lines != ALL_CONTEXT) context_lines = 0;
@@ -651,15 +661,15 @@ int main(int argc, char *argv[])
     int found = 0;
     if (mode == MODE_JSON) printf("[");
     if (git_mode) { // Get the list of files from `git --ls-files ...`
-        found = process_git_files(defs, pattern, (argc-argi), &argv[argi]);
-    } else if (argi < argc) {
+        found = process_git_files(defs, pattern, argc, argv);
+    } else if (argv[0]) {
         // Files pass in as command line args:
         struct stat statbuf;
-        for (int nfiles = 0; argi < argc; nfiles++, argi++) {
-            if (stat(argv[argi], &statbuf) == 0 && S_ISDIR(statbuf.st_mode)) // Symlinks are okay if manually specified
-                found += process_dir(defs, argv[argi], pattern);
+        for ( ; argv[0]; argv++) {
+            if (stat(argv[0], &statbuf) == 0 && S_ISDIR(statbuf.st_mode)) // Symlinks are okay if manually specified
+                found += process_dir(defs, argv[0], pattern);
             else
-                found += process_file(defs, argv[argi], pattern);
+                found += process_file(defs, argv[0], pattern);
         }
     } else if (isatty(STDIN_FILENO)) {
         // No files, no piped in input, so use files in current dir, recursively
