@@ -147,6 +147,8 @@ pat_t *chain_together(file_t *f, pat_t *first, pat_t *second)
             break;
         } else if (p->type == BP_CAPTURE) {
             p = p->args.capture.capture_pat;
+        } else if (p->type == BP_CHAIN) {
+            p = p->args.multiple.second;
         } else if (p->type == BP_EQUAL || p->type == BP_NOT_EQUAL) {
             p = p->args.pat;
         } else break;
