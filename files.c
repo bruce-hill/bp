@@ -67,7 +67,7 @@ file_t *load_file(file_t **files, const char *filename)
     if (fd < 0) return NULL;
     size_t length;
     file_t *f = new(file_t);
-    f->filename = strdup(filename);
+    f->filename = memcheck(strdup(filename));
 
     struct stat sb;
     if (fstat(fd, &sb) == -1)
@@ -110,13 +110,15 @@ file_t *load_file(file_t **files, const char *filename)
 //
 // Create a virtual file from a string.
 //
-file_t *spoof_file(file_t **files, const char *filename, const char *text)
+file_t *spoof_file(file_t **files, const char *filename, const char *text, ssize_t _len)
 {
     if (filename == NULL) filename = "";
     file_t *f = new(file_t);
-    f->filename = strdup(filename);
-    f->contents = strdup(text);
-    f->end = &f->contents[strlen(text)];
+    size_t len = _len == -1 ? strlen(text) : (size_t)_len;
+    f->filename = memcheck(strdup(filename));
+    f->contents = xcalloc(len+1, sizeof(char));
+    memcpy(f->contents, text, len);
+    f->end = &f->contents[len];
     populate_lines(f);
     if (files != NULL) {
         f->next = *files;

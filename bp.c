@@ -73,8 +73,9 @@ static enum {
     MODE_EXPLAIN,
 } mode = MODE_NORMAL;
 
-// If a filename is put here, it will be deleted if a signal is received
-static const char *in_use_tempfile = NULL;
+// If a file is partly through being modified when the program exits, restore it from backup.
+static FILE *modifying_file = NULL;
+static file_t *backup_file;
 
 // Used for user input/output that doesn't interfere with unix pipeline
 static FILE *tty_out = NULL, *tty_in = NULL;
@@ -199,10 +200,16 @@ static int explain_matches(def_t *defs, file_t *f, pat_t *pattern)
 //
 static void cleanup(void)
 {
-    if (in_use_tempfile) {
-        (void)remove(in_use_tempfile);
-        in_use_tempfile = NULL;
+    if (modifying_file && backup_file) {
+        rewind(modifying_file);
+        ftruncate(fileno(modifying_file), 0);
+        fwrite(backup_file->contents, 1,
+               (size_t)(backup_file->end - backup_file->contents),
+               modifying_file);
+        fclose(modifying_file);
+        modifying_file = NULL;
     }
+    if (backup_file) destroy_file(&backup_file);
 }
 
 //
@@ -277,7 +284,13 @@ static void confirm_replacements(file_t *f, match_t *m, confirm_t *confirm)
 //
 static int inplace_modify_file(def_t *defs, file_t *f, pat_t *pattern)
 {
-    char tmp_filename[PATH_MAX+1] = {'\0'};
+    file_t *inmem_copy = NULL;
+    // Ensure the file is resident in memory:
+    if (f->mmapped) {
+        inmem_copy = spoof_file(NULL, f->filename, f->contents, (ssize_t)(f->end - f->contents));
+        f = inmem_copy;
+    }
+
     printer_t pr = {
         .file = f,
         .context_lines = ALL_CONTEXT,
@@ -285,7 +298,7 @@ static int inplace_modify_file(def_t *defs, file_t *f, pat_t *pattern)
         .print_line_numbers = false,
     };
 
-    FILE *inplace_file = NULL; // Lazy-open this on the first match
+    FILE *dest = NULL; // Lazy-open this on the first match
     int matches = 0;
     confirm_t confirm_file = confirm;
     for (match_t *m = NULL; (m = next_match(defs, f, m, pattern, skip, ignorecase)); ) {
@@ -294,35 +307,30 @@ static int inplace_modify_file(def_t *defs, file_t *f, pat_t *pattern)
         if (print_errors(&err_pr, m) > 0)
             exit(EXIT_FAILURE);
         // Lazy-open file for writing upon first match:
-        if (inplace_file == NULL) {
-            if (snprintf(tmp_filename, PATH_MAX, "%s.tmp.XXXXXX", f->filename) > (int)PATH_MAX)
-                errx(EXIT_FAILURE, "Failed to build temporary file template");
-            int out_fd = mkstemp(tmp_filename);
-            if (out_fd < 0)
-                err(EXIT_FAILURE, "Failed to create temporary inplace file");
-            in_use_tempfile = tmp_filename;
-            inplace_file = fdopen(out_fd, "w");
+        if (dest == NULL) {
+            dest = fopen(f->filename, "w");
+            if (!dest)
+                err(EXIT_FAILURE, "Failed to open %s for modification", f->filename);
+            backup_file = f;
+            modifying_file = dest;
             if (confirm == CONFIRM_ASK && f->filename)
                 fprint_filename(tty_out, f->filename);
         }
         confirm_replacements(f, m, &confirm_file);
-        print_match(inplace_file, &pr, m);
+        print_match(dest, &pr, m);
     }
 
-    if (inplace_file) {
+    if (dest) {
         // Print trailing context lines:
-        print_match(inplace_file, &pr, NULL);
+        print_match(dest, &pr, NULL);
         if (confirm == CONFIRM_ALL)
             printf("%s\n", f->filename);
-        (void)fclose(inplace_file);
-
-        // TODO: if I want to implement backup files then add a line like this:
-        // if (backup) rename(f->filename, f->filename + ".bak");
-        if (rename(tmp_filename, f->filename) != 0)
-            err(EXIT_FAILURE, "Failed to write file replacement for %s", f->filename);
-
-        in_use_tempfile = NULL;
+        (void)fclose(dest);
+        if (modifying_file == dest) modifying_file = NULL;
+        if (backup_file == f) backup_file = NULL;
     }
+
+    if (inmem_copy != NULL) destroy_file(&inmem_copy);
 
     return matches;
 }
@@ -527,7 +535,7 @@ int main(int argc, char *argv[])
                 errx(EXIT_FAILURE, "No pattern has been defined for replacement to operate on");
             // TODO: spoof file as sprintf("pattern => '%s'", flag)
             // except that would require handling edge cases like quotation marks etc.
-            file_t *replace_file = spoof_file(&loaded_files, "<replace argument>", flag);
+            file_t *replace_file = spoof_file(&loaded_files, "<replace argument>", flag, -1);
             pattern = bp_replacement(replace_file, pattern, replace_file->contents);
             if (!pattern)
                 errx(EXIT_FAILURE, "Replacement failed to compile: %s", flag);
@@ -543,7 +551,7 @@ int main(int argc, char *argv[])
                 errx(EXIT_FAILURE, "Couldn't find grammar: %s", flag);
             defs = load_grammar(defs, f); // Keep in memory for debug output
         } else if (FLAG("-p")     || FLAG("--pattern")) {
-            file_t *arg_file = spoof_file(&loaded_files, "<pattern argument>", flag);
+            file_t *arg_file = spoof_file(&loaded_files, "<pattern argument>", flag, -1);
             for (const char *str = arg_file->contents; str < arg_file->end; ) {
                 def_t *d = bp_definition(defs, arg_file, str);
                 if (d) {
@@ -559,7 +567,7 @@ int main(int argc, char *argv[])
                 }
             }
         } else if (FLAG("-s")     || FLAG("--skip")) {
-            file_t *arg_file = spoof_file(&loaded_files, "<skip argument>", flag);
+            file_t *arg_file = spoof_file(&loaded_files, "<skip argument>", flag, -1);
             pat_t *s = bp_pattern(arg_file, arg_file->contents);
             if (!s) {
                 fprint_line(stdout, arg_file, arg_file->contents, arg_file->end,
@@ -583,7 +591,7 @@ int main(int argc, char *argv[])
             errx(EXIT_FAILURE, "Unrecognized flag: -%c\n\n%s", argv[0][1], usage);
         } else if (argv[0][0] != '-') {
             if (pattern != NULL) break;
-            file_t *arg_file = spoof_file(&loaded_files, "<pattern argument>", argv[0]);
+            file_t *arg_file = spoof_file(&loaded_files, "<pattern argument>", argv[0], -1);
             pat_t *p = bp_stringpattern(arg_file, arg_file->contents);
             if (!p)
                 errx(EXIT_FAILURE, "Pattern failed to compile: %s", argv[0]);
@@ -630,7 +638,7 @@ int main(int argc, char *argv[])
         size_t len = 0;
         if (getline(&patstr, &len, tty_in) <= 0)
             err(EXIT_FAILURE, "No pattern provided");
-        file_t *arg_file = spoof_file(&loaded_files, "<pattern argument>", patstr);
+        file_t *arg_file = spoof_file(&loaded_files, "<pattern argument>", patstr, -1);
         for (const char *str = arg_file->contents; str < arg_file->end; ) {
             def_t *d = bp_definition(defs, arg_file, str);
             if (d) {
@@ -655,7 +663,7 @@ int main(int argc, char *argv[])
     // we need to define a rule called "pattern" with the value of whatever
     // pattern the args specified, and use `pattern` as the thing being matched.
     defs = with_def(defs, strlen("pattern"), "pattern", pattern);
-    file_t *patref_file = spoof_file(&loaded_files, "<pattern ref>", "pattern");
+    file_t *patref_file = spoof_file(&loaded_files, "<pattern ref>", "pattern", -1);
     pattern = bp_pattern(patref_file, patref_file->contents);
 
     int found = 0;

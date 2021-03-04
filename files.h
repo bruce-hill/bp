@@ -26,7 +26,7 @@ file_t *load_file(file_t **files, const char *filename);
 __attribute__((format(printf,2,3)))
 file_t *load_filef(file_t **files, const char *fmt, ...);
 __attribute__((nonnull(3), returns_nonnull))
-file_t *spoof_file(file_t **files, const char *filename, const char *text);
+file_t *spoof_file(file_t **files, const char *filename, const char *text, ssize_t len);
 __attribute__((nonnull))
 void destroy_file(file_t **f);
 __attribute__((pure, nonnull))
