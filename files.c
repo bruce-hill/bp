@@ -164,6 +164,7 @@ void destroy_file(file_t **f)
 //
 size_t get_line_number(file_t *f, const char *p)
 {
+    if (f->nlines == 0) return 0;
     // Binary search:
     size_t lo = 0, hi = f->nlines-1;
     while (lo <= hi) {

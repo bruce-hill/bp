@@ -138,7 +138,7 @@ match_t *next_match(def_t *defs, file_t *f, match_t *prev, pat_t *pat, pat_t *sk
     } else {
         str = f->contents;
     }
-    while (str < f->end) {
+    while (str <= f->end) {
         match_t *m = match(defs, f, str, pat, ignorecase);
         if (m) return m;
         match_t *s;
