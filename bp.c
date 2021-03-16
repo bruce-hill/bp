@@ -404,7 +404,7 @@ static int process_file(def_t *defs, const char *filename, pat_t *pattern)
 
 #ifdef DEBUG_HEAP
     if (recycle_all_matches() != 0)
-        errx("Memory leak: there should no longer be any matches in use at this point.");
+        errx(EXIT_FAILURE, "Memory leak: there should no longer be any matches in use at this point.");
 #endif
     destroy_file(&f);
     (void)fflush(stdout);
