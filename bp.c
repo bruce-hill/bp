@@ -31,8 +31,9 @@
 #define BP_NAME "bp"
 #endif
 
+static const char *description = (
+    BP_NAME" - a Parsing Expression Grammar command line tool");
 static const char *usage = (
-    BP_NAME" - a Parsing Expression Grammar command line tool\n\n"
     "Usage:\n"
     "  "BP_NAME" [flags] <pattern> [<input files>...]\n\n"
     "Flags:\n"
@@ -48,7 +49,7 @@ static const char *usage = (
     " -r --replace <replacement>       replace the input pattern with the given replacement\n"
     " -s --skip <skip pattern>         skip over the given pattern when looking for matches\n"
     " -c --context <context>           set number of lines of context to print (all: the whole file, 0: only the match, 1: the line, N: N lines of context)\n"
-    " -g --grammar <grammar file>      use the specified file as a grammar\n");
+    " -g --grammar <grammar file>      use the specified file as a grammar");
 
 // Used as a heuristic to check if a file is binary or text:
 #define CHECK_FIRST_N_BYTES 128
@@ -512,7 +513,7 @@ int main(int argc, char *argv[])
             ++argv;
             break;
         } else if (BOOLFLAG("-h") || BOOLFLAG("--help")) {
-            printf("%s\n", usage);
+            printf("%s\n\n%s\n", description, usage);
             exit(EXIT_SUCCESS);
         } else if (BOOLFLAG("-v") || BOOLFLAG("--verbose")) {
             verbose = true;
@@ -602,6 +603,9 @@ int main(int argc, char *argv[])
         }
     }
 
+    if (pattern == NULL)
+        errx(EXIT_FAILURE, "No pattern provided.\n\n%s", usage);
+
     for (argc = 0; argv[argc]; ++argc) ; // update argc
 
     if (context_lines == USE_DEFAULT_CONTEXT) context_lines = 1;
@@ -626,38 +630,10 @@ int main(int argc, char *argv[])
 
     // User input/output is handled through /dev/tty so that normal unix pipes
     // can work properly while simultaneously asking for user input.
-    if (confirm == CONFIRM_ASK || pattern == NULL) {
+    if (confirm == CONFIRM_ASK) {
         tty_in = fopen("/dev/tty", "r");
         tty_out = fopen("/dev/tty", "w");
     }
-
-    if (pattern == NULL) { // If no pattern argument, then ask the user for a pattern
-        fprintf(tty_out, "\033[1mPattern> \033[0m");
-        (void)fflush(tty_out);
-        char *patstr = NULL;
-        size_t len = 0;
-        if (getline(&patstr, &len, tty_in) <= 0)
-            err(EXIT_FAILURE, "No pattern provided");
-        file_t *arg_file = spoof_file(&loaded_files, "<pattern argument>", patstr, -1);
-        for (const char *str = arg_file->contents; str < arg_file->end; ) {
-            def_t *d = bp_definition(defs, arg_file, str);
-            if (d) {
-                defs = d;
-                str = after_spaces(d->pat->end);
-            } else {
-                pat_t *p = bp_pattern(arg_file, str);
-                if (!p)
-                    file_err(arg_file, str, arg_file->end,
-                             "Failed to compile this part of the argument");
-                pattern = chain_together(arg_file, pattern, p);
-                str = after_spaces(p->end);
-            }
-        }
-        free(patstr);
-    }
-
-    if (pattern == NULL)
-        errx(EXIT_FAILURE, "No pattern was given");
 
     // To ensure recursion (and left recursion in particular) works properly,
     // we need to define a rule called "pattern" with the value of whatever
