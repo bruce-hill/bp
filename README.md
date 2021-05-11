@@ -37,6 +37,7 @@ suffix operators.
 
 Pattern            | Meaning
 -------------------|---------------------
+`"foo"`, `'foo'`   | The literal string `foo`. There are no escape sequences within strings.
 `pat1 pat2`        | `pat1` followed by `pat2`
 `pat1 / pat2`      | `pat1` if it matches, otherwise `pat2`
 `..pat`            | Any text up to and including `pat` (except newlines)
@@ -48,6 +49,8 @@ Pattern            | Meaning
 `$`                | The end of a line
 `__`               | Zero or more whitespace characters (including newlines)
 `_`                | Zero or more whitespace characters (excluding newlines)
+`|`                | A word boundary (i.e. the left or right edge of a word)
+`{foo}`            | The literal string `foo` with word boundaries on both ends (shorthand for `|"foo"|`)
 `` `c ``           | The literal character `c`
 `` `a-z ``         | The character range `a` through `z`
 `` `a,b ``         | The character `a` or the character `b`
