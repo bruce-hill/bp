@@ -26,6 +26,9 @@ tags: $(CFILES) bp.c
 clean:
 	rm -f $(NAME) $(OBJFILES)
 
+test:
+	./$(NAME) -g grammars/bp.bp -p Grammar grammars/bp.bp
+
 leaktest:
 	make G=-ggdb O=-O0 EXTRA=-DDEBUG_HEAP clean bp
 	valgrind --leak-check=full ./bp -l -g grammars/bp.bp -p Grammar grammars/bp.bp
@@ -55,4 +58,4 @@ uninstall:
 	  [ "$$confirm" != n ] && rm -rf ~/.config/$(NAME); \
 	fi
 
-.PHONY: all clean install uninstall leaktest splint
+.PHONY: all clean install uninstall leaktest splint test
