@@ -17,7 +17,7 @@ String-pattern: ..%(\n / Nodent / Escape / `\ pat [`;])$$
 pat: simple-pat !(__("!="/"==")) / suffixed-pat
 simple-pat: Upto-and / Dot / String / Chars / Nodent / Escape-range
     / Escape / Repeat / Optional / No / After / Before / Capture
-    / Ref / parens
+    / Start-of-File / Start-of-Line / End-of-File / End-of-Line / Ref / parens
 
 suffixed-pat: (
       Eq-pat
@@ -63,6 +63,10 @@ Replace: (
       @replace-pat=(Replace / Chain / pat) __ "=>" (__ @replacement=String / @!=(''=> "Expected replacement string"))
     )
 Ref: @name=id !(__`:)
+Start-of-File: "^^"
+Start-of-Line: "^"
+End-of-File: "$$"
+End-of-Line: "$"
 
 parens: `( __ extended-pat (__ `) / @!=(''=> "Expected closing parenthesis here"))
 
@@ -73,11 +77,7 @@ extended-pat: Otherwise / Replace / Chain / pat
 # Special-symbol rules:
 _:  *(`  / \t)
 __: *(`  / \t / \r / \n / comment)
-$$: !(./\n)
-$:  !.
-^^: !<(./\n)
-^:  !<.
 
-id: "^^" / "^" / "__" / "_" / "$$" / "$" / "|" / `a-z,A-Z *`a-z,A-Z,0-9,-
+id: "__" / "_" / "|" / `a-z,A-Z *`a-z,A-Z,0-9,-
 
 comment: `# .. $

@@ -28,6 +28,10 @@ enum pattype_e {
     BP_REF,
     BP_BACKREF,
     BP_NODENT,
+    BP_START_OF_FILE,
+    BP_START_OF_LINE,
+    BP_END_OF_FILE,
+    BP_END_OF_LINE,
     BP_LEFTRECURSION,
 };
 
@@ -46,7 +50,7 @@ typedef struct pat_s {
         struct {
             const char *name;
             size_t len;
-        } name;
+        } ref;
         struct {
             unsigned char low, high;
         } range;

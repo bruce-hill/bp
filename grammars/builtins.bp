@@ -38,9 +38,5 @@ esc: \e
 tab: \t
 nl: \n; lf: \n
 comment: !''; # No default definition, can be overridden
-$$: !(./\n)
-$:  !.
-^^: !<(./\n)
-^:  !<.
 __: *(` /\t/\n/\r/comment)
 _:  *(` /\t)

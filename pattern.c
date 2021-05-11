@@ -305,12 +305,12 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
             
             if (c == '{') { // Surround with `|` word boundaries
                 pat_t *left = new_pat(f, start, start+1, -1, BP_REF);
-                left->args.name.name = "|";
-                left->args.name.len = 1;
+                left->args.ref.name = "|";
+                left->args.ref.len = 1;
 
                 pat_t *right = new_pat(f, str, str+1, -1, BP_REF);
-                right->args.name.name = "|";
-                right->args.name.len = 1;
+                right->args.ref.name = "|";
+                right->args.ref.len = 1;
 
                 pat = chain_together(f, left, chain_together(f, pat, right));
             }
@@ -442,15 +442,27 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
             capture->args.capture.namelen = namelen;
             return capture;
         }
+        // Start of file/line:
+        case '^': {
+            if (matchchar(&str, '^'))
+                return new_pat(f, start, str, 0, BP_START_OF_FILE);
+            return new_pat(f, start, str, 0, BP_START_OF_LINE);
+        }
+        // End of file/line:
+        case '$': {
+            if (matchchar(&str, '$'))
+                return new_pat(f, start, str, 0, BP_END_OF_FILE);
+            return new_pat(f, start, str, 0, BP_END_OF_LINE);
+        }
         // Special rules:
-        case '_': case '^': case '$': case '|': {
+        case '_': case '|': {
             size_t namelen = 1;
-            if (matchchar(&str, c)) // double __, ^^, $$
+            if (c == '_' && matchchar(&str, c)) // double __, ^^, $$
                 ++namelen;
             if (matchchar(&str, ':')) return NULL; // Don't match definitions
             pat_t *ref = new_pat(f, start, str, -1, BP_REF);
-            ref->args.name.name = start;
-            ref->args.name.len = namelen;
+            ref->args.ref.name = start;
+            ref->args.ref.len = namelen;
             return ref;
         }
         default: {
@@ -462,8 +474,8 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
             if (matchchar(&str, ':')) // Don't match definitions
                 return NULL;
             pat_t *ref = new_pat(f, start, str, -1, BP_REF);
-            ref->args.name.name = refname;
-            ref->args.name.len = (size_t)(str - refname);
+            ref->args.ref.name = refname;
+            ref->args.ref.len = (size_t)(str - refname);
             return ref;
         }
     }
