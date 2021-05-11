@@ -224,7 +224,7 @@ void fprint_line(FILE *dest, file_t *f, const char *start, const char *end, cons
             linenum,
             (int)charnum - 1, line,
             (int)(end - &line[charnum-1]), &line[charnum-1],
-            (int)(eol - end - 1), end);
+            (int)(eol - end), end);
     fprintf(dest, "      \033[34;1m");
     const char *p = line;
     for (; p < start; ++p) (void)fputc(*p == '\t' ? '\t' : ' ', dest);
