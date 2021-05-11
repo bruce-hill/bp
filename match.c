@@ -35,6 +35,7 @@ static match_t *unused_matches = NULL;
 static match_t *in_use_matches = NULL;
 #endif
 
+static inline pat_t *deref(def_t *defs, pat_t *pat);
 __attribute__((returns_nonnull))
 static match_t *new_match(pat_t *pat, const char *start, const char *end, match_t *child);
 __attribute__((nonnull, pure))
@@ -48,6 +49,18 @@ static match_t *get_capture_by_name(match_t *m, const char *name);
 __attribute__((hot, nonnull(2,3,4)))
 static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool ignorecase);
 
+//
+// If the given pattern is a reference, look it up and return the referenced
+// pattern. This is used for an optimization to avoid repeated lookups.
+//
+static inline pat_t *deref(def_t *defs, pat_t *pat)
+{
+    if (pat && pat->type == BP_REF) {
+        def_t *def = lookup(defs, pat->args.ref.len, pat->args.ref.name);
+        if (def) pat = def->pat;
+    }
+    return pat;
+}
 //
 // Return the location of the next character or UTF8 codepoint.
 // (i.e. skip forward one codepoint at a time, not one byte at a time)
@@ -209,7 +222,8 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
         }
         case BP_UPTO: {
             match_t *m = new_match(pat, str, str, NULL);
-            pat_t *target = pat->args.multiple.first, *skip = pat->args.multiple.second;
+            pat_t *target = deref(defs, pat->args.multiple.first),
+                  *skip = deref(defs, pat->args.multiple.second);
             if (!target && !skip) {
                 while (str < f->end && *str != '\n') ++str;
                 m->end = str;
@@ -253,28 +267,30 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
             match_t **dest = &m->child;
             size_t reps = 0;
             ssize_t max = pat->args.repetitions.max;
+            pat_t *repeating = deref(defs, pat->args.repetitions.repeat_pat);
+            pat_t *sep = deref(defs, pat->args.repetitions.sep);
             for (reps = 0; max == -1 || reps < (size_t)max; ++reps) {
                 const char *start = str;
                 // Separator
                 match_t *msep = NULL;
-                if (pat->args.repetitions.sep != NULL && reps > 0) {
-                    msep = match(defs, f, str, pat->args.repetitions.sep, ignorecase);
+                if (sep != NULL && reps > 0) {
+                    msep = match(defs, f, str, sep, ignorecase);
                     if (msep == NULL) break;
                     str = msep->end;
                 }
-                match_t *mp = match(defs, f, str, pat->args.repetitions.repeat_pat, ignorecase);
+                match_t *mp = match(defs, f, str, repeating, ignorecase);
                 if (mp == NULL) {
                     str = start;
                     if (msep) recycle_if_unused(&msep);
                     break;
                 }
                 if (mp->end == start && reps > 0) {
-                    // Since no forward progress was made on either
-                    // `repeat_pat` or `sep` and BP does not have mutable
-                    // state, it's guaranteed that no progress will be made on
-                    // the next loop either. We know that this will continue to
-                    // loop until reps==max, so let's just cut to the chase
-                    // instead of looping infinitely.
+                    // Since no forward progress was made on either `repeating`
+                    // or `sep` and BP does not have mutable state, it's
+                    // guaranteed that no progress will be made on the next
+                    // loop either. We know that this will continue to loop
+                    // until reps==max, so let's just cut to the chase instead
+                    // of looping infinitely.
                     if (msep) recycle_if_unused(&msep);
                     recycle_if_unused(&mp);
                     if (pat->args.repetitions.max == -1)

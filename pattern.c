@@ -305,12 +305,12 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
             
             if (c == '{') { // Surround with `|` word boundaries
                 pat_t *left = new_pat(f, start, start+1, -1, BP_REF);
-                left->args.ref.name = "|";
-                left->args.ref.len = 1;
+                left->args.ref.name = "left-word-boundary";
+                left->args.ref.len = strlen(left->args.ref.name);
 
                 pat_t *right = new_pat(f, str, str+1, -1, BP_REF);
-                right->args.ref.name = "|";
-                right->args.ref.len = 1;
+                right->args.ref.name = "right-word-boundary";
+                right->args.ref.len = strlen(right->args.ref.name);
 
                 pat = chain_together(f, left, chain_together(f, pat, right));
             }
@@ -454,10 +454,10 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
                 return new_pat(f, start, str, 0, BP_END_OF_FILE);
             return new_pat(f, start, str, 0, BP_END_OF_LINE);
         }
-        // Special rules:
-        case '_': case '|': {
+        // Whitespace:
+        case '_': {
             size_t namelen = 1;
-            if (c == '_' && matchchar(&str, c)) // double __, ^^, $$
+            if (matchchar(&str, '_')) // double __ (whitespace with newlines)
                 ++namelen;
             if (matchchar(&str, ':')) return NULL; // Don't match definitions
             pat_t *ref = new_pat(f, start, str, -1, BP_REF);

@@ -78,6 +78,6 @@ extended-pat: Otherwise / Replace / Chain / pat
 _:  *(`  / \t)
 __: *(`  / \t / \r / \n / comment)
 
-id: "__" / "_" / "|" / `a-z,A-Z *`a-z,A-Z,0-9,-
+id: "__" / "_" / `a-z,A-Z *`a-z,A-Z,0-9,-
 
 comment: `# .. $

@@ -116,9 +116,6 @@ Zero or more whitespace characters (specifically, spaces and tabs)
 .B __
 Zero or more whitespace or newline characters
 
-.B |
-A word boundary
-
 .B "foo"
 .B 'foo'
 The literal string \fIstring\fR. Escape sequences are not allowed.
@@ -237,7 +234,7 @@ Find files ending with ".c" and replace the extension with ".h"
 
 .TP
 .B
-bp -p '|"foobar"| parens' my_file.py
+bp -p '{foobar} parens' my_file.py
 Find the literal string \fB"foobar"\fR, assuming it's a complete word, followed
 by a pair of matching parentheses in the file \fImy_file.py\fR
 

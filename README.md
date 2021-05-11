@@ -49,8 +49,7 @@ Pattern            | Meaning
 `$`                | The end of a line
 `__`               | Zero or more whitespace characters (including newlines)
 `_`                | Zero or more whitespace characters (excluding newlines)
-`|`                | A word boundary (i.e. the left or right edge of a word)
-`{foo}`            | The literal string `foo` with word boundaries on both ends (shorthand for `|"foo"|`)
+`{foo}`            | The literal string `foo` with word boundaries on both ends
 `` `c ``           | The literal character `c`
 `` `a-z ``         | The character range `a` through `z`
 `` `a,b ``         | The character `a` or the character `b`
@@ -99,11 +98,6 @@ Name          | Meaning
 `number`      | An integer or floating point number
 `Hex`         | A hexadecimal character
 `id`          | An identifier
-`|`           | A word boundary
-`^`           | Start of a line
-`^^`          | Start of a file
-`$`           | End of a line
-`$$`          | End of a file
 
 As well as these common definitions, BP also comes with a set of
 language-specific or domain-specific grammars. These are not full language
