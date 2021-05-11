@@ -14,6 +14,6 @@ keyword: |(
  "function" / "goto" / "if" / "in" / "local" / "nil" / "not" / "or" /
  "repeat" / "return" / "then" / "true" / "until" / "while"
 )|
-function-def: |"function"|[_id (*(`.id)[`:id])]_ parens
-block: function / |("do"/"then")| ..%(comment/string/block/\n) (|"end"|)
-function: function-def ..%(comment/string/block/\n) (|"end"|)
+function-def: {function}[_id (*(`.id)[`:id])]_ parens
+block: function / ({do}/{then}) ..%(comment/string/block/\n) {end}
+function: function-def ..%(comment/string/block/\n) {end}

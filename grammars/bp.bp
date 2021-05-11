@@ -29,8 +29,9 @@ Not-eq-pat: @first=(suffixed-pat / simple-pat)__"!="__@second=pat
 
 Dot: `. !`.
 String: (
-        `" @s=*(Escape / !`".) (`" / @!=(''=> "Expected closing quote here"))
-      / `' @s=*(Escape / !`'.) (`' / @!=(''=> "Expected closing quote here"))
+        `" @s=.. (`" / $ @!=(''=> "Expected closing quote here"))
+      / `' @s=.. (`' / $ @!=(''=> "Expected closing quote here"))
+      / `{ @s=.. (`} / $ @!=(''=> "Expected closing brace here"))
     )
 Chars: `` @+(Char-range/Char) % `,
 Char-range: @low=. `- (@high=. / @!=(''=> "Expected a second character to form a character range"))

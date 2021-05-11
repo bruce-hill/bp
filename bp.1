@@ -119,6 +119,13 @@ Zero or more whitespace or newline characters
 .B |
 A word boundary
 
+.B "foo"
+.B 'foo'
+The literal string \fIstring\fR. Escape sequences are not allowed.
+
+.B {foo}
+The literal string \fIfoo\fR with word boundaries on either end. Escape sequences are not allowed.
+
 .B `\fI<c>\fR
 The literal character \fI<c>\fR (e.g. \fB`@\fR matches the "@" character)
 

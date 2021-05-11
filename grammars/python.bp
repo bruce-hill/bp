@@ -14,7 +14,7 @@ keyword: |("and" / "as" / "assert" / "break" / "class" / "continue" / "def" /
     "not" / "or" / "pass" / "raise" / "return" / "try" / "while" /
     "with" / "yield")|
 class: class-def +(\N ..$)
-class-def: ^_|"class"|_id[_parens]_`:
+class-def: ^_{class}_id[_parens]_`:
 function: function-def +(\N ..$)
-function-def: ^_|"def"|_id parens `:
-import: ^_["from"| ..%parens >(|"import"|)] |"import"| ..%parens $
+function-def: ^_{def}_id parens `:
+import: ^_[{from} ..%parens >{import}] {import} ..%parens $

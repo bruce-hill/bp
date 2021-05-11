@@ -25,5 +25,5 @@ keyword: |(
 )|
 function-def: ^_ 2+(keyword / id / anglebraces / `*) % __ parens (__`; / >(__`{))
 function: function-def __ braces
-macro: ^"#define " ..$ *(<`\ \n..$)
-import: ^("#include"/"#import")| __ (string / `<..`>)
+macro: ^{#define} ..$ *(<`\ \n..$)
+import: ^({#include}/{#import}) __ (string / `<..`>)
