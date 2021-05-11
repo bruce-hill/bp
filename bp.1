@@ -90,116 +90,120 @@ Some patterns additionally have "multi-line" variants, which means that they
 include the newline character.
 
 .I <pat1> <pat2>
-A chain of patterns, pronounced \fI<pat1>\fB-then-\fI<pat2>\fR
+A sequence: \fI<pat1>\fR followed by \fI<pat2>\fR
 
 .I <pat1> \fB/\fI <pat2>\fR
-A series of ordered choices (if one pattern matches, the following patterns
-will not be attempted), pronounced \fI<pat1>\fB-or-\fI<pat2>\fR
+A choice: \fI<pat1>\fR, or if it doesn't match, then \fI<pat2>\fR
 
 .B .
-\fBAny\fR character (excluding newline)
+Any character (excluding newline)
 
 .B ^
-\fBStart-of-a-line\fR
+Start of a line
 
 .B ^^
-\fBStart-of-the-text\fR
+Start of the text
 
 .B $
-\fBEnd-of-a-line\fR (does not include newline character)
+End of a line (does not include newline character)
 
 .B $$
-\fBEnd-of-the-text\fR
+End of the text
 
 .B _
-Zero or more \fBwhitespace\fR characters (specifically, spaces and tabs)
+Zero or more whitespace characters (specifically, spaces and tabs)
 
 .B __
-Zero or more \fBwhitespace-or-newline\fR characters
+Zero or more whitespace or newline characters
 
 .B |
-A \fBword-boundary\fR
+A word boundary
 
 .B `\fI<c>\fR
-The literal \fBcharacter-\fI<c>\fR
-
-.B `\fI<c1>\fB-\fI<c2>\fR
-The \fBcharacter-range-\fI<c1>\fB-to-\fI<c2>\fR
+The literal character \fI<c>\fR (e.g. \fB`@\fR matches the "@" character)
 
 .B `\fI<c1>\fB,\fI<c2>\fR
-The literal \fBcharacter-\fI<c1>\fB-or-\fI<c2>\fR (can include arbitrarily many
-comma-separated characters or character ranges).
+The literal character \fI<c1>\fR or \fI<c2>\fR (e.g. \fB`a,e,i,o,u\fR)
+
+.B `\fI<c1>\fB-\fI<c2>\fR
+The character range \fI<c1>\fR to \fI<c2>\fR (e.g. \fB`a-z\fR).
+Multiple ranges can be combined with a comma (e.g. \fB`a-z,A-Z\fR).
 
 .B \\\\\fI<esc>\fR
-The \fBescape-sequence-\fI<esc>\fR (\fB\\n\fR, \fB\\x1F\fR, \fB\\033\fR, etc.)
+An escape sequence (e.g. \fB\\n\fR, \fB\\x1F\fR, \fB\\033\fR, etc.)
 
 .B \\\\\fI<esc1>\fB-\fI<esc2>\fR
-The \fBescape-sequence-range-\fI<esc1>\fB-to-\fI<esc2>\fR
+An escape sequence range from \fI<esc1>\fR to \fI<esc2>\fR (e.g. \fB\\x00-x1F\fR)
 
-.B \\\\\fIN\fR
-A special case escape that matches a "nodent", one or more newlines followed by
+.B \\\\N
+A special case escape that matches a "nodent": one or more newlines followed by
 the same indentation that occurs on the current line.
 
 .B !\fI<pat>\fR
-\fBNot-\fI<pat>\fR
+Not \fI<pat>\fR
 
-.B [\fI<pat>\fR]
-\fBMaybe-\fI<pat>\fR
+.B [\fI<pat>\fB]
+Maybe \fI<pat>\fR
 
 .B \fI<N> <pat>\fR
-.B \fI<MIN>\fB-\fI<MAX> <pat>\fR
-.B \fI<MIN>\fB+ \fI<pat>\fR
-\fI<MIN>\fB-to-\fI<MAX>\fB-\fI<pat>\fBs\fR (repetitions of a pattern)
+Exactly \fIN\fR repetitions of \fI<pat>\fR (e.g. \fB5 `*\fR matches "*****")
+
+.B \fI<N>\fB-\fI<M> <pat>\fR
+Between \fI<N>\fR and \fI<M>\fR repetitions of \fI<pat>\fR (e.g. \fB2-3 `*\fR)
+
+.B \fI<N>\fB+ \fI<pat>\fR
+At least \fI<N>\fR or more repetitions of \fI<pat>\fR (e.g. \fB 2+ `*\fR)
 
 .B *\fI<pat>\fR
-\fBsome-\fI<pat>\fBs\fR
+Some \fI<pat>\fRs (zero or more)
 
 .B +\fI<pat>\fR
-\fBat-least-one-\fI<pat>\fBs\fR
+At least one \fI<pat>\fRs
 
 .B \fI<repeating-pat>\fR \fB%\fI <sep>\fR
-\fI<repeating-pat>\fB-separated-by-\fI<sep>\fR (equivalent to \fI<pat>
-\fB0+(\fI<sep><pat>\fB)\fR)
+\fI<repeating-pat>\fR separated by \fI<sep>\fR (e.g. \fB*word % `,\fR matches
+zero or more comma-separated words)
 
 .B .. \fI<pat>\fR
-Any text \fBup-to-and-including\fR \fI<pat>\fR (excluding newline)
+Any text (except newlines) up to and including \fI<pat>\fR
 
 .B .. % \fI<skip>\fR \fI<pat>\fB
-Any text \fBup-to-and-including\fR \fI<pat>\fR, but skipping over instances of \fI<skip>\fR.
-E.g. \fB`"..`" % (`\\.)
+Any text (except newlines) up to and including \fI<pat>\fR, skipping over
+instances of \fI<skip>\fR (e.g. \fB`"..`" % (`\\.)\fR)
 
 .B <\fI<pat>\fR
-\fBJust-after-\fI<pat>\fR (lookbehind)
+Just after \fI<pat>\fR (lookbehind)
 
 .B >\fI<pat>\fR
-\fBJust-before-\fI<pat>\fR (lookahead)
+Just before \fI<pat>\fR (lookahead)
 
 .B @\fI<pat>\fR
-\fBCapture-\fI<pat>\fR
+Capture \fI<pat>\fR
 
 .B @\fI<name>\fB=\fI<pat>\fR
-\fBLet-\fI<name>\fB-equal-\fI<pat>\fR (named capture)
+Let \fI<name>\fR equal \fI<pat>\fR (named capture). Named captures can be used
+as backreferences like so: \fB@foo=word `( foo `)\fR (matches "asdf(asdf)" or
+"baz(baz)", but not "foo(baz)")
 
-.B \fI<pat>\fB => "\fI<replacement>\fB"
-\fBReplace-\fI<pat>\fB-with-\fI<replacement>\fR. Note: \fI<replacement>\fR should
+.B \fI<pat>\fB => '\fI<replacement>\fB'
+Replace \fI<pat>\fR with \fI<replacement>\fR. Note: \fI<replacement>\fR should
 be a string, and it may contain references to captured values: \fB@0\fR
 (the whole of \fI<pat>\fR), \fB@1\fR (the first capture in \fI<pat>\fR),
-\fB@[\fIfoo\fR]\fR (the capture named \fIfoo\fR in \fI<pat>\fR), etc.
+\fB@\fIfoo\fR (the capture named \fIfoo\fR in \fI<pat>\fR), etc.
+For example, \fB@word _ @rest=(*word % _) => "@rest @1"\fR
 
 .B \fI<pat1>\fB == \fI<pat2>\fR
-Will match only if \fI<pat1>\fR matches and \fI<pat2>\fR matches the text of \fI<pat1>\fR's
-match. Pronounced \fI<pat1>\fB-if-it-matches-\fI<pat2>\fR
+Matches \fI<pat1>\fR, if and only if \fI<pat2>\fR also matches the text of
+\fI<pat1>\fR's match. (e.g. \fBword == ("foo_" *.)\fR matches words that start
+with "foo_")
 
 .B \fI<pat1>\fB != \fI<pat2>\fR
-Will match only if \fI<pat1>\fR matches and \fI<pat2>\fR doesn't match the text of
-\fI<pat1>\fR's match. Pronounced \fI<pat1>\fB-unless-it-matches-\fI<pat2>\fR
+Matches \fI<pat1>\fR, if and only if \fI<pat2>\fR does not match the text of
+\fI<pat1>\fR's match. (e.g. \fBword == ("foo_" *.)\fR matches words that do not
+start with "foo_")
 
-.B \fI<pat1>\fB != \fI<pat2>\fR
-Will match only if \fI<pat1>\fR and \fI<pat2>\fR don't both match and have the
-exact same length. Pronounced \fI<pat1>\fB-assuming-it-doesn't-equal-\fI<pat2>\fR
-
-.B \fI<name>\fB:\fI<pat>\fR
-\fBDefine-\fI<name>\fB-to-mean-\fI<pat>\fR (pattern definition)
+.B \fI<name>\fB: \fI<pat>\fR
+Define \fI<name>\fR to mean \fI<pat>\fR (pattern definition)
 
 .B # \fI<comment>\fR
 A line comment
@@ -226,9 +230,9 @@ Find files ending with ".c" and replace the extension with ".h"
 
 .TP
 .B
-bp -p '"foobar"==id parens' my_file.py
-Find the literal string \fB"foobar"\fR, assuming it's a complete identifier,
-followed by a pair of matching parentheses in the file \fImy_file.py\fR
+bp -p '|"foobar"| parens' my_file.py
+Find the literal string \fB"foobar"\fR, assuming it's a complete word, followed
+by a pair of matching parentheses in the file \fImy_file.py\fR
 
 .TP
 .B
