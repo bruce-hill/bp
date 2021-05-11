@@ -26,7 +26,7 @@ tags: $(CFILES) bp.c
 clean:
 	rm -f $(NAME) $(OBJFILES)
 
-test:
+test: $(NAME)
 	./$(NAME) -g grammars/bp.bp -p Grammar grammars/bp.bp
 
 leaktest:

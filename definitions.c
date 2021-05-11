@@ -70,8 +70,8 @@ def_t *lookup(def_t *defs, size_t namelen, const char *name)
 //
 def_t *with_backref(def_t *defs, file_t *f, size_t namelen, const char *name, match_t *m)
 {
-    pat_t *backref = new_pat(f, m->start, m->end, BP_BACKREF);
-    backref->len = -1; // TODO: maybe calculate this? (nontrivial because of replacements)
+    // TODO: maybe calculate length? (nontrivial because of replacements)
+    pat_t *backref = new_pat(f, m->start, m->end, -1, BP_BACKREF);
     backref->args.backref = m;
     return with_def(defs, namelen, name, backref);
 }
