@@ -1,5 +1,5 @@
 # Definitions of UTF8-compliant identifiers
-id: left-word-boundary (utf8-id-start *utf8-id-cont)!=keyword
+id: left-word-edge (utf8-id-start *utf8-id-cont)!=keyword
 id-char: utf8-id-cont / utf8-id-start
 word-char: utf8-id-cont / utf8-id-start
 
