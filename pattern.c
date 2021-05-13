@@ -308,7 +308,7 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
                 left->args.ref.name = "left-word-edge";
                 left->args.ref.len = strlen(left->args.ref.name);
 
-                pat_t *right = new_pat(f, str, str+1, -1, BP_REF);
+                pat_t *right = new_pat(f, str-1, str, -1, BP_REF);
                 right->args.ref.name = "right-word-edge";
                 right->args.ref.len = strlen(right->args.ref.name);
 
