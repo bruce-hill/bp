@@ -25,6 +25,7 @@ It's written in pure C with no dependencies.
 * `-c` `--context <N>` change how many lines of context are printed (`0`: no context, `all`: the whole file, `<N>` matching lines and `<N-1>` lines before/after)
 * `-g` `--grammar <grammar file>` use the specified file as a grammar
 * `-G` `--git` get filenames from git
+* `--color yes|no|auto` force output to use or not use color
 
 See `man ./bp.1` for more details.
 

@@ -49,6 +49,7 @@ static const char *usage = (
     " -r --replace <replacement>       replace the input pattern with the given replacement\n"
     " -s --skip <skip pattern>         skip over the given pattern when looking for matches\n"
     " -c --context <context>           set number of lines of context to print (all: the whole file, 0: only the match, 1: the line, N: N lines of context)\n"
+    " --color <yes|no|auto>            whether or not to use coloring of text output\n"
     " -g --grammar <grammar file>      use the specified file as a grammar");
 
 // Used as a heuristic to check if a file is binary or text:
@@ -58,7 +59,11 @@ static const char *usage = (
 #define USE_DEFAULT_CONTEXT -2
 #define ALL_CONTEXT -1
 static int context_lines = USE_DEFAULT_CONTEXT;
-static bool print_color = false;
+static enum {
+    COLOR_NO,
+    COLOR_YES,
+    COLOR_AUTO,
+} print_color = COLOR_AUTO;
 static bool print_line_numbers = false;
 static bool ignorecase = false;
 static bool verbose = false;
@@ -87,7 +92,7 @@ static FILE *tty_out = NULL, *tty_in = NULL;
 static inline void fprint_filename(FILE *out, const char *filename)
 {
     if (!filename[0]) return;
-    if (print_color) fprintf(out, "\033[0;1;4;33m%s\033[0m\n", filename);
+    if (print_color == COLOR_YES) fprintf(out, "\033[0;1;4;33m%s\033[0m\n", filename);
     else fprintf(out, "%s:\n", filename);
 }
 
@@ -346,11 +351,10 @@ static int print_matches(def_t *defs, file_t *f, pat_t *pattern)
     printer_t pr = {
         .file = f,
         .context_lines = context_lines,
-        .use_color = print_color,
+        .use_color = print_color == COLOR_YES,
         .print_line_numbers = print_line_numbers,
     };
 
-    confirm_t confirm_file = confirm;
     for (match_t *m = NULL; (m = next_match(defs, f, m, pattern, skip, ignorecase)); ) {
         printer_t err_pr = {.file = f, .context_lines = true, .use_color = true, .print_line_numbers = true};
         if (print_errors(&err_pr, m) > 0)
@@ -360,7 +364,6 @@ static int print_matches(def_t *defs, file_t *f, pat_t *pattern)
             if (printed_filenames++ > 0) printf("\n");
             fprint_filename(stdout, f->filename);
         }
-        confirm_replacements(f, m, &confirm_file);
         print_match(stdout, &pr, m);
     }
 
@@ -588,6 +591,8 @@ int main(int argc, char *argv[])
                 if (flag && flag[0])
                     errx(EXIT_FAILURE, "Unsupported flags after --context: %s", flag);
             }
+        } else if (FLAG("--color")) {
+            print_color = streq(flag, "yes") ? COLOR_YES : streq(flag, "no") ? COLOR_NO : COLOR_AUTO;
         } else if (argv[0][0] == '-' && argv[0][1] && argv[0][1] != '-') { // single-char flags
             errx(EXIT_FAILURE, "Unrecognized flag: -%c\n\n%s", argv[0][1], usage);
         } else if (argv[0][0] != '-') {
@@ -606,13 +611,16 @@ int main(int argc, char *argv[])
     if (pattern == NULL)
         errx(EXIT_FAILURE, "No pattern provided.\n\n%s", usage);
 
+    if (confirm == CONFIRM_ASK && mode != MODE_INPLACE)
+        errx(EXIT_FAILURE, "Confirm mode (-C flag) can only be used with inplace mode (-I flag)");
+
     for (argc = 0; argv[argc]; ++argc) ; // update argc
 
     if (context_lines == USE_DEFAULT_CONTEXT) context_lines = 1;
     if (context_lines < 0 && context_lines != ALL_CONTEXT) context_lines = 0;
 
     if (isatty(STDOUT_FILENO)) {
-        print_color = true;
+        if (print_color == COLOR_AUTO) print_color = COLOR_YES;
         print_line_numbers = true;
     }
 
