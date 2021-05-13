@@ -49,35 +49,32 @@ static const char *usage = (
     " -r --replace <replacement>       replace the input pattern with the given replacement\n"
     " -s --skip <skip pattern>         skip over the given pattern when looking for matches\n"
     " -c --context <context>           set number of lines of context to print (all: the whole file, 0: only the match, 1: the line, N: N lines of context)\n"
-    " --color <yes|no|auto>            whether or not to use coloring of text output\n"
+    " -f --format auto|fancy|plain     set the output format\n"
     " -g --grammar <grammar file>      use the specified file as a grammar");
 
 // Used as a heuristic to check if a file is binary or text:
 #define CHECK_FIRST_N_BYTES 128
 
 // Flag-configurable options:
+typedef enum { CONFIRM_ASK, CONFIRM_ALL, CONFIRM_NONE } confirm_t;
 #define USE_DEFAULT_CONTEXT -2
 #define ALL_CONTEXT -1
-static int context_lines = USE_DEFAULT_CONTEXT;
-static enum {
-    COLOR_NO,
-    COLOR_YES,
-    COLOR_AUTO,
-} print_color = COLOR_AUTO;
-static bool print_line_numbers = false;
-static bool ignorecase = false;
-static bool verbose = false;
-static bool git_mode = false;
-static pat_t *skip = NULL;
-typedef enum { CONFIRM_ASK, CONFIRM_ALL, CONFIRM_NONE } confirm_t;
-static confirm_t confirm = CONFIRM_ALL;
-static enum {
-    MODE_NORMAL,
-    MODE_LISTFILES,
-    MODE_INPLACE,
-    MODE_JSON,
-    MODE_EXPLAIN,
-} mode = MODE_NORMAL;
+static struct {
+    int context_lines;
+    bool ignorecase, verbose, git_mode;
+    confirm_t confirm;
+    enum { MODE_NORMAL, MODE_LISTFILES, MODE_INPLACE, MODE_JSON, MODE_EXPLAIN } mode;
+    enum { FORMAT_AUTO, FORMAT_FANCY, FORMAT_PLAIN } format;
+    pat_t *skip;
+} options = {
+    .context_lines = USE_DEFAULT_CONTEXT,
+    .ignorecase = false,
+    .verbose = false,
+    .confirm = CONFIRM_ALL,
+    .mode = MODE_NORMAL,
+    .format = FORMAT_AUTO,
+    .skip = NULL,
+};
 
 // If a file is partly through being modified when the program exits, restore it from backup.
 static FILE *modifying_file = NULL;
@@ -92,7 +89,7 @@ static FILE *tty_out = NULL, *tty_in = NULL;
 static inline void fprint_filename(FILE *out, const char *filename)
 {
     if (!filename[0]) return;
-    if (print_color == COLOR_YES) fprintf(out, "\033[0;1;4;33m%s\033[0m\n", filename);
+    if (options.format == FORMAT_FANCY) fprintf(out, "\033[0;1;4;33m%s\033[0m\n", filename);
     else fprintf(out, "%s:\n", filename);
 }
 
@@ -171,13 +168,13 @@ static int is_text_file(const char *filename)
 static int print_matches_as_json(def_t *defs, file_t *f, pat_t *pattern)
 {
     int matches = 0;
-    for (match_t *m = NULL; (m = next_match(defs, f, m, pattern, skip, ignorecase)); ) {
+    for (match_t *m = NULL; (m = next_match(defs, f, m, pattern, options.skip, options.ignorecase)); ) {
         if (++matches > 1)
             printf(",\n");
         printf("{\"filename\":\"%s\",", f->filename);
         printf("\"tree\":{\"rule\":\"text\",\"start\":%d,\"end\":%ld,\"children\":[",
                0, f->end - f->contents);
-        json_match(f->contents, m, verbose);
+        json_match(f->contents, m, options.verbose);
         printf("]}}\n");
     }
     return matches;
@@ -189,7 +186,7 @@ static int print_matches_as_json(def_t *defs, file_t *f, pat_t *pattern)
 static int explain_matches(def_t *defs, file_t *f, pat_t *pattern)
 {
     int matches = 0;
-    for (match_t *m = NULL; (m = next_match(defs, f, m, pattern, skip, ignorecase)); ) {
+    for (match_t *m = NULL; (m = next_match(defs, f, m, pattern, options.skip, options.ignorecase)); ) {
         if (++matches == 1) {
             fprint_filename(stdout, f->filename);
         } else {
@@ -242,15 +239,15 @@ static void confirm_replacements(file_t *f, match_t *m, confirm_t *confirm)
         }
 
         { // Print the original
-            printer_t pr = {.file = f, .context_lines = context_lines,
+            printer_t pr = {.file = f, .context_lines = options.context_lines,
                 .use_color = true, .print_line_numbers = true};
             print_match(tty_out, &pr, m->child);
             // Print trailing context lines:
             print_match(tty_out, &pr, NULL);
         }
-        if (context_lines > 1) fprintf(tty_out, "\n");
+        if (options.context_lines > 1) fprintf(tty_out, "\n");
         { // Print the replacement
-            printer_t pr = {.file = f, .context_lines = context_lines,
+            printer_t pr = {.file = f, .context_lines = options.context_lines,
                 .use_color = true, .print_line_numbers = true};
             print_match(tty_out, &pr, m);
             // Print trailing context lines:
@@ -306,8 +303,8 @@ static int inplace_modify_file(def_t *defs, file_t *f, pat_t *pattern)
 
     FILE *dest = NULL; // Lazy-open this on the first match
     int matches = 0;
-    confirm_t confirm_file = confirm;
-    for (match_t *m = NULL; (m = next_match(defs, f, m, pattern, skip, ignorecase)); ) {
+    confirm_t confirm_file = options.confirm;
+    for (match_t *m = NULL; (m = next_match(defs, f, m, pattern, options.skip, options.ignorecase)); ) {
         ++matches;
         printer_t err_pr = {.file = f, .context_lines = true, .use_color = true, .print_line_numbers = true};
         if (print_errors(&err_pr, m) > 0)
@@ -319,7 +316,7 @@ static int inplace_modify_file(def_t *defs, file_t *f, pat_t *pattern)
                 err(EXIT_FAILURE, "Failed to open %s for modification", f->filename);
             backup_file = f;
             modifying_file = dest;
-            if (confirm == CONFIRM_ASK && f->filename)
+            if (options.confirm == CONFIRM_ASK && f->filename)
                 fprint_filename(tty_out, f->filename);
         }
         confirm_replacements(f, m, &confirm_file);
@@ -329,7 +326,7 @@ static int inplace_modify_file(def_t *defs, file_t *f, pat_t *pattern)
     if (dest) {
         // Print trailing context lines:
         print_match(dest, &pr, NULL);
-        if (confirm == CONFIRM_ALL)
+        if (options.confirm == CONFIRM_ALL)
             printf("%s\n", f->filename);
         (void)fclose(dest);
         if (modifying_file == dest) modifying_file = NULL;
@@ -350,12 +347,12 @@ static int print_matches(def_t *defs, file_t *f, pat_t *pattern)
     int matches = 0;
     printer_t pr = {
         .file = f,
-        .context_lines = context_lines,
-        .use_color = print_color == COLOR_YES,
-        .print_line_numbers = print_line_numbers,
+        .context_lines = options.context_lines,
+        .use_color = options.format == FORMAT_FANCY,
+        .print_line_numbers = options.format == FORMAT_FANCY,
     };
 
-    for (match_t *m = NULL; (m = next_match(defs, f, m, pattern, skip, ignorecase)); ) {
+    for (match_t *m = NULL; (m = next_match(defs, f, m, pattern, options.skip, options.ignorecase)); ) {
         printer_t err_pr = {.file = f, .context_lines = true, .use_color = true, .print_line_numbers = true};
         if (print_errors(&err_pr, m) > 0)
             exit(EXIT_FAILURE);
@@ -389,18 +386,18 @@ static int process_file(def_t *defs, const char *filename, pat_t *pattern)
     }
 
     int matches = 0;
-    if (mode == MODE_EXPLAIN) {
+    if (options.mode == MODE_EXPLAIN) {
         matches += explain_matches(defs, f, pattern);
-    } else if (mode == MODE_LISTFILES) {
-        match_t *m = next_match(defs, f, NULL, pattern, skip, ignorecase);
+    } else if (options.mode == MODE_LISTFILES) {
+        match_t *m = next_match(defs, f, NULL, pattern, options.skip, options.ignorecase);
         if (m) {
             recycle_if_unused(&m);
             printf("%s\n", f->filename);
             matches += 1;
         }
-    } else if (mode == MODE_JSON) {
+    } else if (options.mode == MODE_JSON) {
         matches += print_matches_as_json(defs, f, pattern);
-    } else if (mode == MODE_INPLACE) {
+    } else if (options.mode == MODE_INPLACE) {
         matches += inplace_modify_file(defs, f, pattern);
     } else {
         matches += print_matches(defs, f, pattern);
@@ -519,21 +516,21 @@ int main(int argc, char *argv[])
             printf("%s\n\n%s\n", description, usage);
             exit(EXIT_SUCCESS);
         } else if (BOOLFLAG("-v") || BOOLFLAG("--verbose")) {
-            verbose = true;
+            options.verbose = true;
         } else if (BOOLFLAG("-e") || BOOLFLAG("--explain")) {
-            mode = MODE_EXPLAIN;
+            options.mode = MODE_EXPLAIN;
         } else if (BOOLFLAG("-j") || BOOLFLAG("--json")) {
-            mode = MODE_JSON;
+            options.mode = MODE_JSON;
         } else if (BOOLFLAG("-I") || BOOLFLAG("--inplace")) {
-            mode = MODE_INPLACE;
+            options.mode = MODE_INPLACE;
         } else if (BOOLFLAG("-C") || BOOLFLAG("--confirm")) {
-            confirm = CONFIRM_ASK;
+            options.confirm = CONFIRM_ASK;
         } else if (BOOLFLAG("-G") || BOOLFLAG("--git")) {
-            git_mode = true;
+            options.git_mode = true;
         } else if (BOOLFLAG("-i") || BOOLFLAG("--ignore-case")) {
-            ignorecase = true;
+            options.ignorecase = true;
         } else if (BOOLFLAG("-l") || BOOLFLAG("--list-files")) {
-            mode = MODE_LISTFILES;
+            options.mode = MODE_LISTFILES;
         } else if (FLAG("-r")     || FLAG("--replace")) {
             if (!pattern)
                 errx(EXIT_FAILURE, "No pattern has been defined for replacement to operate on");
@@ -580,19 +577,19 @@ int main(int argc, char *argv[])
                 fprint_line(stdout, arg_file, s->end, arg_file->end,
                             "Failed to compile part of the skip argument");
             }
-            skip = either_pat(arg_file, skip, s);
+            options.skip = either_pat(arg_file, options.skip, s);
         } else if (FLAG("-c")     || FLAG("--context")) {
             if (streq(flag, "all")) {
-                context_lines = ALL_CONTEXT;
+                options.context_lines = ALL_CONTEXT;
             } else if (streq(flag, "none")) {
-                context_lines = 0;
+                options.context_lines = 0;
             } else {
-                context_lines = (int)strtol(flag, &flag, 10);
+                options.context_lines = (int)strtol(flag, &flag, 10);
                 if (flag && flag[0])
                     errx(EXIT_FAILURE, "Unsupported flags after --context: %s", flag);
             }
-        } else if (FLAG("--color")) {
-            print_color = streq(flag, "yes") ? COLOR_YES : streq(flag, "no") ? COLOR_NO : COLOR_AUTO;
+        } else if (FLAG("-f")      || FLAG("--format")) {
+            options.format = streq(flag, "fancy") ? FORMAT_FANCY : streq(flag, "plain") ? FORMAT_PLAIN : FORMAT_AUTO;
         } else if (argv[0][0] == '-' && argv[0][1] && argv[0][1] != '-') { // single-char flags
             errx(EXIT_FAILURE, "Unrecognized flag: -%c\n\n%s", argv[0][1], usage);
         } else if (argv[0][0] != '-') {
@@ -611,18 +608,16 @@ int main(int argc, char *argv[])
     if (pattern == NULL)
         errx(EXIT_FAILURE, "No pattern provided.\n\n%s", usage);
 
-    if (confirm == CONFIRM_ASK && mode != MODE_INPLACE)
+    if (options.confirm == CONFIRM_ASK && options.mode != MODE_INPLACE)
         errx(EXIT_FAILURE, "Confirm mode (-C flag) can only be used with inplace mode (-I flag)");
 
     for (argc = 0; argv[argc]; ++argc) ; // update argc
 
-    if (context_lines == USE_DEFAULT_CONTEXT) context_lines = 1;
-    if (context_lines < 0 && context_lines != ALL_CONTEXT) context_lines = 0;
+    if (options.context_lines == USE_DEFAULT_CONTEXT) options.context_lines = 1;
+    if (options.context_lines < 0 && options.context_lines != ALL_CONTEXT) options.context_lines = 0;
 
-    if (isatty(STDOUT_FILENO)) {
-        if (print_color == COLOR_AUTO) print_color = COLOR_YES;
-        print_line_numbers = true;
-    }
+    if (options.format == FORMAT_AUTO)
+        options.format = isatty(STDOUT_FILENO) ? FORMAT_FANCY : FORMAT_PLAIN;
 
     // If any of these signals triggers, and there is a temporary file in use,
     // be sure to clean it up before exiting.
@@ -638,7 +633,7 @@ int main(int argc, char *argv[])
 
     // User input/output is handled through /dev/tty so that normal unix pipes
     // can work properly while simultaneously asking for user input.
-    if (confirm == CONFIRM_ASK) {
+    if (options.confirm == CONFIRM_ASK) {
         tty_in = fopen("/dev/tty", "r");
         tty_out = fopen("/dev/tty", "w");
     }
@@ -651,8 +646,8 @@ int main(int argc, char *argv[])
     pattern = bp_pattern(patref_file, patref_file->contents);
 
     int found = 0;
-    if (mode == MODE_JSON) printf("[");
-    if (git_mode) { // Get the list of files from `git --ls-files ...`
+    if (options.mode == MODE_JSON) printf("[");
+    if (options.git_mode) { // Get the list of files from `git --ls-files ...`
         found = process_git_files(defs, pattern, argc, argv);
     } else if (argv[0]) {
         // Files pass in as command line args:
@@ -670,7 +665,7 @@ int main(int argc, char *argv[])
         // Piped in input:
         found += process_file(defs, "", pattern);
     }
-    if (mode == MODE_JSON) printf("]\n");
+    if (options.mode == MODE_JSON) printf("]\n");
 
     if (tty_out) { (void)fclose(tty_out); tty_out = NULL; }
     if (tty_in) { (void)fclose(tty_in); tty_in = NULL; }

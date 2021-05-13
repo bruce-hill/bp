@@ -67,9 +67,10 @@ Otherwise, if \fI<N>\fR is a positive integer, print the whole line on which
 matches occur, as well as the \fI<N-1>\fR lines before and after the match. The
 default value for this argument is 1 (print whole lines where matches occur).
 
-.B \--color \fIyes|no|auto\fR
-Whether or not to use color output. Default is \fIauto\fR, which means that
-output will be colored only when printing to a TTY output.
+.B \-f\fR, \fB\--format \fIauto|fancy|plain\fR
+Set the output format. \fIfancy\fR includes colors and line numbers,
+\fIplain\fR includes neither, and \fIauto\fR (the default) uses \fIfancy\fR
+formatting only when the output is a TTY.
 
 .B \--help
 Print the usage and exit.
