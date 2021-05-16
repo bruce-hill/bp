@@ -99,8 +99,7 @@ static pat_t *expand_choices(file_t *f, pat_t *first)
                 ++str;
             }
         }
-        if (!matchchar(&str, quote))
-            file_err(f, &repstr[-1], str, "This string doesn't have a closing quote.");
+        (void)matchchar(&str, quote);
 
         pat_t *replacepat = first;
         first = new_pat(f, replacepat->start, str, replacepat->len, BP_REPLACE);
@@ -294,9 +293,8 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
         case '"': case '\'': case '{': case '\002': {
             char endquote = c == '{' ? '}' : (c == '\002' ? '\003' : c);
             char *litstart = (char*)str;
-            for (; *str != endquote; ++str)
-                if (str >= f->end)
-                    file_err(f, start, str, "This string doesn't have a closing %c.", endquote);
+            while (str < f->end && *str != endquote)
+                ++str;
             ssize_t len = (ssize_t)(str - litstart);
             ++str;
 
@@ -389,8 +387,7 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
                 file_err(f, str, str, "There should be a valid pattern after this parenthesis.");
             pat = expand_choices(f, pat);
             str = pat->end;
-            if (!matchchar(&str, ')'))
-                file_err(f, start, str, "This parenthesis group isn't properly closed.");
+            (void)matchchar(&str, ')');
             pat->start = start;
             pat->end = str;
             return pat;
@@ -402,8 +399,7 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
                 file_err(f, str, str, "There should be a valid pattern after this square bracket.");
             maybe = expand_choices(f, maybe);
             str = maybe->end;
-            if (!matchchar(&str, ']'))
-                file_err(f, start, str, "This square bracket group isn't properly closed.");
+            (void)matchchar(&str, ']');
             return new_range(f, start, str, 0, 1, maybe, NULL);
         }
         // Repeating
