@@ -306,7 +306,7 @@ static int inplace_modify_file(def_t *defs, file_t *f, pat_t *pattern)
     confirm_t confirm_file = options.confirm;
     for (match_t *m = NULL; (m = next_match(defs, f, m, pattern, options.skip, options.ignorecase)); ) {
         ++matches;
-        printer_t err_pr = {.file = f, .context_lines = true, .use_color = true, .print_line_numbers = true};
+        printer_t err_pr = {.file = f, .context_lines = 1, .use_color = true, .print_line_numbers = true};
         if (print_errors(&err_pr, m) > 0)
             exit(EXIT_FAILURE);
         // Lazy-open file for writing upon first match:
@@ -353,7 +353,7 @@ static int print_matches(def_t *defs, file_t *f, pat_t *pattern)
     };
 
     for (match_t *m = NULL; (m = next_match(defs, f, m, pattern, options.skip, options.ignorecase)); ) {
-        printer_t err_pr = {.file = f, .context_lines = true, .use_color = true, .print_line_numbers = true};
+        printer_t err_pr = {.file = f, .context_lines = 1, .use_color = true, .print_line_numbers = true};
         if (print_errors(&err_pr, m) > 0)
             exit(EXIT_FAILURE);
 
