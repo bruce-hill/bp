@@ -4,6 +4,7 @@
 // See `man ./bp.1` for more details
 //
 
+#include <ctype.h>
 #include <err.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -151,14 +152,10 @@ static int is_text_file(const char *filename)
     if (fd < 0) return 0;
     char buf[CHECK_FIRST_N_BYTES];
     ssize_t len = read(fd, buf, sizeof(buf)/sizeof(char));
-    if (len < 0) return 0;
     (void)close(fd);
-
-    for (ssize_t i = 0; i < len; i++) {
-        if (!(buf[i] == '\t' || buf[i] == '\n' || buf[i] == '\r'
-            || buf[i] >= '\x20'))
-            return 0;
-    }
+    if (len < 0) return 0;
+    for (ssize_t i = 0; i < len; i++)
+        if (!isprint(buf[i])) return 0;
     return 1;
 }
 
