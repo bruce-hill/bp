@@ -513,19 +513,9 @@ pat_t *bp_stringpattern(file_t *f, const char *str)
         pat_t *interp = NULL;
         for (; str < f->end; str++) {
             if (*str == '\\' && str+1 < f->end) {
-                char e = unescapechar(&str[1], NULL);
-                // If there is not a special escape sequence (\n, \x0A, \N,
-                // etc.) or \\, then check for an interpolated value:
-                if (e != str[1] || e == '\\' || e == 'N') {
-                    interp = bp_simplepattern(f, str);
-                    if (!interp)
-                        errx(EXIT_FAILURE, "Failed to match pattern %.*s", 2, str);
-                    break;
-                } else {
-                    interp = bp_simplepattern(f, str + 1);
-                    if (interp) break;
-                    // If there is no interpolated value, this is just a plain ol' regular backslash
-                }
+                interp = bp_simplepattern(f, str + 1);
+                if (interp) break;
+                // If there is no interpolated value, this is just a plain ol' regular backslash
             }
         }
         // End of string
