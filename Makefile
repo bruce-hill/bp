@@ -46,7 +46,7 @@ splint:
 #		-onlytrans -usedef -nullassign -compdestroy -globstate -nullstate -statictrans -predboolint \
 #		$(CFILES) bp.c
 
-install: $(NAME)
+install: $(NAME) bp.1
 	mkdir -p -m 755 "$(PREFIX)/man/man1" "$(PREFIX)/bin" "$(SYSCONFDIR)/xdg/$(NAME)"
 	cp -r grammars/* "$(SYSCONFDIR)/xdg/$(NAME)/"
 	cp bp.1 "$(PREFIX)/man/man1/$(NAME).1"
