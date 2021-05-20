@@ -7,7 +7,7 @@
 # See the accompanying README.md for more info.
 
 comment: "//" .. $ / "/*" ..%\n "*/"
-string: `" ..%(`\.) `"
+string: `" ..%string-escape `"
 keyword:
     "break" / "default" / "func" / "interface" / "select" / "case" / "defer" / "go" /
     "map" / "struct" / "chan" / "else" / "goto" / "package" / "switch" / "const" /

@@ -7,7 +7,7 @@
 # See the accompanying README.md for more info.
 
 comment: "//" .. $ / "/*" ..%\n "*/"
-string: `" ..%(`\.) `" / `' ..%(`\.) `' / `/ ..%(`\.) `/
+string: `" ..%string-escape `" / `' ..%string-escape `' / `/ ..%string-escape `/
 keyword:
     "abstract" / "arguments" / "await" / "boolean" / "break" / "byte" / "case" /
     "catch" / "char" / "class" / "const" / "continue" / "debugger" / "default" /

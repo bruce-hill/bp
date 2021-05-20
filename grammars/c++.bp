@@ -7,7 +7,7 @@
 # See the accompanying README.md for more info.
 
 comment: "//" .. $ / "/*" ..%\n "*/"
-string: `" ..%(`\.) `"
+string: `" ..%string-escape `"
 keyword:
     "alignas" / "alignof" / "and" / "and_eq" / "asm" / "atomic_cancel" / "atomic_commit" /
     "atomic_noexcept" / "auto" / "bitand" / "bitor" / "bool" / "break" / "case" / "catch" /

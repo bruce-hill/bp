@@ -7,7 +7,7 @@
 # See the accompanying README.md for more info.
 
 comment: "--" (`[ @eqs=*`= `[ ..%\n (`]eqs`]) / ..$)
-string: `"..%(`\.) `" / `' ..%(`\.) `' / `[ @eqs=*`= `[ ..%\n (`]eqs`])
+string: `"..%string-escape `" / `' ..%string-escape `' / `[ @eqs=*`= `[ ..%\n (`]eqs`])
 table: `{ ..%(table/string/comment/\n) `}
 keyword:
  "and" / "break" / "do" / "else" / "elseif" / "end" / "false" / "for" /

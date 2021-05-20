@@ -7,7 +7,7 @@
 # See the accompanying README.md for more info.
 
 comment: ";" ..$
-string: `" ..%(`\.) `"
+string: `" ..%string-escape `"
 list: parens
 function-def: `(__{defun}__id
 function: function-def ..%parens `)

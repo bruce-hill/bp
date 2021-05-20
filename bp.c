@@ -36,7 +36,7 @@ static const char *description = (
     BP_NAME" - a Parsing Expression Grammar command line tool");
 static const char *usage = (
     "Usage:\n"
-    "  "BP_NAME" [flags] <pattern> [<input files>...]\n\n"
+    "  "BP_NAME" [flags] <pattern> [<files>...]\n\n"
     "Flags:\n"
     " -h --help                        print the usage and quit\n"
     " -v --verbose                     print verbose debugging info\n"
@@ -48,10 +48,10 @@ static const char *usage = (
     " -l --list-files                  list filenames only\n"
     " -p --pattern <pat>               provide a pattern (equivalent to bp '\\(<pat>)')\n"
     " -r --replace <replacement>       replace the input pattern with the given replacement\n"
-    " -s --skip <skip pattern>         skip over the given pattern when looking for matches\n"
+    " -s --skip <skip-pattern>         skip over the given pattern when looking for matches\n"
     " -c --context <context>           set number of lines of context to print (all: the whole file, 0: only the match, 1: the line, N: N lines of context)\n"
     " -f --format auto|fancy|plain     set the output format\n"
-    " -g --grammar <grammar file>      use the specified file as a grammar");
+    " -g --grammar <grammar-file>      use the specified file as a grammar");
 
 // Used as a heuristic to check if a file is binary or text:
 #define CHECK_FIRST_N_BYTES 128

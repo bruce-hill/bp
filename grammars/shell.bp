@@ -7,8 +7,9 @@
 # See the accompanying README.md for more info.
 
 comment: `#..$
-string: `" ..%(`\./subcommand/\n) `" / `' ..%\n `' / "<<" _ @delim=id _$ ..%\n (^delim$)
-subcommand: `` ..%\n `` / "$" parens
+string: `" ..%(string-escape / subcommand / \n) `" / `' ..%\n `' / "<<" _ @delim=id _$ ..%\n (^delim$)
+string-escape: `\ `",`
+subcommand: `` ..%\n `` / "$" (parens/braces)
 keyword:
     "echo" / "read" / "set" / "unset" / "readonly" / "shift" / "export" / "if" / "fi" /
     "else" / "while" / "do" / "done" / "for" / "until" / "case" / "esac" / "break" /

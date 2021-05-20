@@ -7,7 +7,7 @@
 # See the accompanying README.md for more info.
 
 comment: "//" .. $ / "/*" ..%(comment / \n) "*/"
-string: `" ..%(`\.) `"
+string: `" ..%string-escape `"
 keyword:
     "as" / "break" / "const" / "continue" / "crate" / "else" / "enum" / "extern" /
     "false" / "fn" / "for" / "if" / "impl" / "in" / "let" / "loop" / "match" /
