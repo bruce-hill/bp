@@ -408,17 +408,18 @@ void print_match(FILE *out, printer_t *pr, match_t *m)
 }
 
 //
-// Print any errors that are present in the given match object.
+// Print any errors that are present in the given match object to stderr and
+// return the number of errors found.
 //
 int print_errors(printer_t *pr, match_t *m)
 {
     int ret = 0;
     if (m->pat->type == BP_ERROR) {
-        printf("\033[31;1m");
+        fprintf(stderr, "\033[31;1m");
         printer_t tmp = {.file = pr->file}; // No bells and whistles
-        print_match(stdout, &tmp, m); // Error message
-        printf("\033[0m\n");
-        fprint_line(stdout, pr->file, m->start, m->end, " ");
+        print_match(stderr, &tmp, m); // Error message
+        fprintf(stderr, "\033[0m\n");
+        fprint_line(stderr, pr->file, m->start, m->end, " ");
         return 1;
     }
     if (m->child) ret += print_errors(pr, m->child);
