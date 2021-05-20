@@ -165,7 +165,7 @@ static int is_text_file(const char *filename)
 //
 static int print_matches_as_json(def_t *defs, file_t *f, pat_t *pattern)
 {
-    int matches = 0;
+    static int matches = 0;
     for (match_t *m = NULL; (m = next_match(defs, f, m, pattern, options.skip, options.ignorecase)); ) {
         if (++matches > 1)
             printf(",\n");
@@ -173,7 +173,7 @@ static int print_matches_as_json(def_t *defs, file_t *f, pat_t *pattern)
         printf("\"tree\":{\"rule\":\"text\",\"start\":%d,\"end\":%ld,\"children\":[",
                0, f->end - f->contents);
         json_match(f->contents, m, options.verbose);
-        printf("]}}\n");
+        printf("]}}");
     }
     return matches;
 }

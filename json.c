@@ -17,7 +17,7 @@ static int _json_match(const char *text, match_t *m, int comma, bool verbose);
 static int _json_match(const char *text, match_t *m, int comma, bool verbose)
 {
     if (!verbose) {
-        if (m->pat->type != BP_REF) {
+        if (m->pat->type != BP_REF && m->pat->type != BP_ERROR) {
             for (match_t *child = m->child; child; child = child->nextsibling) {
                 comma |= _json_match(text, child, comma, verbose);
             }
