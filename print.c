@@ -377,6 +377,13 @@ void print_match(FILE *out, printer_t *pr, match_t *m)
     if (m) {
         const char *before_m = context_before(pr, m->start);
         if (!first) {
+            // When not printing context lines, print each match on its own
+            // line instead of jamming them all together:
+            if (pr->context_lines == 0 && (!pr->needs_line_number || !pr->print_line_numbers)) {
+                fprintf(out, "\n");
+                pr->needs_line_number = 1;
+            }
+
             const char *after_last = context_after(pr, pr->pos);
             if (after_last >= before_m) {
                 // Overlapping ranges:
@@ -395,7 +402,7 @@ void print_match(FILE *out, printer_t *pr, match_t *m)
         const char *after_last = context_after(pr, pr->pos);
         print_between(out, pr, pr->pos, after_last, pr->use_color ? color_normal : NULL);
         // Guarantee trailing newline
-        if (!pr->needs_line_number) fprintf(out, "\n");
+        if (!pr->needs_line_number || !pr->print_line_numbers) fprintf(out, "\n");
     }
     if (pr->use_color) fprintf(out, "%s", color_normal);
 }
