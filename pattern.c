@@ -87,7 +87,7 @@ static pat_t *expand_replacements(file_t *f, const char *str, pat_t *replace_pat
             file_err(f, str, str, "There should be a string literal as a replacement here.");
         char quote = str[-1];
         const char *repstr = str;
-        for (; *str && *str != quote; str++) {
+        for (; *str && *str != quote; str = next_char(f, str)) {
             if (*str == '\\') {
                 if (!str[1] || str[1] == '\n')
                     file_err(f, str, str+1,
@@ -515,7 +515,7 @@ pat_t *bp_stringpattern(file_t *f, const char *str)
     while (*str) {
         char *start = (char*)str;
         pat_t *interp = NULL;
-        for (; str < f->end; str++) {
+        for (; str < f->end; str = next_char(f, str)) {
             if (*str == '\\' && str+1 < f->end) {
                 interp = bp_simplepattern(f, str + 1);
                 if (interp) break;
