@@ -286,10 +286,9 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
 
             const char *opstart = str;
             unsigned char e = (unsigned char)unescapechar(str, &str);
-            if (*str == '-') { // Escape range (e.g. \x00-\xFF)
+            if (matchchar(&str, '-')) { // Escape range (e.g. \x00-\xFF)
                 if (next_char(f, str) != str+1)
                     file_err(f, start, next_char(f, str), "Sorry, UTF8 escape sequences are not supported.");
-                str = next_char(f, str);
                 const char *seqstart = str;
                 unsigned char e2 = (unsigned char)unescapechar(str, &str);
                 if (str == seqstart)
