@@ -14,7 +14,7 @@ OBJFILES=$(CFILES:.c=.o)
 
 all: $(NAME) bp.1
 
-%.o: %.c %.h types.h
+%.o: %.c %.h types.h utf8.h
 	$(CC) -c $(ALL_FLAGS) -o $@ $<
 
 $(NAME): $(OBJFILES) bp.c

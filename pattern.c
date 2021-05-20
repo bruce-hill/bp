@@ -13,6 +13,7 @@
 #include "files.h"
 #include "pattern.h"
 #include "utils.h"
+#include "utf8.h"
 
 __attribute__((nonnull(1,2)))
 static pat_t *expand_replacements(file_t *f, const char *str, pat_t *replace_pat);
@@ -31,7 +32,7 @@ static pat_t *bp_simplepattern(file_t *f, const char *str);
 // Allocate a new pattern for this file (ensuring it will be automatically
 // freed when the file is freed)
 //
-pat_t *new_pat(file_t *f, const char *start, const char *end, ssize_t len, enum pattype_e type)
+pat_t *new_pat(file_t *f, const char *start, const char *end, size_t minlen, ssize_t maxlen, enum pattype_e type)
 {
     allocated_pat_t *tracker = new(allocated_pat_t);
     tracker->next = f->pats;
@@ -39,7 +40,8 @@ pat_t *new_pat(file_t *f, const char *start, const char *end, ssize_t len, enum 
     tracker->pat.type = type;
     tracker->pat.start = start;
     tracker->pat.end = end;
-    tracker->pat.len = len;
+    tracker->pat.min_matchlen = minlen;
+    tracker->pat.max_matchlen = maxlen;
     return &tracker->pat;
 }
 
@@ -48,13 +50,10 @@ pat_t *new_pat(file_t *f, const char *start, const char *end, ssize_t len, enum 
 //
 static pat_t *new_range(file_t *f, const char *start, const char *end, size_t min, ssize_t max, pat_t *repeating, pat_t *sep)
 {
-    pat_t *range = new_pat(f, start, end, -1, BP_REPEAT);
-    if ((ssize_t)min == max && repeating->len >= 0) {
-        if (sep == NULL || max == 0)
-            range->len = repeating->len * max;
-        else if (sep->len >= 0)
-            range->len = repeating->len * max + sep->len * (max - 1);
-    }
+    size_t minlen = min*repeating->min_matchlen + (min > 0 ? min-1 : 0)*(sep ? sep->min_matchlen : 0);
+    ssize_t maxlen = (max == -1 || UNBOUNDED(repeating) || (max != 0 && max != 1 && sep && UNBOUNDED(sep))) ? -1
+        : max*repeating->max_matchlen + (ssize_t)(max > 0 ? min-1 : 0)*(ssize_t)(sep ? sep->min_matchlen : 0);
+    pat_t *range = new_pat(f, start, end, minlen, maxlen, BP_REPEAT);
     range->args.repetitions.min = min;
     range->args.repetitions.max = max;
     range->args.repetitions.repeat_pat = repeating;
@@ -93,13 +92,14 @@ static pat_t *expand_replacements(file_t *f, const char *str, pat_t *replace_pat
                 if (!str[1] || str[1] == '\n')
                     file_err(f, str, str+1,
                              "There should be an escape sequence after this backslash.");
-                ++str;
+                str = next_char(f, str);
             }
         }
         (void)matchchar(&str, quote);
 
-        if (replace_pat == NULL) replace_pat = new_pat(f, start, start, 0, BP_STRING);
-        pat_t *pat = new_pat(f, replace_pat->start, str, replace_pat->len, BP_REPLACE);
+        if (replace_pat == NULL) replace_pat = new_pat(f, start, start, 0, 0, BP_STRING);
+        pat_t *pat = new_pat(f, replace_pat->start, str, replace_pat->min_matchlen,
+                             replace_pat->max_matchlen, BP_REPLACE);
         pat->args.replace.pat = replace_pat;
         pat->args.replace.text = repstr;
         pat->args.replace.len = (size_t)(str-repstr-1);
@@ -134,8 +134,9 @@ pat_t *chain_together(file_t *f, pat_t *first, pat_t *second)
 {
     if (first == NULL) return second;
     if (second == NULL) return first;
-    ssize_t len = (first->len >= 0 && second->len >= 0) ? first->len + second->len : -1;
-    pat_t *chain = new_pat(f, first->start, second->end, len, BP_CHAIN);
+    size_t minlen = first->min_matchlen + second->min_matchlen;
+    ssize_t maxlen = (UNBOUNDED(first) || UNBOUNDED(second)) ? -1 : first->max_matchlen + second->max_matchlen;
+    pat_t *chain = new_pat(f, first->start, second->end, minlen, maxlen, BP_CHAIN);
     chain->args.multiple.first = first;
     chain->args.multiple.second = second;
 
@@ -144,6 +145,7 @@ pat_t *chain_together(file_t *f, pat_t *first, pat_t *second)
     for (pat_t *p = first; p; ) {
         if (p->type == BP_UPTO) {
             p->args.multiple.first = second;
+            p->min_matchlen = second->min_matchlen;
             break;
         } else if (p->type == BP_CAPTURE) {
             p = p->args.capture.capture_pat;
@@ -164,8 +166,10 @@ pat_t *either_pat(file_t *f, pat_t *first, pat_t *second)
 {
     if (first == NULL) return second;
     if (second == NULL) return first;
-    ssize_t len = first->len == second->len ? first->len : -1;
-    pat_t *either = new_pat(f, first->start, second->end, len, BP_OTHERWISE);
+    size_t minlen = first->min_matchlen < second->min_matchlen ? first->min_matchlen : second->min_matchlen;
+    ssize_t maxlen = (UNBOUNDED(first) || UNBOUNDED(second)) ? -1 : 
+        (first->max_matchlen > second->max_matchlen ? first->max_matchlen : second->max_matchlen);
+    pat_t *either = new_pat(f, first->start, second->end, minlen, maxlen, BP_OTHERWISE);
     either->args.multiple.first = first;
     either->args.multiple.second = second;
     return either;
@@ -197,7 +201,7 @@ static pat_t *bp_simplepattern(file_t *f, const char *str)
         if (!second)
             file_err(f, str, str, "The '%s' operator expects a pattern before and after.", type == BP_MATCH ? "~" : "!~");
 
-        pat = new_pat(f, str, second->end, first->len, type);
+        pat = new_pat(f, str, second->end, first->min_matchlen, first->max_matchlen, type);
         pat->args.multiple.first = first;
         pat->args.multiple.second = second;
         str = pat->end;
@@ -216,54 +220,56 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
     if (!*str) return NULL;
     const char *start = str;
     char c = *str;
-    ++str;
+    str = next_char(f, str);
     switch (c) {
         // Any char (dot)
         case '.': {
             if (*str == '.') { // ".."
                 pat_t *skip = NULL;
-                ++str;
+                str = next_char(f, str);
                 if (matchchar(&str, '%')) {
                     skip = bp_simplepattern(f, str);
                     if (!skip)
                         file_err(f, str, str, "There should be a pattern to skip here after the '%%'");
                     str = skip->end;
                 }
-                pat_t *upto = new_pat(f, start, str, -1, BP_UPTO);
+                pat_t *upto = new_pat(f, start, str, 0, -1, BP_UPTO);
                 upto->args.multiple.second = skip;
                 return upto;
             } else {
-                return new_pat(f, start, str, 1, BP_ANYCHAR);
+                return new_pat(f, start, str, 1, UTF8_MAXCHARLEN, BP_ANYCHAR);
             }
         }
         // Char literals
         case '`': {
             pat_t *all = NULL;
             do {
-                const char *charloc = str;
-                c = *str;
-                if (!c || c == '\n')
+                if (str >= f->end || !*str || *str == '\n')
                     file_err(f, str, str, "There should be a character here after the '`'");
-                const char *opstart = str-1;
 
-                ++str;
+                const char *c1_loc = str;
+                str = next_char(f, c1_loc);
                 if (matchchar(&str, '-')) { // Range
+                    if (&str[-1] - c1_loc > 1 || next_char(f, str) > str+1)
+                        file_err(f, start, next_char(f, str), "Sorry, UTF-8 character ranges are not yet supported.");
+                    char c1 = *c1_loc;
                     char c2 = *str;
                     if (!c2 || c2 == '\n')
                         file_err(f, str, str, "There should be a character here to complete the character range.");
-                    if (c > c2) { // Swap order
-                        char tmp = c;
-                        c = c2;
+                    if (c1 > c2) { // Swap order
+                        char tmp = c1;
+                        c1 = c2;
                         c2 = tmp;
                     }
-                    ++str;
-                    pat_t *pat = new_pat(f, opstart, str, 1, BP_RANGE);
-                    pat->args.range.low = (unsigned char)c;
+                    str = next_char(f, str);
+                    pat_t *pat = new_pat(f, start, str, 1, 1, BP_RANGE);
+                    pat->args.range.low = (unsigned char)c1;
                     pat->args.range.high = (unsigned char)c2;
                     all = either_pat(f, all, pat);
                 } else {
-                    pat_t *pat = new_pat(f, opstart, str, 1, BP_STRING);
-                    pat->args.string = charloc;
+                    size_t len = (size_t)(str - start - 1);
+                    pat_t *pat = new_pat(f, start, str, len, (ssize_t)len, BP_STRING);
+                    pat->args.string = c1_loc;
                     all = either_pat(f, all, pat);
                 }
             } while (matchchar(&str, ','));
@@ -276,24 +282,26 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
                 file_err(f, str, str, "There should be an escape sequence here after this backslash.");
 
             if (matchchar(&str, 'N')) // \N (nodent)
-                return new_pat(f, start, str, -1, BP_NODENT);
+                return new_pat(f, start, str, 1, -1, BP_NODENT);
 
             const char *opstart = str;
             unsigned char e = (unsigned char)unescapechar(str, &str);
             if (*str == '-') { // Escape range (e.g. \x00-\xFF)
-                ++str;
+                if (next_char(f, str) != str+1)
+                    file_err(f, start, next_char(f, str), "Sorry, UTF8 escape sequences are not supported.");
+                str = next_char(f, str);
                 const char *seqstart = str;
                 unsigned char e2 = (unsigned char)unescapechar(str, &str);
                 if (str == seqstart)
                     file_err(f, seqstart, str+1, "This value isn't a valid escape sequence");
                 if (e2 < e)
                     file_err(f, start, str, "Escape ranges should be low-to-high, but this is high-to-low.");
-                pat_t *esc = new_pat(f, opstart, str, 1, BP_RANGE);
+                pat_t *esc = new_pat(f, opstart, str, 1, 1, BP_RANGE);
                 esc->args.range.low = e;
                 esc->args.range.high = e2;
                 return esc;
             } else {
-                pat_t *esc = new_pat(f, opstart, str, 1, BP_STRING);
+                pat_t *esc = new_pat(f, opstart, str, 1, 1, BP_STRING);
                 char *s = xcalloc(sizeof(char), 2);
                 s[0] = (char)e;
                 esc->args.string = s;
@@ -305,19 +313,19 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
             char endquote = c == '{' ? '}' : (c == '\002' ? '\003' : c);
             char *litstart = (char*)str;
             while (str < f->end && *str != endquote)
-                ++str;
-            ssize_t len = (ssize_t)(str - litstart);
-            ++str;
+                str = next_char(f, str);
+            size_t len = (size_t)(str - litstart);
+            str = next_char(f, str);
 
-            pat_t *pat = new_pat(f, start, str, len, BP_STRING);
+            pat_t *pat = new_pat(f, start, str, len, (ssize_t)len, BP_STRING);
             pat->args.string = litstart;
             
             if (c == '{') { // Surround with `|` word boundaries
-                pat_t *left = new_pat(f, start, start+1, -1, BP_REF);
+                pat_t *left = new_pat(f, start, start+1, 0, -1, BP_REF);
                 left->args.ref.name = "left-word-edge";
                 left->args.ref.len = strlen(left->args.ref.name);
 
-                pat_t *right = new_pat(f, str-1, str, -1, BP_REF);
+                pat_t *right = new_pat(f, str-1, str, 0, -1, BP_REF);
                 right->args.ref.name = "right-word-edge";
                 right->args.ref.len = strlen(right->args.ref.name);
 
@@ -329,7 +337,7 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
         case '!': {
             pat_t *p = bp_simplepattern(f, str);
             if (!p) file_err(f, str, str, "There should be a pattern after this '!'");
-            pat_t *not = new_pat(f, start, p->end, 0, BP_NOT);
+            pat_t *not = new_pat(f, start, p->end, 0, 0, BP_NOT);
             not->args.pat = p;
             return not;
         }
@@ -372,12 +380,8 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
             if (!behind)
                 file_err(f, str, str, "There should be a pattern after this '<'");
             str = behind->end;
-            if (behind->len == -1)
-                file_err(f, start, behind->end,
-                         "Sorry, variable-length lookbehind patterns like this are not supported.\n"
-                         "Please use a fixed-length lookbehind pattern instead.");
             str = behind->end;
-            pat_t *pat = new_pat(f, start, str, 0, BP_AFTER);
+            pat_t *pat = new_pat(f, start, str, 0, 0, BP_AFTER);
             pat->args.pat = behind;
             return pat;
         }
@@ -387,7 +391,7 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
             if (!ahead)
                 file_err(f, str, str, "There should be a pattern after this '>'");
             str = ahead->end;
-            pat_t *pat = new_pat(f, start, str, 0, BP_BEFORE);
+            pat_t *pat = new_pat(f, start, str, 0, 0, BP_BEFORE);
             pat->args.pat = ahead;
             return pat;
         }
@@ -395,10 +399,10 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
         case '(': {
             if (matchstr(&str, "!)")) {
                 pat_t *pat = bp_simplepattern(f, str);
-                if (!pat) pat = new_pat(f, str, str, 0, BP_STRING);
+                if (!pat) pat = new_pat(f, str, str, 0, 0, BP_STRING);
                 pat = expand_replacements(f, pat->end, pat);
 
-                pat_t *error = new_pat(f, start, pat->end, pat->len, BP_ERROR);
+                pat_t *error = new_pat(f, start, pat->end, pat->min_matchlen, pat->max_matchlen, BP_ERROR);
                 error->args.pat = pat;
                 return error;
             }
@@ -453,7 +457,7 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
             if (!pat)
                 file_err(f, str, str, "There should be a valid pattern here to capture after the '@'");
 
-            pat_t *capture = new_pat(f, start, pat->end, pat->len, BP_CAPTURE);
+            pat_t *capture = new_pat(f, start, pat->end, pat->min_matchlen, pat->max_matchlen, BP_CAPTURE);
             capture->args.capture.capture_pat = pat;
             capture->args.capture.name = name;
             capture->args.capture.namelen = namelen;
@@ -466,14 +470,14 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
         // Start of file/line:
         case '^': {
             if (matchchar(&str, '^'))
-                return new_pat(f, start, str, 0, BP_START_OF_FILE);
-            return new_pat(f, start, str, 0, BP_START_OF_LINE);
+                return new_pat(f, start, str, 0, 0, BP_START_OF_FILE);
+            return new_pat(f, start, str, 0, 0, BP_START_OF_LINE);
         }
         // End of file/line:
         case '$': {
             if (matchchar(&str, '$'))
-                return new_pat(f, start, str, 0, BP_END_OF_FILE);
-            return new_pat(f, start, str, 0, BP_END_OF_LINE);
+                return new_pat(f, start, str, 0, 0, BP_END_OF_FILE);
+            return new_pat(f, start, str, 0, 0, BP_END_OF_LINE);
         }
         // Whitespace:
         case '_': {
@@ -481,7 +485,7 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
             if (matchchar(&str, '_')) // double __ (whitespace with newlines)
                 ++namelen;
             if (matchchar(&str, ':')) return NULL; // Don't match definitions
-            pat_t *ref = new_pat(f, start, str, -1, BP_REF);
+            pat_t *ref = new_pat(f, start, str, 0, -1, BP_REF);
             ref->args.ref.name = start;
             ref->args.ref.len = namelen;
             return ref;
@@ -494,7 +498,7 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
             str = after_name(str);
             if (matchchar(&str, ':')) // Don't match definitions
                 return NULL;
-            pat_t *ref = new_pat(f, start, str, -1, BP_REF);
+            pat_t *ref = new_pat(f, start, str, 0, -1, BP_REF);
             ref->args.ref.name = refname;
             ref->args.ref.len = (size_t)(str - refname);
             return ref;
@@ -519,9 +523,9 @@ pat_t *bp_stringpattern(file_t *f, const char *str)
             }
         }
         // End of string
-        ssize_t len = (ssize_t)(str - start);
+        size_t len = (size_t)(str - start);
         if (len > 0) {
-            pat_t *str_chunk = new_pat(f, start, str, len, BP_STRING);
+            pat_t *str_chunk = new_pat(f, start, str, len, (ssize_t)len, BP_STRING);
             str_chunk->args.string = start;
             ret = chain_together(f, ret, str_chunk);
         }
@@ -541,7 +545,7 @@ pat_t *bp_stringpattern(file_t *f, const char *str)
 //
 pat_t *bp_replacement(file_t *f, pat_t *replacepat, const char *replacement)
 {
-    pat_t *pat = new_pat(f, replacepat->start, replacepat->end, replacepat->len, BP_REPLACE);
+    pat_t *pat = new_pat(f, replacepat->start, replacepat->end, replacepat->min_matchlen, replacepat->max_matchlen, BP_REPLACE);
     pat->args.replace.pat = replacepat;
     const char *p = replacement;
     for (; *p; p++) {

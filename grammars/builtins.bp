@@ -24,8 +24,7 @@ id: left-id-edge !`0-9 !(keyword left-id-edge) +id-char
 id-char: `a-z,A-Z,_,0-9
 var: id
 keyword: !"" # No keywords defined by default
-left-word-edge: ^ / <(\x00-x7f!~(^^word-char)) / <((\xc0-xdf \x80-xbf)!~(^^word-char))
-    / <((\xe0-xef 2\x80-xbf)!~(^^word-char)) / <((\xf0-xf7 3\x80-xbf)!~(^^word-char))
+left-word-edge: !<word-char
 right-word-edge: !word-char
 word-char: `a-z,A-Z,_,0-9,-,'
 word: left-word-edge +word-char

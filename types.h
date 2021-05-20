@@ -9,6 +9,8 @@
 
 #include "files.h"
 
+#define UNBOUNDED(pat) ((pat)->max_matchlen == -1)
+
 // BP virtual machine pattern types
 enum pattype_e {
     BP_ANYCHAR = 1,
@@ -44,8 +46,9 @@ struct match_s; // forward declared to resolve circular struct defs
 typedef struct pat_s {
     enum pattype_e type;
     const char *start, *end;
-    // Length of the match, if constant, otherwise -1
-    ssize_t len;
+    // The bounds of the match length (used for backtracking)
+    size_t min_matchlen;
+    ssize_t max_matchlen; // -1 means unbounded length
     union {
         const char *string;
         struct {

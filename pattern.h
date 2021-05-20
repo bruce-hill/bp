@@ -8,7 +8,7 @@
 #include "types.h"
 
 __attribute__((returns_nonnull, nonnull(1,2)))
-pat_t *new_pat(file_t *f, const char *start, const char *end, ssize_t len, enum pattype_e type);
+pat_t *new_pat(file_t *f, const char *start, const char *end, size_t minlen, ssize_t maxlen, enum pattype_e type);
 __attribute__((nonnull(1,2)))
 pat_t *bp_stringpattern(file_t *f, const char *str);
 __attribute__((nonnull(1,2)))

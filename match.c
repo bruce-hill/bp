@@ -13,6 +13,7 @@
 #include "match.h"
 #include "types.h"
 #include "utils.h"
+#include "utf8.h"
 
 #ifdef DEBUG_HEAP
 // Doubly-linked list operations:
@@ -38,8 +39,6 @@ static match_t *in_use_matches = NULL;
 static inline pat_t *deref(def_t *defs, pat_t *pat);
 __attribute__((returns_nonnull))
 static match_t *new_match(pat_t *pat, const char *start, const char *end, match_t *child);
-__attribute__((nonnull, pure))
-static inline const char *next_char(file_t *f, const char *str);
 __attribute__((nonnull))
 static const char *match_backref(const char *str, match_t *cap, bool ignorecase);
 __attribute__((nonnull))
@@ -60,25 +59,6 @@ static inline pat_t *deref(def_t *defs, pat_t *pat)
         if (def) pat = def->pat;
     }
     return pat;
-}
-//
-// Return the location of the next character or UTF8 codepoint.
-// (i.e. skip forward one codepoint at a time, not one byte at a time)
-//
-static inline const char *next_char(file_t *f, const char *str)
-{
-    char c = *str;
-    ++str;
-    if (__builtin_expect(!(c & 0x80), 1))
-        return str;
-
-    if (__builtin_expect(str < f->end && !!(*str & 0x80), 1))
-        ++str;
-    if (c > '\xDF' && __builtin_expect(str < f->end && !!(*str & 0x80), 1))
-        ++str;
-    if (c > '\xEF' && __builtin_expect(str < f->end && !!(*str & 0x80), 1))
-        ++str;
-    return str;
 }
 
 //
@@ -200,10 +180,10 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
             return (str == f->end || *str == '\n') ? new_match(pat, str, str, NULL) : NULL;
         }
         case BP_STRING: {
-            if (&str[pat->len] > f->end) return NULL;
-            if (pat->len > 0 && (ignorecase ? memicmp : memcmp)(str, pat->args.string, (size_t)pat->len) != 0)
+            if (&str[pat->min_matchlen] > f->end) return NULL;
+            if (pat->min_matchlen > 0 && (ignorecase ? memicmp : memcmp)(str, pat->args.string, (size_t)pat->min_matchlen) != 0)
                 return NULL;
-            return new_match(pat, str, str + pat->len, NULL);
+            return new_match(pat, str, str + pat->min_matchlen, NULL);
         }
         case BP_RANGE: {
             if (str >= f->end) return NULL;
@@ -315,28 +295,27 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
             return m;
         }
         case BP_AFTER: {
-            ssize_t backtrack = pat->args.pat->len;
-            if (backtrack == -1)
-                errx(EXIT_FAILURE, "'<' is only allowed for fixed-length operations");
-            if (str - backtrack < f->contents) return NULL;
-            match_t *before = match(defs, f, str - backtrack, pat->args.pat, ignorecase);
-            if (before == NULL) return NULL;
-            return new_match(pat, str, str, before);
+            pat_t *back = deref(defs, pat->args.pat);
+            for (const char *pos = &str[-back->min_matchlen];
+              pos >= f->contents && (back->max_matchlen == -1 || pos >= &str[-back->max_matchlen]);
+              pos = prev_char(f, pos)) {
+                match_t *m = match(defs, f, pos, back, ignorecase);
+                if (m) return new_match(pat, str, str, m);
+                if (pos == f->contents) break;
+            }
+            return NULL;
         }
         case BP_BEFORE: {
             match_t *after = match(defs, f, str, pat->args.pat, ignorecase);
-            if (after == NULL) return NULL;
-            return new_match(pat, str, str, after);
+            return after ? new_match(pat, str, str, after) : NULL;
         }
         case BP_CAPTURE: {
             match_t *p = match(defs, f, str, pat->args.pat, ignorecase);
-            if (p == NULL) return NULL;
-            return new_match(pat, str, p->end, p);
+            return p ? new_match(pat, str, p->end, p) : NULL;
         }
         case BP_OTHERWISE: {
             match_t *m = match(defs, f, str, pat->args.multiple.first, ignorecase);
-            if (m == NULL) m = match(defs, f, str, pat->args.multiple.second, ignorecase);
-            return m;
+            return m ? match(defs, f, str, pat->args.multiple.second, ignorecase) : NULL;
         }
         case BP_CHAIN: {
             match_t *m1 = match(defs, f, str, pat->args.multiple.first, ignorecase);
@@ -400,7 +379,8 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
                 .type = BP_LEFTRECURSION,
                 .start = ref->start,
                 .end = ref->end,
-                .len = 0,
+                .min_matchlen = 0,
+                .max_matchlen = -1,
                 .args.leftrec = {
                     .match = NULL,
                     .visits = 0,
