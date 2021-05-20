@@ -155,7 +155,8 @@ static int is_text_file(const char *filename)
     (void)close(fd);
     if (len < 0) return 0;
     for (ssize_t i = 0; i < len; i++)
-        if (!isprint(buf[i])) return 0;
+        if (isascii(buf[i]) && !(isprint(buf[i]) || isspace(buf[i])))
+            return 0;
     return 1;
 }
 
