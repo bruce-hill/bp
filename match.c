@@ -296,18 +296,28 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
         }
         case BP_AFTER: {
             pat_t *back = deref(defs, pat->args.pat);
+
+            // We only care about the region from the backtrack pos up to the
+            // current pos, so mock it out as a file slice.
+            // TODO: this breaks ^/^^/$/$$, but that can probably be ignored
+            // because you rarely need to check those in a backtrack.
+            file_t slice;
+            memcpy(&slice, f, sizeof(file_t));
+            slice.end = (char*)str;
             for (const char *pos = &str[-(long)back->min_matchlen];
               pos >= f->contents && (back->max_matchlen == -1 || pos >= &str[-(long)back->max_matchlen]);
               pos = prev_char(f, pos)) {
-                match_t *m = match(defs, f, pos, back, ignorecase);
+                slice.contents = (char*)pos;
+                match_t *m = match(defs, &slice, pos, back, ignorecase);
                 // Match should not go past str (i.e. (<"AB" "B") should match "ABB", but not "AB")
-                // TODO: this breaks with (<+Abc "x"), which will never match
-                // but if we spoof the file, then (<$$ .) will match
                 if (m && m->end != str)
                     recycle_if_unused(&m);
                 else if (m)
                     return new_match(pat, str, str, m);
                 if (pos == f->contents) break;
+                // To prevent extreme performance degradation, don't keep
+                // walking backwards endlessly over newlines.
+                if (back->max_matchlen == -1 && *pos == '\n') break;
             }
             return NULL;
         }
@@ -350,15 +360,11 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
 
             // <p1>==<p2> matches iff the text of <p1> matches <p2>
             // <p1>!=<p2> matches iff the text of <p1> does not match <p2>
-            file_t inner = {
-                .filename=f->filename,
-                .contents=(char*)m1->start, .end=(char*)m1->end,
-                .lines=f->lines, // I think this works, but am not 100% sure
-                .nlines=1 + get_line_number(f, m1->end)-get_line_number(f, m1->start),
-                .mmapped=f->mmapped,
-                .pats = NULL, .next = NULL,
-            };
-            match_t *m2 = next_match(defs, &inner, NULL, pat->args.multiple.second, NULL, ignorecase);
+            file_t slice;
+            memcpy(&slice, f, sizeof(file_t));
+            slice.contents = (char*)m1->start;
+            slice.end = (char*)m1->end;
+            match_t *m2 = next_match(defs, &slice, NULL, pat->args.multiple.second, NULL, ignorecase);
             if ((!m2 && pat->type == BP_MATCH) || (m2 && pat->type == BP_NOT_MATCH)) {
                 recycle_if_unused(&m2);
                 recycle_if_unused(&m1);
