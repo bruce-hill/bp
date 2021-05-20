@@ -139,7 +139,7 @@ pat_t *chain_together(file_t *f, pat_t *first, pat_t *second)
             p = p->args.capture.capture_pat;
         } else if (p->type == BP_CHAIN) {
             p = p->args.multiple.second;
-        } else if (p->type == BP_EQUAL || p->type == BP_NOT_EQUAL) {
+        } else if (p->type == BP_MATCH || p->type == BP_NOT_MATCH) {
             p = p->args.pat;
         } else break;
     }
@@ -174,19 +174,20 @@ static pat_t *bp_simplepattern(file_t *f, const char *str)
 
     // Expand postfix operators (if any)
     str = after_spaces(pat->end);
-    while (str+2 < f->end && (matchstr(&str, "!=") || matchstr(&str, "=="))) { // Equality <pat1>==<pat2> and inequality <pat1>!=<pat2>
-        bool equal = str[-2] == '=';
+    while (str+2 < f->end) {
+        enum pattype_e type;
+        if (matchchar(&str, '~'))
+            type = BP_MATCH;
+        else if (matchstr(&str, "!~"))
+            type = BP_NOT_MATCH;
+        else break;
+
         pat_t *first = pat;
         pat_t *second = bp_simplepattern(f, str);
         if (!second)
-            file_err(f, str, str, "The '%c=' operator expects a pattern before and after.", equal?'=':'!');
-        if (equal) {
-            if (!(first->len == -1 || second->len == -1 || first->len == second->len))
-                file_err(f, pat->start, second->end,
-                  "These two patterns cannot possibly give the same result (different lengths: %ld != %ld)",
-                  first->len, second->len);
-        }
-        pat = new_pat(f, str, second->end, first->len, equal ? BP_EQUAL : BP_NOT_EQUAL);
+            file_err(f, str, str, "The '%s' operator expects a pattern before and after.", type == BP_MATCH ? "~" : "!~");
+
+        pat = new_pat(f, str, second->end, first->len, type);
         pat->args.multiple.first = first;
         pat->args.multiple.second = second;
         str = pat->end;

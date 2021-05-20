@@ -17,15 +17,15 @@ braces: `{ ..%(\n/braces/string) `}
 parens: `( ..%(\n/parens/string) `)
 string: `" ..%string-escape `" / `' ..%string-escape `'
 string-escape: `\ (`x 2 Hex / 1-3 `0-7 / `u 1-4 Hex / .)
-left-id-edge: ^ / <(\x00-x7f!=id-char) / <((\xc0-xdf \x80-xbf)!=id-char)
-    / <((\xe0-xef 2\x80-xbf)!=id-char) / <((\xf0-xf7 3\x80-xbf)!=id-char)
+left-id-edge: ^ / <(\x00-x7f!~(^^id-char)) / <((\xc0-xdf \x80-xbf)!~(^^id-char))
+    / <((\xe0-xef 2\x80-xbf)!~(^^id-char)) / <((\xf0-xf7 3\x80-xbf)!~(^^id-char))
 right-id-edge: !id-char
-id: left-id-edge !`0-9 (+id-char)!=keyword
+id: left-id-edge !`0-9 !(keyword left-id-edge) +id-char
 id-char: `a-z,A-Z,_,0-9
 var: id
 keyword: !"" # No keywords defined by default
-left-word-edge: ^ / <(\x00-x7f!=word-char) / <((\xc0-xdf \x80-xbf)!=word-char)
-    / <((\xe0-xef 2\x80-xbf)!=word-char) / <((\xf0-xf7 3\x80-xbf)!=word-char)
+left-word-edge: ^ / <(\x00-x7f!~(^^word-char)) / <((\xc0-xdf \x80-xbf)!~(^^word-char))
+    / <((\xe0-xef 2\x80-xbf)!~(^^word-char)) / <((\xf0-xf7 3\x80-xbf)!~(^^word-char))
 right-word-edge: !word-char
 word-char: `a-z,A-Z,_,0-9,-,'
 word: left-word-edge +word-char

@@ -70,8 +70,8 @@ Pattern            | Meaning
 `@foo=pat`         | Let `foo` be the text of `pat` (used for text replacement and backreferences)
 `pat => "replacement"` | Match `pat` and replace it with `replacement`
 `(pat1 @keep=pat2) => "@keep"` | Match `pat1` followed by `pat2` and replace it with the text of `pat2`
-`pat1==pat2`       | `pat1`, assuming `pat2` also matches with the same length
-`pat1!=pat2`       | `pat1`, unless `pat2` also matches with the same length
+`pat1~pat2`        | `pat1` when `pat2` can be found within the result
+`pat1!~pat2`       | `pat1` when `pat2` can not be found within the result
 `name:pat2`        | `name` is defined to mean `pat`
 `# line comment`   | A line comment
 

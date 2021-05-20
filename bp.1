@@ -256,17 +256,17 @@ references to captured values: \f[B]\[at]0\f[R] (the whole of
 For example, \f[B]\[at]word _ \[at]rest=(*word % _) => \[dq]\[at]rest
 \[at]1\[dq]\f[R]
 .TP
-\f[I]pat1\f[R] \f[B]==\f[R] \f[I]pat2\f[R]
-Matches \f[I]pat1\f[R], if and only if \f[I]pat2\f[R] also matches the
-text of \f[I]pat1\f[R]\[aq]s match.
-(e.g.\ \f[B]word == (\[dq]foo_\[dq] *.)\f[R] matches words that start
-with \f[B]\[lq]foo_\[rq]\f[R])
+\f[I]pat1\f[R] \f[B]\[ti]\f[R] \f[I]pat2\f[R]
+Matches when \f[I]pat1\f[R] matches and \f[I]pat2\f[R] can be found
+within the text of that match.
+(e.g.\ \f[B]comment \[ti] {TODO}\f[R] matches comments that contain the
+word \f[B]\[lq]TODO\[rq]\f[R])
 .TP
-\f[I]pat1\f[R] \f[B]!=\f[R] \f[I]pat2\f[R]
-Matches \f[I]pat1\f[R], if and only if \f[I]pat2\f[R] does not match the
-text of \f[I]pat1\f[R]\[aq]s match.
-(e.g.\ \f[B]word == (\[dq]foo_\[dq] *.)\f[R] matches words that do not
-start with \f[B]\[lq]foo_\[rq]\f[R])
+\f[I]pat1\f[R] \f[B]!\[ti]\f[R] \f[I]pat2\f[R]
+Matches when \f[I]pat1\f[R] matches, but \f[I]pat2\f[R] can not be found
+within the text of that match.
+(e.g.\ \f[B]comment \[ti] {IGNORE}\f[R] matches only comments that do
+not contain the word \f[B]\[lq]IGNORE\[rq]\f[R])
 .TP
 \f[I]name\f[R]\f[B]:\f[R] \f[I]pat\f[R]
 Define \f[I]name\f[R] to mean \f[I]pat\f[R] (pattern definition)
@@ -295,12 +295,12 @@ some common patterns.
 For example, the c++ grammar file contains definitions for
 \f[B]//\f[R]-style line comments as well as \f[B]/*\&...*/\f[R]-style
 block comments.
-Thus, you can find all comments with the string \[lq]TODO\[rq] with the
+Thus, you can find all comments with the word \[lq]TODO\[rq] with the
 following command:
 .IP
 .nf
 \f[C]
-bp -g c++ -p \[aq]comment==(..%\[rs]n \[dq]TODO\[dq] ..%\[rs]n$$)\[aq] *.cpp
+bp -g c++ -p \[aq]comment\[ti]{TODO}\[aq] *.cpp
 \f[R]
 .fi
 .SH EXAMPLES
@@ -313,12 +313,15 @@ Find files ending with \[dq].c\[dq] and replace the extension with
 \[dq].h\[dq]
 .TP
 \f[B]bp -p \[aq]{foobar} parens\[aq] my_file.py\f[R]
-Find the literal string \f[B]\[dq]foobar\[dq]\f[R], assuming it\[aq]s a
-complete word, followed by a pair of matching parentheses in the file
-\f[I]my_file.py\f[R]
+Find the word \f[B]\[dq]foobar\[dq]\f[R], followed by a pair of matching
+parentheses in the file \f[I]my_file.py\f[R]
 .TP
-\f[B]bp -g html -p `html-element==(\[dq]<a \[dq]..%\[rs]n$$)' foo.html\f[R]
-Using the \f[I]html\f[R] grammar, find all \f[I]html-element\f[R]s
-matching the tag \f[I]a\f[R] in the file \f[I]foo.html\f[R]
+\f[B]bp -g html -p \[aq]element \[ti] (\[ha]\[ha]\[dq]<a \[dq])\[aq] foo.html\f[R]
+Using the \f[I]html\f[R] grammar, find all \f[I]element\f[R]s matching
+the tag \f[I]a\f[R] in the file \f[I]foo.html\f[R]
+.TP
+\f[B]bp -g python -p \[aq]comment\[ti]{TODO}\[aq] *.py\f[R]
+Find all comments with the word \f[B]\[lq]TODO\[rq]\f[R] in local python
+files.
 .SH AUTHORS
 Bruce Hill (\f[I]bruce\[at]bruce-hill.com\f[R]).

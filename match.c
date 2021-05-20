@@ -114,8 +114,7 @@ static const char *match_backref(const char *str, match_t *cap, bool ignorecase)
         for (match_t *child = cap->child; child; child = child->nextsibling) {
             if (child->start > prev) {
                 size_t len = (size_t)(child->start - prev);
-                if (ignorecase ? memicmp(str, prev, len) != 0
-                               : memcmp(str, prev, len) != 0) {
+                if ((ignorecase ? memicmp : memcmp)(str, prev, len) != 0) {
                     return NULL;
                 }
                 str += len;
@@ -128,8 +127,7 @@ static const char *match_backref(const char *str, match_t *cap, bool ignorecase)
         }
         if (cap->end > prev) {
             size_t len = (size_t)(cap->end - prev);
-            if (ignorecase ? memicmp(str, prev, len) != 0
-                           : memcmp(str, prev, len) != 0) {
+            if ((ignorecase ? memicmp : memcmp)(str, prev, len) != 0) {
                 return NULL;
             }
             str += len;
@@ -151,9 +149,11 @@ match_t *next_match(def_t *defs, file_t *f, match_t *prev, pat_t *pat, pat_t *sk
     } else {
         str = f->contents;
     }
+    bool only_start = pat->type == BP_START_OF_FILE || (pat->type == BP_CHAIN && pat->args.multiple.first->type == BP_START_OF_FILE);
     while (str <= f->end) {
         match_t *m = match(defs, f, str, pat, ignorecase);
         if (m) return m;
+        if (only_start) return NULL;
         match_t *s;
         if (skip && (s = match(defs, f, str, skip, ignorecase))) {
             str = s->end > str ? s->end : str + 1;
@@ -201,8 +201,7 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
         }
         case BP_STRING: {
             if (&str[pat->len] > f->end) return NULL;
-            if (ignorecase ? memicmp(str, pat->args.string, (size_t)pat->len) != 0
-                           : memcmp(str, pat->args.string, (size_t)pat->len) != 0)
+            if ((ignorecase ? memicmp : memcmp)(str, pat->args.string, (size_t)pat->len) != 0)
                 return NULL;
             return new_match(pat, str, str + pat->len, NULL);
         }
@@ -360,7 +359,7 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
             ADD_OWNER(m1->nextsibling, m2);
             return new_match(pat, str, m2->end, m1);
         }
-        case BP_EQUAL: case BP_NOT_EQUAL: {
+        case BP_MATCH: case BP_NOT_MATCH: {
             match_t *m1 = match(defs, f, str, pat->args.multiple.first, ignorecase);
             if (m1 == NULL) return NULL;
 
@@ -374,17 +373,13 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
                 .mmapped=f->mmapped,
                 .pats = NULL, .next = NULL,
             };
-            match_t *m2 = match(defs, &inner, str, pat->args.multiple.second, ignorecase);
-            if ((m2 == NULL || m2->end != m1->end) == (pat->type == BP_EQUAL)) {
+            match_t *m2 = next_match(defs, &inner, NULL, pat->args.multiple.second, NULL, ignorecase);
+            if ((!m2 && pat->type == BP_MATCH) || (m2 && pat->type == BP_NOT_MATCH)) {
+                recycle_if_unused(&m2);
                 recycle_if_unused(&m1);
-                if (m2 != NULL) recycle_if_unused(&m2);
                 return NULL;
             }
-            if (pat->type == BP_EQUAL) {
-                ADD_OWNER(m1->nextsibling, m2);
-            } else {
-                recycle_if_unused(&m2);
-            }
+            if (pat->type == BP_MATCH) ADD_OWNER(m1->nextsibling, m2);
             return new_match(pat, m1->start, m1->end, m1);
         }
         case BP_REPLACE: {

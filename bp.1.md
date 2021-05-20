@@ -228,15 +228,15 @@ string, and it may contain references to captured values: **\@0** (the whole of
 named *foo* in *pat*), etc. For example, **\@word \_ \@rest=(\*word % \_)
 =\> \"\@rest \@1\"**
 
-*pat1* **==** *pat2*
-: Matches *pat1*, if and only if *pat2* also matches the text of
-*pat1*\'s match. (e.g. **word == (\"foo\_\" \*.)** matches words that start
-with **"foo\_"**)
+*pat1* **~** *pat2*
+: Matches when *pat1* matches and *pat2* can be found within the text of that
+match. (e.g. **comment ~ {TODO}** matches comments that contain the word
+**"TODO"**)
 
-*pat1* **!=** *pat2*
-: Matches *pat1*, if and only if *pat2* does not match the text of
-*pat1*\'s match. (e.g. **word == (\"foo\_\" \*.)** matches words that do
-not start with **"foo\_"**)
+*pat1* **!~** *pat2*
+: Matches when *pat1* matches, but *pat2* can not be found within the text of
+that match. (e.g. **comment ~ {IGNORE}** matches only comments that do not
+contain the word **"IGNORE"**)
 
 *name***:** *pat*
 : Define *name* to mean *pat* (pattern definition)
@@ -262,10 +262,10 @@ which may be loaded on demand. These grammar files are not comprehensive syntax
 definitions, but only some common patterns. For example, the c++ grammar file
 contains definitions for **//**-style line comments as well as
 **/\*...\*/**-style block comments. Thus, you can find all comments with the
-string "TODO" with the following command:
+word "TODO" with the following command:
 
 ```
-bp -g c++ -p 'comment==(..%\n "TODO" ..%\n$$)' *.cpp
+bp -g c++ -p 'comment~{TODO}' *.cpp
 ```
 
 
@@ -278,9 +278,12 @@ bp -g c++ -p 'comment==(..%\n "TODO" ..%\n$$)' *.cpp
 : Find files ending with \".c\" and replace the extension with \".h\"
 
 **bp -p \'{foobar} parens\' my_file.py**
-: Find the literal string **\"foobar\"**, assuming it\'s a complete word,
-followed by a pair of matching parentheses in the file *my_file.py*
+: Find the word **\"foobar\"**, followed by a pair of matching parentheses in
+the file *my_file.py*
 
-**bp -g html -p 'html-element==(\"\<a \"..%\\n\$\$)' foo.html**
-: Using the *html* grammar, find all *html-element*s matching the tag *a* in
-the file *foo.html*
+**bp -g html -p \'element ~ (^^\"\<a \")\' foo.html**
+: Using the *html* grammar, find all *element*s matching the tag *a* in the
+file *foo.html*
+
+**bp -g python -p \'comment~{TODO}\' \*.py**
+: Find all comments with the word **"TODO"** in local python files.
