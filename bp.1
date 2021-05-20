@@ -273,9 +273,9 @@ Define \f[I]name\f[R] to mean \f[I]pat\f[R] (pattern definition)
 .TP
 \f[B](!)\f[R] \f[I]error-pat\f[R]
 If \f[I]error-pat\f[R] matches, \f[B]bp\f[R] will not print any results
-in this file and instead print an error message highlighting the
-matching position of \f[I]error-pat\f[R] in the file and printing the
-text of \f[I]error-pat\f[R] as an error message.
+in this file and instead print an error message to \f[B]STDERR\f[R]
+highlighting the matching position of \f[I]error-pat\f[R] in the file
+and printing the text of \f[I]error-pat\f[R] as an error message.
 Then, \f[B]bp\f[R] will exit with a failure status and not process any
 further files.
 .TP

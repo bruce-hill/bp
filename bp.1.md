@@ -243,8 +243,8 @@ contain the word **"IGNORE"**)
 
 **(!)** *error-pat*
 : If *error-pat* matches, **bp** will not print any results in this file and
-instead print an error message highlighting the matching position of
-*error-pat* in the file and printing the text of *error-pat* as an error
+instead print an error message to **STDERR** highlighting the matching position
+of *error-pat* in the file and printing the text of *error-pat* as an error
 message. Then, **bp** will exit with a failure status and not process any
 further files.
 
