@@ -181,7 +181,7 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
         }
         case BP_STRING: {
             if (&str[pat->min_matchlen] > f->end) return NULL;
-            if (pat->min_matchlen > 0 && (ignorecase ? memicmp : memcmp)(str, pat->args.string, (size_t)pat->min_matchlen) != 0)
+            if (pat->min_matchlen > 0 && (ignorecase ? memicmp : memcmp)(str, pat->args.string, pat->min_matchlen) != 0)
                 return NULL;
             return new_match(pat, str, str + pat->min_matchlen, NULL);
         }
@@ -296,11 +296,17 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
         }
         case BP_AFTER: {
             pat_t *back = deref(defs, pat->args.pat);
-            for (const char *pos = &str[-back->min_matchlen];
-              pos >= f->contents && (back->max_matchlen == -1 || pos >= &str[-back->max_matchlen]);
+            for (const char *pos = &str[-(long)back->min_matchlen];
+              pos >= f->contents && (back->max_matchlen == -1 || pos >= &str[-(long)back->max_matchlen]);
               pos = prev_char(f, pos)) {
                 match_t *m = match(defs, f, pos, back, ignorecase);
-                if (m) return new_match(pat, str, str, m);
+                // Match should not go past str (i.e. (<"AB" "B") should match "ABB", but not "AB")
+                // TODO: this breaks with (<+Abc "x"), which will never match
+                // but if we spoof the file, then (<$$ .) will match
+                if (m && m->end != str)
+                    recycle_if_unused(&m);
+                else if (m)
+                    return new_match(pat, str, str, m);
                 if (pos == f->contents) break;
             }
             return NULL;
@@ -315,7 +321,7 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
         }
         case BP_OTHERWISE: {
             match_t *m = match(defs, f, str, pat->args.multiple.first, ignorecase);
-            return m ? match(defs, f, str, pat->args.multiple.second, ignorecase) : NULL;
+            return m ? m : match(defs, f, str, pat->args.multiple.second, ignorecase);
         }
         case BP_CHAIN: {
             match_t *m1 = match(defs, f, str, pat->args.multiple.first, ignorecase);
