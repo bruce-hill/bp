@@ -413,8 +413,7 @@ void print_match(FILE *out, printer_t *pr, match_t *m)
 int print_errors(printer_t *pr, match_t *m)
 {
     int ret = 0;
-    if (m->pat->type == BP_CAPTURE && m->pat->args.capture.name
-        && strncmp(m->pat->args.capture.name, "!", m->pat->args.capture.namelen) == 0) {
+    if (m->pat->type == BP_ERROR) {
         printf("\033[31;1m");
         printer_t tmp = {.file = pr->file}; // No bells and whistles
         print_match(stdout, &tmp, m); // Error message

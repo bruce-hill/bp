@@ -5,18 +5,18 @@
 # The grammar files provided with BP are not otherwise intended to be full
 # language grammars.
 
-Grammar: __ *(Def [__`;])%__ __ ($$ / @!=(..%\n$$ => "Could not parse this code"))
+Grammar: __ *(Def [__`;])%__ __ ($$ / (!)(..%\n$$ => "Could not parse this code"))
 Def: @name=id __ `: __ (
       @definition=extended-pat
-    / $$ @!=(''=>"No definition for rule")
-    / @!=(..%\n>(`;/id_`:/$) => "Invalid definition: @0"))
+    / $$ (!)=>"No definition for rule"
+    / (!)(..%\n>(`;/id_`:/$) => "Invalid definition: @0"))
 
 # This is used for command line arguments:
 String-pattern: ..%(\n / Nodent / Escape / `\ pat [`;])$$
 
 pat: simple-pat !(__("!~"/"~")) / suffixed-pat
 simple-pat: Upto-and / Dot / String / Chars / Nodent / Escape-range
-    / Escape / Repeat / Optional / No / After / Before / Capture
+    / Escape / Repeat / Optional / No / After / Before / Capture  / Error / Empty-replacement
     / Start-of-File / Start-of-Line / End-of-File / End-of-Line / Ref / parens
 
 suffixed-pat: (
@@ -24,43 +24,47 @@ suffixed-pat: (
     / Not-match-pat
 )
 
-Match-pat: @first=(suffixed-pat / simple-pat)__"~"__@second=(pat / @!=(''=> "Expected pattern after '~'"))
-Not-match-pat: @first=(suffixed-pat / simple-pat)__"!~"__@second=(pat / @!=(''=> "Expected pattern after '!~'"))
+Match-pat: @first=(suffixed-pat / simple-pat)__"~"__@second=(pat / (!)=>"Expected pattern after '~'")
+Not-match-pat: @first=(suffixed-pat / simple-pat)__"!~"__@second=(pat / (!)=>"Expected pattern after '!~'")
 
 Dot: `. !`.
 String: (
-        `" @s=.. (`" / $ @!=(''=> "Expected closing quote here"))
-      / `' @s=.. (`' / $ @!=(''=> "Expected closing quote here"))
-      / `{ @s=.. (`} / $ @!=(''=> "Expected closing brace here"))
+        `" @s=.. (`" / $ (!)=>"Expected closing quote here")
+      / `' @s=.. (`' / $ (!)=>"Expected closing quote here")
+      / `{ @s=.. (`} / $ (!)=>"Expected closing brace here")
     )
 Chars: `` @+(Char-range/Char) % `,
-Char-range: @low=. `- (@high=. / @!=(''=> "Expected a second character to form a character range"))
-Char: (@s=. / @!=(''=> "Expected a character following the '`'"))
+Char-range: @low=. `- (@high=. / (!)=>"Expected a second character to form a character range")
+Char: (@s=. / (!)=>"Expected a character following the '`'")
 Escape-range: `\ @low=escape-sequence `- @high=escape-sequence
 Escape: `\ (@s=escape-sequence
-    / $ @!=(''=>"Backslashes are used for escape sequences, not splitting lines")
-    / @!=(. *(Abc/`0-9) => "Invalid escape sequence: '@0'")
+    / $ (!)=>"Backslashes are used for escape sequences, not splitting lines"
+    / (!)(. *(Abc/`0-9) => "Invalid escape sequence: '@0'")
 )
 escape-sequence: (
        `n,t,r,e,b,a,v
       / 1-3 `0-7
       / `x 2 `0-9,a-f,A-F
     )
-No: `! (__@pat / @!=(''=>"Expected a pattern after the exclamation mark"))
+No: `! (__@pat / (!)=>"Expected a pattern after the exclamation mark")
 Nodent: `\ `N
 Upto-and: ".." [__`%__@second=simple-pat] [__@first=simple-pat] 
 Repeat: (
-        @min=(''=>'0') (`*=>"-") @max=(''=>'∞')
+        @min=(=>'0') (`*=>"-") @max=(=>'∞')
       / @min=int __ `- __ @max=int
-      / @min=(int / ''=>'1') __ (`+=>"-") @max=(''=>'∞')
+      / @min=(int / =>'1') __ (`+=>"-") @max=(=>'∞')
       / @min=@max=int
     ) __ @repeat-pat=pat [__`%__@sep=pat]
-Optional: `[ __ extended-pat (__`] / @!=(''=> "Expected closing square bracket here"))
+Optional: `[ __ extended-pat (__`] / (!)=>"Expected closing square bracket here")
 After: `< __ pat
 Before: `> __ pat
-Capture: `@ [__ @capture-name=(id/`!) __ !"=>" `=] __ (@capture=pat / @!=(''=> "Expected pattern to capture"))
+Capture: `@ [__ @capture-name=(id/`!) __ !"=>" `=] __ (@capture=pat / (!)=>"Expected pattern to capture")
+Error: "(!)" @pat=[__ (Replace / Chain / pat)]
 Replace: (
-      @replace-pat=(Replace / Chain / pat) __ "=>" (__ @replacement=String / @!=(''=> "Expected replacement string"))
+      @replace-pat=(Replace / Chain / pat) __ "=>" (__ @replacement=String / (!)=>"Expected replacement string")
+    )
+Empty-replacement: (
+       @replace-pat=(=>"''") "=>" (__ @replacement=String / (!)=>"Expected replacement string")
     )
 Ref: @name=id !(__`:)
 Start-of-File: "^^"
@@ -68,7 +72,7 @@ Start-of-Line: "^"
 End-of-File: "$$"
 End-of-Line: "$"
 
-parens: `( __ extended-pat (__ `) / @!=(''=> "Expected closing parenthesis here"))
+parens: `( __ extended-pat (__ `) / (!)=>"Expected closing parenthesis here")
 
 Chain: 2+@(pat !(__"=>") / Replace)%__
 Otherwise: 2+@(Replace / Chain / pat)%(__`/__)

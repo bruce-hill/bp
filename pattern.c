@@ -14,6 +14,8 @@
 #include "pattern.h"
 #include "utils.h"
 
+__attribute__((nonnull(1,2)))
+static pat_t *expand_replacements(file_t *f, const char *str, pat_t *replace_pat);
 __attribute__((nonnull))
 static pat_t *expand_chain(file_t *f, pat_t *first);
 __attribute__((nonnull))
@@ -76,20 +78,15 @@ static pat_t *expand_chain(file_t *f, pat_t *first)
 }
 
 //
-// Take a pattern and parse any "=>" replacements and then expand it into a
-// chain of choices if it's followed by any "/"-separated patterns (e.g.
-// "`x/`y"), otherwise return the original input.
+// Match trailing => replacements (with optional pattern beforehand)
 //
-static pat_t *expand_choices(file_t *f, pat_t *first)
+static pat_t *expand_replacements(file_t *f, const char *str, pat_t *replace_pat)
 {
-    first = expand_chain(f, first);
-    const char *str = first->end;
-    
-    while (str+2 < f->end && matchstr(&str, "=>")) { // Replacement <pat> => <pat>
-        str = after_spaces(str);
-        char quote = *str;
+    const char *start = str;
+    while (matchstr(&str, "=>")) {
         if (!(matchchar(&str, '"') || matchchar(&str, '\'')))
             file_err(f, str, str, "There should be a string literal as a replacement here.");
+        char quote = str[-1];
         const char *repstr = str;
         for (; *str && *str != quote; str++) {
             if (*str == '\\') {
@@ -101,13 +98,26 @@ static pat_t *expand_choices(file_t *f, pat_t *first)
         }
         (void)matchchar(&str, quote);
 
-        pat_t *replacepat = first;
-        first = new_pat(f, replacepat->start, str, replacepat->len, BP_REPLACE);
-        first->args.replace.pat = replacepat;
-        first->args.replace.text = repstr;
-        first->args.replace.len = (size_t)(str-repstr-1);
+        if (replace_pat == NULL) replace_pat = new_pat(f, start, start, 0, BP_STRING);
+        pat_t *pat = new_pat(f, replace_pat->start, str, replace_pat->len, BP_REPLACE);
+        pat->args.replace.pat = replace_pat;
+        pat->args.replace.text = repstr;
+        pat->args.replace.len = (size_t)(str-repstr-1);
+        replace_pat = pat;
     }
+    return replace_pat;
+}
 
+//
+// Take a pattern and parse any "=>" replacements and then expand it into a
+// chain of choices if it's followed by any "/"-separated patterns (e.g.
+// "`x/`y"), otherwise return the original input.
+//
+static pat_t *expand_choices(file_t *f, pat_t *first)
+{
+    first = expand_chain(f, first);
+    first = expand_replacements(f, first->end, first);
+    const char *str = first->end;
     if (!matchchar(&str, '/')) return first;
     pat_t *second = bp_simplepattern(f, str);
     if (!second)
@@ -383,6 +393,16 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
         }
         // Parentheses
         case '(': {
+            if (matchstr(&str, "!)")) {
+                pat_t *pat = bp_simplepattern(f, str);
+                if (!pat) pat = new_pat(f, str, str, 0, BP_STRING);
+                pat = expand_replacements(f, pat->end, pat);
+
+                pat_t *error = new_pat(f, start, pat->end, pat->len, BP_ERROR);
+                error->args.pat = pat;
+                return error;
+            }
+
             pat_t *pat = bp_simplepattern(f, str);
             if (!pat)
                 file_err(f, str, str, "There should be a valid pattern after this parenthesis.");
@@ -423,7 +443,7 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
         case '@': {
             const char *name = NULL;
             size_t namelen = 0;
-            const char *a = *str == '!' ? &str[1] : after_name(str);
+            const char *a = after_name(str);
             if (a > str && after_spaces(a)[0] == '=' && after_spaces(a)[1] != '>') {
                 name = str;
                 namelen = (size_t)(a-str);
@@ -438,6 +458,10 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
             capture->args.capture.name = name;
             capture->args.capture.namelen = namelen;
             return capture;
+        }
+        // Replacement with empty pattern: (=> 'blah')
+        case '=': {
+            return expand_replacements(f, start, NULL);
         }
         // Start of file/line:
         case '^': {

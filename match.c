@@ -201,7 +201,7 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
         }
         case BP_STRING: {
             if (&str[pat->len] > f->end) return NULL;
-            if ((ignorecase ? memicmp : memcmp)(str, pat->args.string, (size_t)pat->len) != 0)
+            if (pat->len > 0 && (ignorecase ? memicmp : memcmp)(str, pat->args.string, (size_t)pat->len) != 0)
                 return NULL;
             return new_match(pat, str, str + pat->len, NULL);
         }
@@ -475,6 +475,10 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
             }
 
             return new_match(pat, start, &str[dents], NULL);
+        }
+        case BP_ERROR: {
+            match_t *p = match(defs, f, str, pat->args.pat, ignorecase);
+            return p ? new_match(pat, str, p->end, p) : NULL;
         }
         default: {
             errx(EXIT_FAILURE, "Unknown pattern type: %d", pat->type);

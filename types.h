@@ -33,6 +33,7 @@ enum pattype_e {
     BP_END_OF_FILE,
     BP_END_OF_LINE,
     BP_LEFTRECURSION,
+    BP_ERROR,
 };
 
 struct match_s; // forward declared to resolve circular struct defs
