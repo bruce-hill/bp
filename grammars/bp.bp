@@ -5,7 +5,7 @@
 # The grammar files provided with BP are not otherwise intended to be full
 # language grammars.
 
-Grammar: __ *(Def [__`;])%__ __ ($$ / (!)(..%\n$$ => "Could not parse this code"))
+Grammar: __ *(Def [__`;])%__ __ [(!)(+(./\n) => "Could not parse this code")]
 Def: @name=id __ `: __ (
       @definition=extended-pat
     / $$ (!)=>"No definition for rule"

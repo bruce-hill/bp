@@ -146,6 +146,7 @@ pat_t *chain_together(file_t *f, pat_t *first, pat_t *second)
         if (p->type == BP_UPTO) {
             p->args.multiple.first = second;
             p->min_matchlen = second->min_matchlen;
+            p->max_matchlen = -1;
             break;
         } else if (p->type == BP_CAPTURE) {
             p = p->args.capture.capture_pat;
@@ -250,10 +251,10 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
                 const char *c1_loc = str;
                 str = next_char(f, c1_loc);
                 if (matchchar(&str, '-')) { // Range
-                    if (&str[-1] - c1_loc > 1 || next_char(f, str) > str+1)
-                        file_err(f, start, next_char(f, str), "Sorry, UTF-8 character ranges are not yet supported.");
-                    char c1 = *c1_loc;
-                    char c2 = *str;
+                    const char *c2_loc = str;
+                    if (next_char(f, c1_loc) > c1_loc+1 || next_char(f, c2_loc) > c2_loc+1)
+                        file_err(f, start, next_char(f, c2_loc), "Sorry, UTF-8 character ranges are not yet supported.");
+                    char c1 = *c1_loc, c2 = *c2_loc;
                     if (!c2 || c2 == '\n')
                         file_err(f, str, str, "There should be a character here to complete the character range.");
                     if (c1 > c2) { // Swap order
@@ -261,14 +262,14 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
                         c1 = c2;
                         c2 = tmp;
                     }
-                    str = next_char(f, str);
-                    pat_t *pat = new_pat(f, start, str, 1, 1, BP_RANGE);
+                    str = next_char(f, c2_loc);
+                    pat_t *pat = new_pat(f, start == c1_loc - 1 ? start : c1_loc, str, 1, 1, BP_RANGE);
                     pat->args.range.low = (unsigned char)c1;
                     pat->args.range.high = (unsigned char)c2;
                     all = either_pat(f, all, pat);
                 } else {
-                    size_t len = (size_t)(str - start - 1);
-                    pat_t *pat = new_pat(f, start, str, len, (ssize_t)len, BP_STRING);
+                    size_t len = (size_t)(str - c1_loc);
+                    pat_t *pat = new_pat(f, c1_loc, str, len, (ssize_t)len, BP_STRING);
                     pat->args.string = c1_loc;
                     all = either_pat(f, all, pat);
                 }
