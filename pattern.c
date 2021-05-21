@@ -1,7 +1,6 @@
 //
 // pattern.c - Compile strings into BP pattern objects that can be matched against.
 //
-
 #include <ctype.h>
 #include <err.h>
 #include <stdbool.h>
@@ -300,10 +299,16 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
                 esc->args.range.low = e;
                 esc->args.range.high = e2;
                 return esc;
+            } else if (str > opstart) {
+                pat_t *esc = new_pat(f, start, str, 1, 1, BP_STRING);
+                char *s = xcalloc(sizeof(char), 2);
+                s[0] = (char)e;
+                esc->args.string = s;
+                return esc;
             } else {
                 const char *next = next_char(f, opstart);
                 size_t len = (size_t)(next-opstart);
-                pat_t *esc = new_pat(f, opstart, next, len, (ssize_t)len, BP_STRING);
+                pat_t *esc = new_pat(f, start, next, len, (ssize_t)len, BP_STRING);
                 char *s = xcalloc(sizeof(char), 1+len);
                 memcpy(s, opstart, len);
                 esc->args.string = s;
