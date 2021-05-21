@@ -224,10 +224,26 @@ over instances of \f[I]skip\f[R] (e.g.\ \f[B]\[ga]\[dq]..\[ga]\[dq] %
 (\[ga]\[rs].)\f[R])
 .TP
 \f[B]<\f[R] \f[I]pat\f[R]
-Just after \f[I]pat\f[R] (lookbehind)
+Matches at the current position if \f[I]pat\f[R] matches immediately
+before the current position (lookbehind).
+Conceptually, you can think of this as creating a file containing only
+the \f[I]N\f[R] characters immediately before the current position and
+attempting to match \f[I]pat\f[R] on that file, for all values of
+\f[I]N\f[R] from the minimum number of characters \f[I]pat\f[R] can
+match up to maximum number of characters \f[I]pat\f[R] can match (or the
+length of the current line upto the current position, whichever is
+smaller).
+\f[B]Note:\f[R] For fixed-length lookbehinds, this is quite efficient
+(e.g.\ \f[B]<(100\[ga]x)\f[R]), however this could cause performance
+problems with variable-length lookbehinds (e.g.\ \f[B]<(\[ga]x
+0-100\[ga]y)\f[R]).
+Also, it is not advised to use \f[B]\[ha]\f[R], \f[B]\[ha]\[ha]\f[R],
+\f[B]\[u2005]*\[u2005]*,\f[BI]o\f[B]\f[BI]r\f[B]\[u2005]*\[u2005]*$\f[R]
+inside a lookbehind, as they will match against the edges of the
+lookbehind slice.
 .TP
 \f[B]>\f[R] \f[I]pat\f[R]
-Just before \f[I]pat\f[R] (lookahead)
+Matches \f[I]pat\f[R], but does not consume any input (lookahead).
 .TP
 \f[B]\[at]\f[R] \f[I]pat\f[R]
 Capture \f[I]pat\f[R]
