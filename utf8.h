@@ -1,4 +1,6 @@
-// UTF8 helper functions
+//
+// utf8.h - UTF8 helper functions
+//
 #ifndef UTF8__H
 #define UTF8__H
 
