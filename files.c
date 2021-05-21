@@ -65,21 +65,17 @@ file_t *load_file(file_t **files, const char *filename)
 {
     int fd = filename[0] == '\0' ? STDIN_FILENO : open(filename, O_RDONLY);
     if (fd < 0) {
-        // Check for <file>:<line>[:<col>]
-        if (strchr(filename, ':')) {
+        // Check for <file>:<line>
+        if (strrchr(filename, ':')) {
             char tmp[PATH_MAX] = {0};
             strcpy(tmp, filename);
-            char *colon = strchr(tmp, ':');
+            char *colon = strrchr(tmp, ':');
             *colon = '\0';
             file_t *f = load_file(files, tmp);
             if (!f) return f;
             long line = strtol(colon+1, &colon, 10);
             f->start = (char*)get_line(f, (size_t)line);
-            if (*colon == ':') {
-                long offset = strtol(colon+1, &colon, 10);
-                f->start += offset;
-            }
-            if (f->start > f->end) f->start = f->end;
+            f->end = (char*)get_line(f, (size_t)line+1);
             return f;
         }
         return NULL;
@@ -234,9 +230,9 @@ const char *get_line(file_t *f, size_t line_number)
 //
 void fprint_line(FILE *dest, file_t *f, const char *start, const char *end, const char *fmt, ...)
 {
-    if (start < f->start) start = f->start;
+    if (start < f->memory) start = f->memory;
     if (start > f->end) start = f->end;
-    if (end < f->start) end = f->start;
+    if (end < f->memory) end = f->memory;
     if (end > f->end) end = f->end;
     size_t linenum = get_line_number(f, start);
     const char *line = get_line(f, linenum);
