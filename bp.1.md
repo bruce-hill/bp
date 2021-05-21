@@ -202,10 +202,20 @@ zero or more comma-separated words)
 instances of *skip* (e.g. **\`\"..\`\" % (\`\\.)**)
 
 **\<** *pat*
-: Just after *pat* (lookbehind)
+: Matches at the current position if *pat* matches immediately before the
+current position (lookbehind). Conceptually, you can think of this as creating
+a file containing only the *N* characters immediately before the current
+position and attempting to match *pat* on that file, for all values of *N* from
+the minimum number of characters *pat* can match up to maximum number of
+characters *pat* can match (or the length of the current line upto the current
+position, whichever is smaller). **Note:** For fixed-length lookbehinds, this
+is quite efficient (e.g. **\<(100\`x)**), however this could cause performance
+problems with variable-length lookbehinds (e.g. **\<(\`x 0-100\`y)**). Also,
+it is not advised to use **\^**, **\^\^**, **$**, or **$$** inside a lookbehind,
+as they will match against the edges of the lookbehind slice.
 
 **\>** *pat*
-: Just before *pat* (lookahead)
+: Matches *pat*, but does not consume any input (lookahead).
 
 **\@** *pat*
 : Capture *pat*
