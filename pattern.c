@@ -301,9 +301,11 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
                 esc->args.range.high = e2;
                 return esc;
             } else {
-                pat_t *esc = new_pat(f, opstart, str, 1, 1, BP_STRING);
-                char *s = xcalloc(sizeof(char), 2);
-                s[0] = (char)e;
+                const char *next = next_char(f, opstart);
+                size_t len = (size_t)(next-opstart);
+                pat_t *esc = new_pat(f, opstart, next, len, (ssize_t)len, BP_STRING);
+                char *s = xcalloc(sizeof(char), 1+len);
+                memcpy(s, opstart, len);
                 esc->args.string = s;
                 return esc;
             }
