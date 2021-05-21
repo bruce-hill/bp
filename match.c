@@ -127,7 +127,7 @@ match_t *next_match(def_t *defs, file_t *f, match_t *prev, pat_t *pat, pat_t *sk
         str = prev->end > prev->start ? prev->end : prev->end + 1;
         recycle_if_unused(&prev);
     } else {
-        str = f->contents;
+        str = f->start;
     }
     bool only_start = pat->type == BP_START_OF_FILE || (pat->type == BP_CHAIN && pat->args.multiple.first->type == BP_START_OF_FILE);
     while (str <= f->end) {
@@ -168,10 +168,10 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
             return (str < f->end && *str != '\n') ? new_match(pat, str, next_char(f, str), NULL) : NULL;
         }
         case BP_START_OF_FILE: {
-            return (str == f->contents) ? new_match(pat, str, str, NULL) : NULL;
+            return (str == f->start) ? new_match(pat, str, str, NULL) : NULL;
         }
         case BP_START_OF_LINE: {
-            return (str == f->contents || str[-1] == '\n') ? new_match(pat, str, str, NULL) : NULL;
+            return (str == f->start || str[-1] == '\n') ? new_match(pat, str, str, NULL) : NULL;
         }
         case BP_END_OF_FILE: {
             return (str == f->end) ? new_match(pat, str, str, NULL) : NULL;
@@ -302,19 +302,18 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
             // TODO: this breaks ^/^^/$/$$, but that can probably be ignored
             // because you rarely need to check those in a backtrack.
             file_t slice;
-            memcpy(&slice, f, sizeof(file_t));
-            slice.end = (char*)str;
+            slice_file(&slice, f, f->start, str);
             for (const char *pos = &str[-(long)back->min_matchlen];
-              pos >= f->contents && (back->max_matchlen == -1 || pos >= &str[-(long)back->max_matchlen]);
+              pos >= f->start && (back->max_matchlen == -1 || pos >= &str[-(long)back->max_matchlen]);
               pos = prev_char(f, pos)) {
-                slice.contents = (char*)pos;
+                slice.start = (char*)pos;
                 match_t *m = match(defs, &slice, pos, back, ignorecase);
                 // Match should not go past str (i.e. (<"AB" "B") should match "ABB", but not "AB")
                 if (m && m->end != str)
                     recycle_if_unused(&m);
                 else if (m)
                     return new_match(pat, str, str, m);
-                if (pos == f->contents) break;
+                if (pos == f->start) break;
                 // To prevent extreme performance degradation, don't keep
                 // walking backwards endlessly over newlines.
                 if (back->max_matchlen == -1 && *pos == '\n') break;
@@ -361,9 +360,7 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
             // <p1>==<p2> matches iff the text of <p1> matches <p2>
             // <p1>!=<p2> matches iff the text of <p1> does not match <p2>
             file_t slice;
-            memcpy(&slice, f, sizeof(file_t));
-            slice.contents = (char*)m1->start;
-            slice.end = (char*)m1->end;
+            slice_file(&slice, f, m1->start, m1->end);
             match_t *m2 = next_match(defs, &slice, NULL, pat->args.multiple.second, NULL, ignorecase);
             if ((!m2 && pat->type == BP_MATCH) || (m2 && pat->type == BP_NOT_MATCH)) {
                 recycle_if_unused(&m2);
@@ -451,7 +448,7 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
 
             size_t linenum = get_line_number(f, str);
             const char *p = get_line(f, linenum);
-            if (p < f->contents) p=f->contents; // Can happen with recursive matching
+            if (p < f->start) p = f->start; // Can happen with recursive matching
 
             // Current indentation:
             char denter = *p;

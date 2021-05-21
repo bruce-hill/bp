@@ -15,7 +15,7 @@ struct allocated_pat_s; // declared in types.h
 typedef struct file_s {
     struct file_s *next;
     const char *filename;
-    char *contents, **lines, *end;
+    char *memory, **lines, *start, *end;
     size_t nlines;
     struct allocated_pat_s *pats;
     bool mmapped:1;
@@ -25,6 +25,8 @@ __attribute__((nonnull(2)))
 file_t *load_file(file_t **files, const char *filename);
 __attribute__((format(printf,2,3)))
 file_t *load_filef(file_t **files, const char *fmt, ...);
+__attribute__((nonnull))
+void slice_file(file_t *slice, file_t *src, const char *start, const char *end);
 __attribute__((nonnull(3), returns_nonnull))
 file_t *spoof_file(file_t **files, const char *filename, const char *text, ssize_t len);
 __attribute__((nonnull))

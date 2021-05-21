@@ -371,7 +371,7 @@ void print_match(FILE *out, printer_t *pr, match_t *m)
     current_color = color_normal;
     bool first = (pr->pos == NULL);
     if (first) { // First match printed:
-        pr->pos = pr->file->contents;
+        pr->pos = pr->file->start;
         pr->needs_line_number = 1;
     }
     if (m) {

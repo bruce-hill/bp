@@ -30,7 +30,7 @@ def_t *with_def(def_t *defs, size_t namelen, const char *name, pat_t *pat)
 //
 def_t *load_grammar(def_t *defs, file_t *f)
 {
-    const char *src = f->contents;
+    const char *src = f->start;
     src = after_spaces(src);
     while (src < f->end) {
         const char *name = src;

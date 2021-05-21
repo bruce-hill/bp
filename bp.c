@@ -169,11 +169,9 @@ static int print_matches_as_json(def_t *defs, file_t *f, pat_t *pattern)
     for (match_t *m = NULL; (m = next_match(defs, f, m, pattern, options.skip, options.ignorecase)); ) {
         if (++matches > 1)
             printf(",\n");
-        printf("{\"filename\":\"%s\",", f->filename);
-        printf("\"tree\":{\"rule\":\"text\",\"start\":%d,\"end\":%ld,\"children\":[",
-               0, f->end - f->contents);
-        json_match(f->contents, m, options.verbose);
-        printf("]}}");
+        printf("{\"filename\":\"%s\",\"match\":", f->filename);
+        json_match(f->start, m, options.verbose);
+        printf("}");
     }
     return matches;
 }
@@ -204,8 +202,8 @@ static void cleanup(void)
     if (modifying_file && backup_file) {
         rewind(modifying_file);
         ftruncate(fileno(modifying_file), 0);
-        fwrite(backup_file->contents, 1,
-               (size_t)(backup_file->end - backup_file->contents),
+        fwrite(backup_file->start, 1,
+               (size_t)(backup_file->end - backup_file->start),
                modifying_file);
         fclose(modifying_file);
         modifying_file = NULL;
@@ -288,7 +286,7 @@ static int inplace_modify_file(def_t *defs, file_t *f, pat_t *pattern)
     file_t *inmem_copy = NULL;
     // Ensure the file is resident in memory:
     if (f->mmapped) {
-        inmem_copy = spoof_file(NULL, f->filename, f->contents, (ssize_t)(f->end - f->contents));
+        inmem_copy = spoof_file(NULL, f->filename, f->start, (ssize_t)(f->end - f->start));
         f = inmem_copy;
     }
 
@@ -535,7 +533,7 @@ int main(int argc, char *argv[])
             // TODO: spoof file as sprintf("pattern => '%s'", flag)
             // except that would require handling edge cases like quotation marks etc.
             file_t *replace_file = spoof_file(&loaded_files, "<replace argument>", flag, -1);
-            pattern = bp_replacement(replace_file, pattern, replace_file->contents);
+            pattern = bp_replacement(replace_file, pattern, replace_file->start);
             if (!pattern)
                 errx(EXIT_FAILURE, "Replacement failed to compile: %s", flag);
         } else if (FLAG("-g")     || FLAG("--grammar")) {
@@ -551,7 +549,7 @@ int main(int argc, char *argv[])
             defs = load_grammar(defs, f); // Keep in memory for debug output
         } else if (FLAG("-p")     || FLAG("--pattern")) {
             file_t *arg_file = spoof_file(&loaded_files, "<pattern argument>", flag, -1);
-            for (const char *str = arg_file->contents; str < arg_file->end; ) {
+            for (const char *str = arg_file->start; str < arg_file->end; ) {
                 def_t *d = bp_definition(defs, arg_file, str);
                 if (d) {
                     defs = d;
@@ -567,9 +565,9 @@ int main(int argc, char *argv[])
             }
         } else if (FLAG("-s")     || FLAG("--skip")) {
             file_t *arg_file = spoof_file(&loaded_files, "<skip argument>", flag, -1);
-            pat_t *s = bp_pattern(arg_file, arg_file->contents);
+            pat_t *s = bp_pattern(arg_file, arg_file->start);
             if (!s) {
-                fprint_line(stdout, arg_file, arg_file->contents, arg_file->end,
+                fprint_line(stdout, arg_file, arg_file->start, arg_file->end,
                             "Failed to compile the skip argument");
             } else if (after_spaces(s->end) < arg_file->end) {
                 fprint_line(stdout, arg_file, s->end, arg_file->end,
@@ -593,7 +591,7 @@ int main(int argc, char *argv[])
         } else if (argv[0][0] != '-') {
             if (pattern != NULL) break;
             file_t *arg_file = spoof_file(&loaded_files, "<pattern argument>", argv[0], -1);
-            pat_t *p = bp_stringpattern(arg_file, arg_file->contents);
+            pat_t *p = bp_stringpattern(arg_file, arg_file->start);
             if (!p)
                 errx(EXIT_FAILURE, "Pattern failed to compile: %s", argv[0]);
             pattern = chain_together(arg_file, pattern, p);
@@ -641,7 +639,7 @@ int main(int argc, char *argv[])
     // pattern the args specified, and use `pattern` as the thing being matched.
     defs = with_def(defs, strlen("pattern"), "pattern", pattern);
     file_t *patref_file = spoof_file(&loaded_files, "<pattern ref>", "pattern", -1);
-    pattern = bp_pattern(patref_file, patref_file->contents);
+    pattern = bp_pattern(patref_file, patref_file->start);
 
     int found = 0;
     if (options.mode == MODE_JSON) printf("[");

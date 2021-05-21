@@ -18,7 +18,7 @@
 #include "utils.h"
 
 __attribute__((nonnull))
-static void populate_lines(file_t *f);
+static void populate_lines(file_t *f, size_t len);
 __attribute__((pure, nonnull))
 static size_t get_char_number(file_t *f, const char *p);
 
@@ -26,14 +26,14 @@ static size_t get_char_number(file_t *f, const char *p);
 // In the file object, populate the `lines` array with pointers to the
 // beginning of each line.
 //
-static void populate_lines(file_t *f)
+static void populate_lines(file_t *f, size_t len)
 {
     // Calculate line numbers:
     size_t linecap = 10;
     f->lines = xcalloc(sizeof(const char*), linecap);
     f->nlines = 0;
-    char *p = f->contents;
-    for (size_t n = 0; p && p < f->end; ++n) {
+    char *p = f->memory;
+    for (size_t n = 0; p && p < &f->memory[len]; ++n) {
         ++f->nlines;
         if (n >= linecap)
             f->lines = xrealloc(f->lines, sizeof(const char*)*(linecap *= 2));
@@ -64,7 +64,26 @@ file_t *load_filef(file_t **files, const char *fmt, ...)
 file_t *load_file(file_t **files, const char *filename)
 {
     int fd = filename[0] == '\0' ? STDIN_FILENO : open(filename, O_RDONLY);
-    if (fd < 0) return NULL;
+    if (fd < 0) {
+        // Check for <file>:<line>[:<col>]
+        if (strchr(filename, ':')) {
+            char tmp[PATH_MAX] = {0};
+            strcpy(tmp, filename);
+            char *colon = strchr(tmp, ':');
+            *colon = '\0';
+            file_t *f = load_file(files, tmp);
+            if (!f) return f;
+            long line = strtol(colon+1, &colon, 10);
+            f->start = (char*)get_line(f, (size_t)line);
+            if (*colon == ':') {
+                long offset = strtol(colon+1, &colon, 10);
+                f->start += offset;
+            }
+            if (f->start > f->end) f->start = f->end;
+            return f;
+        }
+        return NULL;
+    }
     size_t length;
     file_t *f = new(file_t);
     f->filename = memcheck(strdup(filename));
@@ -73,8 +92,8 @@ file_t *load_file(file_t **files, const char *filename)
     if (fstat(fd, &sb) == -1)
         goto skip_mmap;
 
-    f->contents = mmap(NULL, (size_t)sb.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
-    if (f->contents == MAP_FAILED)
+    f->memory = mmap(NULL, (size_t)sb.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+    if (f->memory == MAP_FAILED)
         goto skip_mmap;
 
     f->mmapped = true;
@@ -85,12 +104,12 @@ file_t *load_file(file_t **files, const char *filename)
     f->mmapped = false;
     size_t capacity = 1000;
     length = 0;
-    f->contents = xcalloc(sizeof(char), capacity);
+    f->memory = xcalloc(sizeof(char), capacity);
     ssize_t just_read;
-    while ((just_read=read(fd, &f->contents[length], capacity - length)) > 0) {
+    while ((just_read=read(fd, &f->memory[length], capacity - length)) > 0) {
         length += (size_t)just_read;
         if (length >= capacity)
-            f->contents = xrealloc(f->contents, sizeof(char)*(capacity *= 2) + 1);
+            f->memory = xrealloc(f->memory, sizeof(char)*(capacity *= 2) + 1);
     }
 
   finished_loading:
@@ -98,13 +117,24 @@ file_t *load_file(file_t **files, const char *filename)
         if (close(fd) != 0)
             err(EXIT_FAILURE, "Failed to close file");
     }
-    f->end = &f->contents[length];
-    populate_lines(f);
+    f->start = &f->memory[0];
+    f->end = &f->memory[length];
+    populate_lines(f, length);
     if (files != NULL) {
         f->next = *files;
         *files = f;
     }
     return f;
+}
+
+//
+// Set a file struct to represent a region of a different file.
+//
+void slice_file(file_t *slice, file_t *src, const char *start, const char *end)
+{
+    memcpy(slice, src, sizeof(file_t));
+    slice->start = (char*)start;
+    slice->end = (char*)end;
 }
 
 //
@@ -116,10 +146,11 @@ file_t *spoof_file(file_t **files, const char *filename, const char *text, ssize
     file_t *f = new(file_t);
     size_t len = _len == -1 ? strlen(text) : (size_t)_len;
     f->filename = memcheck(strdup(filename));
-    f->contents = xcalloc(len+1, sizeof(char));
-    memcpy(f->contents, text, len);
-    f->end = &f->contents[len];
-    populate_lines(f);
+    f->memory = xcalloc(len+1, sizeof(char));
+    memcpy(f->memory, text, len);
+    f->start = &f->memory[0];
+    f->end = &f->memory[len];
+    populate_lines(f, len);
     if (files != NULL) {
         f->next = *files;
         *files = f;
@@ -141,13 +172,13 @@ void destroy_file(file_t **f)
         xfree(&((*f)->lines));
     }
 
-    if ((*f)->contents) {
+    if ((*f)->memory) {
         if ((*f)->mmapped) {
-            if (munmap((*f)->contents, (size_t)((*f)->end - (*f)->contents)) != 0)
+            if (munmap((*f)->memory, (size_t)((*f)->end - (*f)->memory)) != 0)
                 err(EXIT_FAILURE, "Failure to un-memory-map some memory");
-            (*f)->contents = NULL;
+            (*f)->memory = NULL;
         } else {
-            xfree(&((*f)->contents));
+            xfree(&((*f)->memory));
         }
     }
 
@@ -203,9 +234,9 @@ const char *get_line(file_t *f, size_t line_number)
 //
 void fprint_line(FILE *dest, file_t *f, const char *start, const char *end, const char *fmt, ...)
 {
-    if (start < f->contents) start = f->contents;
+    if (start < f->start) start = f->start;
     if (start > f->end) start = f->end;
-    if (end < f->contents) end = f->contents;
+    if (end < f->start) end = f->start;
     if (end > f->end) end = f->end;
     size_t linenum = get_line_number(f, start);
     const char *line = get_line(f, linenum);
