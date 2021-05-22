@@ -14,8 +14,8 @@
 #include "utils.h"
 #include "utf8.h"
 
-__attribute__((nonnull(1,2)))
-static pat_t *expand_replacements(file_t *f, const char *str, pat_t *replace_pat);
+__attribute__((nonnull))
+static pat_t *expand_replacements(file_t *f, pat_t *replace_pat);
 __attribute__((nonnull))
 static pat_t *expand_chain(file_t *f, pat_t *first);
 __attribute__((nonnull))
@@ -78,30 +78,35 @@ static pat_t *expand_chain(file_t *f, pat_t *first)
 //
 // Match trailing => replacements (with optional pattern beforehand)
 //
-static pat_t *expand_replacements(file_t *f, const char *str, pat_t *replace_pat)
+static pat_t *expand_replacements(file_t *f, pat_t *replace_pat)
 {
-    const char *start = str;
+    const char *str = replace_pat->end;
     while (matchstr(&str, "=>")) {
-        if (!(matchchar(&str, '"') || matchchar(&str, '\'')))
-            file_err(f, str, str, "There should be a string literal as a replacement here.");
-        char quote = str[-1];
-        const char *repstr = str;
-        for (; *str && *str != quote; str = next_char(f, str)) {
-            if (*str == '\\') {
-                if (!str[1] || str[1] == '\n')
-                    file_err(f, str, str+1,
-                             "There should be an escape sequence after this backslash.");
-                str = next_char(f, str);
+        const char *repstr;
+        size_t replen;
+        if (matchchar(&str, '"') || matchchar(&str, '\'')) {
+            char quote = str[-1];
+            repstr = str;
+            for (; *str && *str != quote; str = next_char(f, str)) {
+                if (*str == '\\') {
+                    if (!str[1] || str[1] == '\n')
+                        file_err(f, str, str+1,
+                                 "There should be an escape sequence after this backslash.");
+                    str = next_char(f, str);
+                }
             }
+            replen = (size_t)(str-repstr);
+            (void)matchchar(&str, quote);
+        } else {
+            repstr = "";
+            replen = 0;
         }
-        (void)matchchar(&str, quote);
 
-        if (replace_pat == NULL) replace_pat = new_pat(f, start, start, 0, 0, BP_STRING);
         pat_t *pat = new_pat(f, replace_pat->start, str, replace_pat->min_matchlen,
                              replace_pat->max_matchlen, BP_REPLACE);
         pat->args.replace.pat = replace_pat;
         pat->args.replace.text = repstr;
-        pat->args.replace.len = (size_t)(str-repstr-1);
+        pat->args.replace.len = replen;
         replace_pat = pat;
     }
     return replace_pat;
@@ -115,10 +120,12 @@ static pat_t *expand_replacements(file_t *f, const char *str, pat_t *replace_pat
 static pat_t *expand_choices(file_t *f, pat_t *first)
 {
     first = expand_chain(f, first);
-    first = expand_replacements(f, first->end, first);
+    first = expand_replacements(f, first);
     const char *str = first->end;
     if (!matchchar(&str, '/')) return first;
     pat_t *second = bp_simplepattern(f, str);
+    if (matchstr(&str, "=>"))
+        second = expand_replacements(f, second ? second : new_pat(f, str-2, str-2, 0, 0, BP_STRING));
     if (!second)
         file_err(f, str, str, "There should be a pattern here after a '/'");
     second = expand_choices(f, second);
@@ -404,20 +411,18 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
         }
         // Parentheses
         case '(': {
-            if (matchstr(&str, "!)")) {
+            if (matchstr(&str, "!)")) { // (!) errors
                 pat_t *pat = bp_simplepattern(f, str);
                 if (!pat) pat = new_pat(f, str, str, 0, 0, BP_STRING);
-                pat = expand_replacements(f, pat->end, pat);
-
+                pat = expand_replacements(f, pat);
                 pat_t *error = new_pat(f, start, pat->end, pat->min_matchlen, pat->max_matchlen, BP_ERROR);
                 error->args.pat = pat;
                 return error;
             }
 
-            pat_t *pat = bp_simplepattern(f, str);
+            pat_t *pat = bp_pattern(f, str);
             if (!pat)
                 file_err(f, str, str, "There should be a valid pattern after this parenthesis.");
-            pat = expand_choices(f, pat);
             str = pat->end;
             (void)matchchar(&str, ')');
             pat->start = start;
@@ -426,10 +431,9 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
         }
         // Square brackets
         case '[': {
-            pat_t *maybe = bp_simplepattern(f, str);
+            pat_t *maybe = bp_pattern(f, str);
             if (!maybe)
                 file_err(f, str, str, "There should be a valid pattern after this square bracket.");
-            maybe = expand_choices(f, maybe);
             str = maybe->end;
             (void)matchchar(&str, ']');
             return new_range(f, start, str, 0, 1, maybe, NULL);
@@ -469,10 +473,6 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
             capture->args.capture.name = name;
             capture->args.capture.namelen = namelen;
             return capture;
-        }
-        // Replacement with empty pattern: (=> 'blah')
-        case '=': {
-            return expand_replacements(f, start, NULL);
         }
         // Start of file/line:
         case '^': {
@@ -577,6 +577,8 @@ pat_t *bp_pattern(file_t *f, const char *str)
 {
     pat_t *pat = bp_simplepattern(f, str);
     if (pat != NULL) pat = expand_choices(f, pat);
+    if (matchstr(&str, "=>"))
+        pat = expand_replacements(f, pat ? pat : new_pat(f, str-2, str-2, 0, 0, BP_STRING));
     return pat;
 }
 

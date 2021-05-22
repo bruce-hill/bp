@@ -466,7 +466,7 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
             return new_match(pat, start, &str[dents], NULL);
         }
         case BP_ERROR: {
-            match_t *p = match(defs, f, str, pat->args.pat, ignorecase);
+            match_t *p = pat->args.pat ? match(defs, f, str, pat->args.pat, ignorecase) : NULL;
             return p ? new_match(pat, str, p->end, p) : NULL;
         }
         default: {
