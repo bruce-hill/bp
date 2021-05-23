@@ -21,7 +21,7 @@ $(NAME): $(OBJFILES) bp.c
 	$(CC) $(ALL_FLAGS) -o $@ $(OBJFILES) bp.c
 
 bp.1: bp.1.md
-	pandoc -s $< -t man -o $@
+	pandoc --lua-filter=.pandoc/bold-code.lua -s $< -t man -o $@
 
 tags: $(CFILES) bp.c
 	ctags *.c *.h

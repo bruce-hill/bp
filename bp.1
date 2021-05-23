@@ -7,7 +7,7 @@
 bp - Bruce\[aq]s Parsing Expression Grammar tool
 .SH SYNOPSIS
 .PP
-\f[B]bp\f[R] [\f[I]options\&...\f[R]] \f[I]pattern\f[R] [[--]
+\f[B]bp\f[R] [\f[I]options\&...\f[R]] \f[I]pattern\f[R] [[\f[B]--\f[R]]
 \f[I]files\&...\f[R]]
 .SH DESCRIPTION
 .PP
@@ -60,8 +60,7 @@ instead of treated as literal files.
 \f[B]-c\f[R], \f[B]--context\f[R] \f[I]N\f[R]
 The number of lines of context to print.
 If \f[I]N\f[R] is 0, print only the exact text of the matches.
-If \f[I]N\f[R] is \f[B]\f[CB]\[dq]all\[dq]\f[B]\f[R], print the entire
-file.
+If \f[I]N\f[R] is \f[B]\[lq]all\[rq]\f[R], print the entire file.
 Otherwise, if \f[I]N\f[R] is a positive integer, print the whole line on
 which matches occur, as well as the \f[I]N-1\f[R] lines before and after
 the match.
@@ -97,7 +96,7 @@ with one or two patterns.
 The default mode for bp patterns is \[lq]string pattern mode\[rq].
 In string pattern mode, all characters are interpreted literally except
 for the backslash (\f[B]\[rs]\f[R]), which may be followed by a bp
-pattern (see the \f[B]PATTERNS\f[R] section above).
+pattern (see the \f[B]PATTERNS\f[R] section below).
 Optionally, the bp pattern may be terminated by a semicolon
 (\f[B];\f[R]).
 .SH PATTERNS
@@ -107,9 +106,12 @@ Expression Grammars and regular expression syntax.
 The syntax is designed to map closely to verbal descriptions of the
 patterns, and prefix operators are preferred over suffix operators (as
 is common in regex syntax).
-.PP
-Some patterns additionally have \[lq]multi-line\[rq] variants, which
-means that they include the newline character.
+Patterns are whitespace-agnostic, so they work the same regardless of
+whether whitespace is present or not, except for string literals
+(\f[B]\[aq]...\[aq]\f[R] and \f[B]\[dq]...\[dq]\f[R]), character
+literals (\f[B]\[ga]\f[R]), and escape sequences (\f[B]\[rs]\f[R]).
+Whitespace between patterns or parts of a pattern should be used for
+clarity, but it will not affect the meaning of the pattern.
 .TP
 \f[I]pat1 pat2\f[R]
 A sequence: \f[I]pat1\f[R] followed by \f[I]pat2\f[R]
@@ -155,8 +157,8 @@ either end.
 Escape sequences are not allowed.
 .TP
 \f[B]\[ga]\f[R]\f[I]c\f[R]
-The literal character \f[I]c\f[R] (e.g.\ **\[ga]\[at]** matches the
-\[lq]\[at]\[rq] character)
+The literal character \f[I]c\f[R] (e.g.\ \f[B]\[ga]\[at]\f[R] matches
+the \[lq]\[at]\[rq] character)
 .TP
 \f[B]\[ga]\f[R]\f[I]c1\f[R]\f[B],\f[R]\f[I]c2\f[R]
 The literal character \f[I]c1\f[R] or \f[I]c2\f[R]
@@ -188,40 +190,43 @@ Not \f[I]pat\f[R]
 Maybe \f[I]pat\f[R]
 .TP
 \f[I]N\f[R] \f[I]pat\f[R]
-Exactly \f[I]N\f[R] repetitions of \f[I]pat\f[R] (e.g.\ \f[B]5
-\[ga]x\f[R] matches \f[B]\[lq]xxxxx\[rq]\f[R])
+Exactly \f[I]N\f[R] repetitions of \f[I]pat\f[R]
+(e.g.\ \f[B]5 \[dq]x\[dq]\f[R] matches \f[B]\[lq]xxxxx\[rq]\f[R])
 .TP
 \f[I]N\f[R] \f[B]-\f[R] \f[I]M\f[R] \f[I]pat\f[R]
 Between \f[I]N\f[R] and \f[I]M\f[R] repetitions of \f[I]pat\f[R]
-(e.g.\ \f[B]2-3 \[ga]x\f[R] matches \f[B]\[lq]xx\[rq]\f[R] or
+(e.g.\ \f[B]2-3 \[dq]x\[dq]\f[R] matches \f[B]\[lq]xx\[rq]\f[R] or
 \f[B]\[lq]xxx\[rq]\f[R])
 .TP
 \f[I]N\f[R]\f[B]+\f[R] \f[I]pat\f[R]
-At least \f[I]N\f[R] or more repetitions of \f[I]pat\f[R] (e.g.\ \f[B]2+
-\[ga]x\f[R] matches \f[B]\[lq]xx\[rq]\f[R], \f[B]\[lq]xxx\[rq]\f[R],
-\f[B]\[lq]xxxx\[rq]\f[R], etc.)
+At least \f[I]N\f[R] or more repetitions of \f[I]pat\f[R]
+(e.g.\ \f[B]2+ \[dq]x\[dq]\f[R] matches \f[B]\[lq]xx\[rq]\f[R],
+\f[B]\[lq]xxx\[rq]\f[R], \f[B]\[lq]xxxx\[rq]\f[R], etc.)
 .TP
 \f[B]*\f[R] \f[I]pat\f[R]
-Some \f[I]pat\f[R]s (zero or more, e.g.\ \f[B]* \[ga]x\f[R] matches
+Some \f[I]pat\f[R]s (zero or more, e.g.\ \f[B]* \[dq]x\[dq]\f[R] matches
 \f[B]\[dq]\[lq]\f[R], \f[B]\[rq]x\[lq]\f[R], \f[B]\[rq]xx\[dq]\f[R],
 etc.)
 .TP
 \f[B]+\f[R] \f[I]pat\f[R]
-At least one \f[I]pat\f[R]s (e.g.\ \f[B]+ \[ga]x\f[R] matches
+At least one \f[I]pat\f[R]s (e.g.\ \f[B]+ \[dq]x\[dq]\f[R] matches
 \f[B]\[lq]x\[rq]\f[R], \f[B]\[lq]xx\[rq]\f[R], \f[B]\[lq]xxx\[rq]\f[R],
 etc.)
 .TP
 \f[I]repeating-pat\f[R] \f[B]%\f[R] \f[I]sep\f[R]
-\f[I]repeating-pat\f[R] separated by \f[I]sep\f[R] (e.g.\ \f[B]*word %
-\[ga],\f[R] matches zero or more comma-separated words)
+\f[I]repeating-pat\f[R] (see the examples above) separated by
+\f[I]sep\f[R] (e.g.\ \f[B]*word % \[dq],\[dq]\f[R] matches zero or more
+comma-separated words)
 .TP
 \f[B]..\f[R] \f[I]pat\f[R]
 Any text (except newlines) up to and including \f[I]pat\f[R]
 .TP
 \f[B].. %\f[R] \f[I]skip\f[R] \f[I]pat\f[R]
 Any text (except newlines) up to and including \f[I]pat\f[R], skipping
-over instances of \f[I]skip\f[R] (e.g.\ \f[B]\[ga]\[dq]..\[ga]\[dq] %
-(\[ga]\[rs].)\f[R])
+over instances of \f[I]skip\f[R]
+(e.g.\ \f[B]\[aq]\[dq]\[aq] ..%(\[aq]\[rs]\[aq] .) \[aq]\[dq]\[aq]\f[R]
+opening quote, up to closing quote, skipping over backslash followed by
+a single character)
 .TP
 \f[B]<\f[R] \f[I]pat\f[R]
 Matches at the current position if \f[I]pat\f[R] matches immediately
@@ -234,13 +239,13 @@ match up to maximum number of characters \f[I]pat\f[R] can match (or the
 length of the current line upto the current position, whichever is
 smaller).
 \f[B]Note:\f[R] For fixed-length lookbehinds, this is quite efficient
-(e.g.\ \f[B]<(100\[ga]x)\f[R]), however this could cause performance
-problems with variable-length lookbehinds (e.g.\ \f[B]<(\[ga]x
-0-100\[ga]y)\f[R]).
-Also, it is not advised to use \f[B]\[ha]\f[R], \f[B]\[ha]\[ha]\f[R],
-\f[B]\[u2005]*\[u2005]*,\f[BI]o\f[B]\f[BI]r\f[B]\[u2005]*\[u2005]*$\f[R]
-inside a lookbehind, as they will match against the edges of the
-lookbehind slice.
+(e.g.\ \f[B]<(100 \[dq]x\[dq])\f[R]), however this could cause
+performance problems with variable-length lookbehinds
+(e.g.\ \f[B]<(\[dq]x\[dq] 0-100\[dq]y\[dq])\f[R]).
+Also, it is worth noting that \f[B]\[ha]\f[R], \f[B]\[ha]\[ha]\f[R],
+\f[B]$\f[R], and \f[B]$$\f[R] all match against the edges of the slice,
+which may give false positives if you were expecting them to match only
+against the edges file or line.
 .TP
 \f[B]>\f[R] \f[I]pat\f[R]
 Matches \f[I]pat\f[R], but does not consume any input (lookahead).
@@ -258,19 +263,24 @@ See the \f[B]GRAMMAR FILES\f[R] section for more info.
 .TP
 \f[B]\[at]\f[R] \f[I]name\f[R] \f[B]=\f[R] \f[I]pat\f[R]
 Let \f[I]name\f[R] equal \f[I]pat\f[R] (named capture).
-Named captures can be used as backreferences like so: \f[B]\[at]foo=word
-\[ga]( foo \[ga])\f[R] (matches \f[B]\[lq]asdf(asdf)\[rq]\f[R] or
-\f[B]\[lq]baz(baz)\[rq]\f[R], but not \f[B]\[lq]foo(baz)\[rq]\f[R])
+Named captures can be used as backreferences like so:
+\f[B]\[at]foo=word \[ga]( foo \[ga])\f[R] (matches
+\f[B]\[lq]asdf(asdf)\[rq]\f[R] or \f[B]\[lq]baz(baz)\[rq]\f[R], but not
+\f[B]\[lq]foo(baz)\[rq]\f[R])
 .TP
-\f[I]pat\f[R] \f[B]=> \[aq]\f[R]\f[I]replacement\f[R]\f[B]\[aq]\f[R]
+\f[I]pat\f[R] \f[B]=>\f[R] \f[B]\[dq]\f[R]\f[I]replacement\f[R]\f[B]\[dq]\f[R]
 Replace \f[I]pat\f[R] with \f[I]replacement\f[R].
-Note: \f[I]replacement\f[R] should be a string, and it may contain
+Note: \f[I]replacement\f[R] should be a string (single or double
+quoted), and it may contain escape sequences (e.g.\ \f[B]\[rs]n\f[R]) or
 references to captured values: \f[B]\[at]0\f[R] (the whole of
 \f[I]pat\f[R]), \f[B]\[at]1\f[R] (the first capture in \f[I]pat\f[R]),
 \f[B]\[at]\f[R]\f[I]foo\f[R] (the capture named \f[I]foo\f[R] in
 \f[I]pat\f[R]), etc.
-For example, \f[B]\[at]word _ \[at]rest=(*word % _) => \[dq]\[at]rest
-\[at]1\[dq]\f[R]
+For example,
+\f[B]\[at]word _ \[at]rest=(*word % _) => \[dq]\[at]rest:\[rs]n\[rs]t\[at]1\[dq]\f[R]
+matches a word followed by whitespace, followed by a series of words and
+replaces it with the series of words, a colon, a newline, a tab, and
+then the first word.
 .TP
 \f[I]pat1\f[R] \f[B]\[ti]\f[R] \f[I]pat2\f[R]
 Matches when \f[I]pat1\f[R] matches and \f[I]pat2\f[R] can be found
@@ -305,47 +315,51 @@ The \f[B]builtins\f[R] grammar file is loaded by default, and it defines
 a few useful general-purpose patterns.
 For example, it defines the \f[B]parens\f[R] rule, which matches pairs
 of matching parentheses, accounting for nested inner parentheses:
-.IP
-.nf
-\f[C]
-bp -p \[aq]\[dq]my_func\[dq] parens\[aq]
-\f[R]
-.fi
+.RS
+.PP
+\f[B]bp -p \[aq]\[dq]my_func\[dq] parens\[aq]\f[R]
+.RE
 .PP
 \f[B]bp\f[R] also comes with a few grammar files for common programming
 languages, which may be loaded on demand.
 These grammar files are not comprehensive syntax definitions, but only
 some common patterns.
 For example, the c++ grammar file contains definitions for
-\f[B]//\f[R]-style line comments as well as \f[B]/*\&...*/\f[R]-style
+\f[B]//\f[R]-style line comments as well as \f[B]/*...*/\f[R]-style
 block comments.
 Thus, you can find all comments with the word \[lq]TODO\[rq] with the
 following command:
-.IP
-.nf
-\f[C]
-bp -g c++ -p \[aq]comment\[ti]{TODO}\[aq] *.cpp
-\f[R]
-.fi
+.RS
+.PP
+\f[B]bp -g c++ -p \[aq]comment \[ti] {TODO}\[aq] *.cpp\f[R]
+.RE
 .SH EXAMPLES
-.TP
+.PP
+Find files containing the string \[lq]foo\[rq] (a string pattern):
+.RS
+.PP
 \f[B]ls | bp foo\f[R]
-Find files containing the string \[dq]foo\[dq] (a string pattern)
-.TP
+.RE
+.PP
+Find files ending with \[lq].c\[rq] and print the name with the
+\[lq].c\[rq] replaced with \[lq].h\[rq]:
+.RS
+.PP
 \f[B]ls | bp \[aq].c\[rs]$\[aq] -r \[aq].h\[aq]\f[R]
-Find files ending with \[dq].c\[dq] and replace the extension with
-\[dq].h\[dq]
-.TP
+.RE
+.PP
+Find the word \[lq]foobar\[rq], followed by a pair of matching
+parentheses in the file \f[I]my_file.py\f[R]:
+.RS
+.PP
 \f[B]bp -p \[aq]{foobar} parens\[aq] my_file.py\f[R]
-Find the word \f[B]\[dq]foobar\[dq]\f[R], followed by a pair of matching
-parentheses in the file \f[I]my_file.py\f[R]
-.TP
-\f[B]bp -g html -p \[aq]element \[ti] (\[ha]\[ha]\[dq]<a \[dq])\[aq] foo.html\f[R]
+.RE
+.PP
 Using the \f[I]html\f[R] grammar, find all \f[I]element\f[R]s matching
-the tag \f[I]a\f[R] in the file \f[I]foo.html\f[R]
-.TP
-\f[B]bp -g python -p \[aq]comment\[ti]{TODO}\[aq] *.py\f[R]
-Find all comments with the word \f[B]\[lq]TODO\[rq]\f[R] in local python
-files.
+the tag \f[I]a\f[R] in the file \f[I]foo.html\f[R]:
+.RS
+.PP
+\f[B]bp -g html -p \[aq]element \[ti] (\[ha]\[ha]\[dq]<a \[dq])\[aq] foo.html\f[R]
+.RE
 .SH AUTHORS
 Bruce Hill (\f[I]bruce\[at]bruce-hill.com\f[R]).
