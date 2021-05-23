@@ -12,7 +12,7 @@
 // (i.e. skip forward one codepoint at a time, not one byte at a time)
 //
 __attribute__((nonnull, pure))
-static inline const char *next_char(file_t *f, const char *str)
+inline const char *next_char(file_t *f, const char *str)
 {
     if (__builtin_expect(str+1 <= f->end && (str[0] & 0x80) == 0x0, 1))
         return str+1;
@@ -30,7 +30,7 @@ static inline const char *next_char(file_t *f, const char *str)
 // (i.e. skip backwards one codepoint at a time, not one byte at a time)
 //
 __attribute__((nonnull, pure))
-static inline const char *prev_char(file_t *f, const char *str)
+inline const char *prev_char(file_t *f, const char *str)
 {
     if (__builtin_expect(str-1 >= f->start && (str[-1] & 0x80) == 0x0, 1))
         return str-1;

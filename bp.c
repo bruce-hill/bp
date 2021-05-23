@@ -202,9 +202,9 @@ static void cleanup(void)
     if (modifying_file && backup_file) {
         rewind(modifying_file);
         ftruncate(fileno(modifying_file), 0);
-        fwrite(backup_file->start, 1,
-               (size_t)(backup_file->end - backup_file->start),
-               modifying_file);
+        (void)fwrite(backup_file->start, 1,
+                     (size_t)(backup_file->end - backup_file->start),
+                     modifying_file);
         fclose(modifying_file);
         modifying_file = NULL;
     }

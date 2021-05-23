@@ -50,7 +50,7 @@ pat_t *new_pat(file_t *f, const char *start, const char *end, size_t minlen, ssi
 static pat_t *new_range(file_t *f, const char *start, const char *end, size_t min, ssize_t max, pat_t *repeating, pat_t *sep)
 {
     size_t minlen = min*repeating->min_matchlen + (min > 0 ? min-1 : 0)*(sep ? sep->min_matchlen : 0);
-    ssize_t maxlen = (max == -1 || UNBOUNDED(repeating) || (max != 0 && max != 1 && sep && UNBOUNDED(sep))) ? -1
+    ssize_t maxlen = (max == -1 || UNBOUNDED(repeating) || (max != 0 && max != 1 && sep && UNBOUNDED(sep))) ? (ssize_t)-1
         : max*repeating->max_matchlen + (ssize_t)(max > 0 ? min-1 : 0)*(ssize_t)(sep ? sep->min_matchlen : 0);
     pat_t *range = new_pat(f, start, end, minlen, maxlen, BP_REPEAT);
     range->args.repetitions.min = min;
@@ -141,7 +141,7 @@ pat_t *chain_together(file_t *f, pat_t *first, pat_t *second)
     if (first == NULL) return second;
     if (second == NULL) return first;
     size_t minlen = first->min_matchlen + second->min_matchlen;
-    ssize_t maxlen = (UNBOUNDED(first) || UNBOUNDED(second)) ? -1 : first->max_matchlen + second->max_matchlen;
+    ssize_t maxlen = (UNBOUNDED(first) || UNBOUNDED(second)) ? (ssize_t)-1 : first->max_matchlen + second->max_matchlen;
     pat_t *chain = new_pat(f, first->start, second->end, minlen, maxlen, BP_CHAIN);
     chain->args.multiple.first = first;
     chain->args.multiple.second = second;
@@ -174,7 +174,7 @@ pat_t *either_pat(file_t *f, pat_t *first, pat_t *second)
     if (first == NULL) return second;
     if (second == NULL) return first;
     size_t minlen = first->min_matchlen < second->min_matchlen ? first->min_matchlen : second->min_matchlen;
-    ssize_t maxlen = (UNBOUNDED(first) || UNBOUNDED(second)) ? -1 : 
+    ssize_t maxlen = (UNBOUNDED(first) || UNBOUNDED(second)) ? (ssize_t)-1 : 
         (first->max_matchlen > second->max_matchlen ? first->max_matchlen : second->max_matchlen);
     pat_t *either = new_pat(f, first->start, second->end, minlen, maxlen, BP_OTHERWISE);
     either->args.multiple.first = first;
