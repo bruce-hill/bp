@@ -52,9 +52,10 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
 // If the given pattern is a reference, look it up and return the referenced
 // pattern. This is used for an optimization to avoid repeated lookups.
 //
+__attribute__((nonnull, returns_nonnull))
 static inline pat_t *deref(def_t *defs, pat_t *pat)
 {
-    if (pat && pat->type == BP_REF) {
+    if (pat->type == BP_REF) {
         def_t *def = lookup(defs, pat->args.ref.len, pat->args.ref.name);
         if (def) pat = def->pat;
     }

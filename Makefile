@@ -3,7 +3,7 @@ CC=cc
 PREFIX=/usr/local
 SYSCONFDIR=/etc
 CFLAGS=-std=c99 -Werror -D_XOPEN_SOURCE=700 -D_GNU_SOURCE -D_POSIX_C_SOURCE=200809L
-CWARN=-Wall -Wpedantic -Wextra -Wsign-conversion -Wtype-limits -Wunused-result
+CWARN=-Wall -Wpedantic -Wextra -Wsign-conversion -Wtype-limits -Wunused-result -Wnull-dereference
 EXTRA=
 G=
 O=-O3
