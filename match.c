@@ -36,6 +36,7 @@ static match_t *unused_matches = NULL;
 static match_t *in_use_matches = NULL;
 #endif
 
+__attribute__((nonnull(1)))
 static inline pat_t *deref(def_t *defs, pat_t *pat);
 __attribute__((returns_nonnull))
 static match_t *new_match(pat_t *pat, const char *start, const char *end, match_t *child);
@@ -52,10 +53,9 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
 // If the given pattern is a reference, look it up and return the referenced
 // pattern. This is used for an optimization to avoid repeated lookups.
 //
-__attribute__((nonnull, returns_nonnull))
 static inline pat_t *deref(def_t *defs, pat_t *pat)
 {
-    if (pat->type == BP_REF) {
+    if (pat && pat->type == BP_REF) {
         def_t *def = lookup(defs, pat->args.ref.len, pat->args.ref.name);
         if (def) pat = def->pat;
     }
@@ -297,6 +297,7 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
         }
         case BP_AFTER: {
             pat_t *back = deref(defs, pat->args.pat);
+            if (!back) return NULL;
 
             // We only care about the region from the backtrack pos up to the
             // current pos, so mock it out as a file slice.
