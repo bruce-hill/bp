@@ -26,6 +26,7 @@ const char *after_spaces(const char *str)
             while (*str && *str != '\n') ++str;
             goto skip_whitespace;
         }
+        default: break;
     }
     return str;
 }

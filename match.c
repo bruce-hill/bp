@@ -472,7 +472,7 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
             return p ? new_match(pat, str, p->end, p) : NULL;
         }
         default: {
-            errx(EXIT_FAILURE, "Unknown pattern type: %d", pat->type);
+            errx(EXIT_FAILURE, "Unknown pattern type: %u", pat->type);
             return NULL;
         }
     }

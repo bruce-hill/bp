@@ -98,14 +98,16 @@ file_t *load_file(file_t **files, const char *filename)
 
   skip_mmap:
     f->mmapped = false;
-    size_t capacity = 1000;
-    length = 0;
-    f->memory = xcalloc(sizeof(char), capacity);
-    ssize_t just_read;
-    while ((just_read=read(fd, &f->memory[length], capacity - length)) > 0) {
-        length += (size_t)just_read;
-        if (length >= capacity)
-            f->memory = xrealloc(f->memory, sizeof(char)*(capacity *= 2) + 1);
+    {
+        size_t capacity = 1000;
+        length = 0;
+        f->memory = xcalloc(sizeof(char), capacity);
+        ssize_t just_read;
+        while ((just_read=read(fd, &f->memory[length], capacity - length)) > 0) {
+            length += (size_t)just_read;
+            if (length >= capacity)
+                f->memory = xrealloc(f->memory, sizeof(char)*(capacity *= 2) + 1);
+        }
     }
 
   finished_loading:

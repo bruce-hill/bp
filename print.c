@@ -274,9 +274,8 @@ static void _print_match(FILE *out, printer_t *pr, match_t *m)
             _print_match(out, pr, m->child);
             return;
         }
-        size_t line_start = get_line_number(pr->file, m->start);
+        size_t line = get_line_number(pr->file, m->start);
         size_t line_end = get_line_number(pr->file, m->end);
-        size_t line = line_start;
 
         if (pr->use_color && current_color != color_replace) {
             fprintf(out, "%s", color_replace);
