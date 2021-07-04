@@ -25,7 +25,7 @@ var: id
 keyword: !"" # No keywords defined by default
 left-word-edge: !<word-char
 right-word-edge: !word-char
-word-char: `a-z,A-Z,_,0-9,-,'
+word-char: `a-z,A-Z,_,0-9
 word: left-word-edge +word-char
 HEX: `0-9,A-F
 Hex: `0-9,a-f,A-F
