@@ -498,8 +498,8 @@ int main(int argc, char *argv[])
     pat_t *pattern = NULL;
 
     // Load builtins:
-    file_t *xdg_file = load_filef(&loaded_files, "/etc/xdg/"BP_NAME"/builtins.bp");
-    if (xdg_file) defs = load_grammar(defs, xdg_file);
+    file_t *builtins_file = load_filef(&loaded_files, "/etc/"BP_NAME"/builtins.bp");
+    if (builtins_file) defs = load_grammar(defs, builtins_file);
     file_t *local_file = load_filef(&loaded_files, "%s/.config/"BP_NAME"/builtins.bp", getenv("HOME"));
     if (local_file) defs = load_grammar(defs, local_file);
 
@@ -543,7 +543,7 @@ int main(int argc, char *argv[])
             if (f == NULL)
                 f = load_filef(&loaded_files, "%s/.config/"BP_NAME"/%s.bp", getenv("HOME"), flag);
             if (f == NULL)
-                f = load_filef(&loaded_files, "/etc/xdg/"BP_NAME"/%s.bp", flag);
+                f = load_filef(&loaded_files, "/etc/"BP_NAME"/%s.bp", flag);
             if (f == NULL)
                 errx(EXIT_FAILURE, "Couldn't find grammar: %s", flag);
             defs = load_grammar(defs, f); // Keep in memory for debug output

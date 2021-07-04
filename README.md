@@ -123,7 +123,7 @@ grammar file, use `bp -g <path-to-file>` or `bp --grammar=<path-to-file>`. Once
 BP is installed, however, you can use `bp -g <grammar-name>` directly, and BP
 will figure out which grammar you mean (e.g. `bp -g lua ...`). BP first
 searches `~/.config/bp/` for any grammar files you keep locally, then searches
-`/etc/xdg/bp/` for system-wide grammar files.
+`/etc/bp/` for system-wide grammar files.
 
 Testing for these grammar files (other than `builtins`) is iffy at this point,
 so use at your own risk! These grammar files are only approximations of syntax.
