@@ -216,7 +216,8 @@ static void print_between(FILE *out, printer_t *pr, const char *start, const cha
             fprintf(out, "%s", color);
             current_color = color;
         }
-        fprintf(out, "%.*s", (int)(eol - start), start);
+        for (const char *c = start; c < eol; c++)
+            fputc(*c, out);
         if (eol[-1] == '\n')
             pr->needs_line_number = 1;
         start = eol;

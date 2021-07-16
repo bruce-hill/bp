@@ -38,8 +38,14 @@ static void populate_lines(file_t *f, size_t len)
         if (n >= linecap)
             f->lines = xrealloc(f->lines, sizeof(const char*)*(linecap *= 2));
         f->lines[n] = p;
-        p = strchr(p, '\n');
-        if (p) ++p;
+        do {
+            char *nl = strchr(p, '\n');
+            if (nl) {
+                p = nl+1;
+                break;
+            } else if (p < &f->memory[len])
+                p += strlen(p)+1;
+        } while (p < &f->memory[len]);
     }
 }
 
