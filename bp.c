@@ -635,13 +635,6 @@ int main(int argc, char *argv[])
         tty_out = fopen("/dev/tty", "w");
     }
 
-    // To ensure recursion (and left recursion in particular) works properly,
-    // we need to define a rule called "pattern" with the value of whatever
-    // pattern the args specified, and use `pattern` as the thing being matched.
-    defs = with_def(defs, strlen("pattern"), "pattern", pattern);
-    file_t *patref_file = spoof_file(&loaded_files, "<pattern ref>", "pattern", -1);
-    pattern = bp_pattern(patref_file, patref_file->start);
-
     int found = 0;
     if (options.mode == MODE_JSON) printf("[");
     if (options.git_mode) { // Get the list of files from `git --ls-files ...`
