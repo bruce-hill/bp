@@ -62,26 +62,31 @@ static inline pat_t *deref(def_t *defs, pat_t *pat)
 }
 
 //
-// Find and return the first string literal to be matched (if any)
+// Find and return the first and simplest pattern that will definitely have to
+// match for the whole pattern to match (if any)
 //
-static pat_t *first_literal(def_t *defs, pat_t *pat)
+static pat_t *first_pat(def_t *defs, pat_t *pat)
 {
     for (pat_t *p = pat; p; ) {
-        if (p->type == BP_STRING)
-            return p;
-        else if (p->type == BP_BEFORE)
-            p = p->args.pat;
-        else if (p->type == BP_CAPTURE)
-            p = p->args.capture.capture_pat;
-        else if (p->type == BP_CHAIN)
-            p = p->args.multiple.first;
-        else if (p->type == BP_REPLACE)
-            p = p->args.replace.pat;
-        else if (p->type == BP_REF)
-            p = deref(defs, p);
-        else break;
+        switch (p->type) {
+            case BP_BEFORE:
+                p = p->args.pat; break;
+            case BP_REPEAT:
+                if (p->args.repetitions.min == 0)
+                    return p;
+                p = p->args.repetitions.repeat_pat; break;
+            case BP_CAPTURE:
+                p = p->args.capture.capture_pat; break;
+            case BP_CHAIN: case BP_MATCH: case BP_NOT_MATCH:
+                p = p->args.multiple.first; break;
+            case BP_REPLACE:
+                p = p->args.replace.pat; break;
+            case BP_REF:
+                p = deref(defs, p); break;
+            default: return p;
+        }
     }
-    return NULL;
+    return pat;
 }
 
 //
@@ -89,7 +94,6 @@ static pat_t *first_literal(def_t *defs, pat_t *pat)
 //
 match_t *next_match(def_t *defs, file_t *f, match_t *prev, pat_t *pat, pat_t *skip, bool ignorecase)
 {
-    pat = deref(defs, pat);
     const char *str;
     if (prev) {
         str = prev->end > prev->start ? prev->end : prev->end + 1;
@@ -97,22 +101,25 @@ match_t *next_match(def_t *defs, file_t *f, match_t *prev, pat_t *pat, pat_t *sk
     } else {
         str = f->start;
     }
-    bool only_start = pat->type == BP_START_OF_FILE || (pat->type == BP_CHAIN && pat->args.multiple.first->type == BP_START_OF_FILE);
+
+    pat = deref(defs, pat);
+    pat_t *first = first_pat(defs, pat);
 
     // Performance optimization: if the pattern starts with a string literal,
     // we can just rely on the highly optimized strstr()/strcasestr()
     // implementations to skip past areas where we know we won't find a match.
-    pat_t *first_str = first_literal(defs, pat);
-    if (first_str) {
-        for (size_t i = 0; i < first_str->min_matchlen; i++)
-            if (first_str->args.string[i] == '\0')
+    if (first->type == BP_STRING) {
+        for (size_t i = 0; i < first->min_matchlen; i++)
+            if (first->args.string[i] == '\0')
                 goto pattern_search;
-        char *tmp = strndup(first_str->args.string, first_str->min_matchlen);
+        char *tmp = strndup(first->args.string, first->min_matchlen);
         char *found = (ignorecase ? strcasestr : strstr)(str, tmp);
         if (found)
             str = found;
         else if (&str[strlen(str)] == f->end)
             str = f->end+1;
+        else
+            str = &str[strlen(str)];
         free(tmp);
     }
 
@@ -120,7 +127,7 @@ match_t *next_match(def_t *defs, file_t *f, match_t *prev, pat_t *pat, pat_t *sk
     while (str <= f->end) {
         match_t *m = match(defs, f, str, pat, ignorecase);
         if (m) return m;
-        if (only_start) return NULL;
+        if (first->type == BP_START_OF_FILE) return NULL;
         match_t *s;
         if (skip && (s = match(defs, f, str, skip, ignorecase))) {
             str = s->end > str ? s->end : str + 1;
@@ -350,8 +357,8 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
             match_t *m1 = match(defs, f, str, pat->args.multiple.first, ignorecase);
             if (m1 == NULL) return NULL;
 
-            // <p1>==<p2> matches iff the text of <p1> matches <p2>
-            // <p1>!=<p2> matches iff the text of <p1> does not match <p2>
+            // <p1>~<p2> matches iff the text of <p1> matches <p2>
+            // <p1>!~<p2> matches iff the text of <p1> does not match <p2>
             file_t slice;
             slice_file(&slice, f, m1->start, m1->end);
             match_t *m2 = next_match(defs, &slice, NULL, pat->args.multiple.second, NULL, ignorecase);
