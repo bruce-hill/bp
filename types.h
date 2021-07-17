@@ -28,7 +28,6 @@ enum pattype_e {
     BP_NOT_MATCH,
     BP_REPLACE,
     BP_REF,
-    BP_BACKREF,
     BP_NODENT,
     BP_START_OF_FILE,
     BP_START_OF_LINE,

@@ -66,17 +66,6 @@ def_t *lookup(def_t *defs, size_t namelen, const char *name)
 }
 
 //
-// Push a backreference onto the backreference stack
-//
-def_t *with_backref(def_t *defs, file_t *f, size_t namelen, const char *name, match_t *m)
-{
-    // TODO: maybe calculate length? (nontrivial because of replacements)
-    pat_t *backref = new_pat(f, m->start, m->end, 0, -1, BP_BACKREF);
-    backref->args.backref = m;
-    return with_def(defs, namelen, name, backref);
-}
-
-//
 // Free all the given definitions up till (but not including) `stop`
 //
 void free_defs(def_t **defs, def_t *stop)

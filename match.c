@@ -11,6 +11,7 @@
 
 #include "definitions.h"
 #include "match.h"
+#include "pattern.h"
 #include "types.h"
 #include "utils.h"
 #include "utf8.h"
@@ -41,8 +42,6 @@ static inline pat_t *deref(def_t *defs, pat_t *pat);
 __attribute__((returns_nonnull))
 static match_t *new_match(pat_t *pat, const char *start, const char *end, match_t *child);
 __attribute__((nonnull))
-static const char *match_backref(const char *str, match_t *cap, bool ignorecase);
-__attribute__((nonnull))
 static match_t *get_capture_by_num(match_t *m, int *n);
 __attribute__((nonnull, pure))
 static match_t *get_capture_by_name(match_t *m, const char *name);
@@ -61,62 +60,6 @@ static inline pat_t *deref(def_t *defs, pat_t *pat)
     }
     return pat;
 }
-
-//
-// Attempt to match text against a previously captured value.
-// Return the character position after the backref has matched, or NULL if no match has occurred.
-//
-static const char *match_backref(const char *str, match_t *cap, bool ignorecase)
-{
-    if (cap->pat->type == BP_REPLACE) {
-        const char *text = cap->pat->args.replace.text;
-        const char *end = &text[cap->pat->args.replace.len];
-        for (const char *r = text; r < end; ) {
-            if (*r == '\\') {
-                ++r;
-                if (*(str++) != unescapechar(r, &r))
-                    return NULL;
-            } else if (*r != '@') {
-                if (*(str++) != *r)
-                    return NULL;
-                ++r;
-                continue;
-            }
-
-            ++r;
-            match_t *value = get_capture(cap, &r);
-            if (value != NULL) {
-                str = match_backref(str, value, ignorecase);
-                if (str == NULL) return NULL;
-            }
-        }
-    } else {
-        const char *prev = cap->start;
-        for (match_t *child = cap->child; child; child = child->nextsibling) {
-            if (child->start > prev) {
-                size_t len = (size_t)(child->start - prev);
-                if ((ignorecase ? memicmp : memcmp)(str, prev, len) != 0) {
-                    return NULL;
-                }
-                str += len;
-                prev = child->start;
-            }
-            if (child->start < prev) continue;
-            str = match_backref(str, child, ignorecase);
-            if (str == NULL) return NULL;
-            prev = child->end;
-        }
-        if (cap->end > prev) {
-            size_t len = (size_t)(cap->end - prev);
-            if ((ignorecase ? memicmp : memcmp)(str, prev, len) != 0) {
-                return NULL;
-            }
-            str += len;
-        }
-    }
-    return str;
-}
-
 
 //
 // Find the next match after prev (or the first match if prev is NULL)
@@ -341,9 +284,14 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
             match_t *m2;
             { // Push backrefs and run matching, then cleanup
                 def_t *defs2 = defs;
-                if (m1->pat->type == BP_CAPTURE && m1->pat->args.capture.name)
-                    defs2 = with_backref(defs2, f, m1->pat->args.capture.namelen, m1->pat->args.capture.name, m1);
-                // def_t *defs2 = with_backrefs(defs, f, m1);
+                if (m1->pat->type == BP_CAPTURE && m1->pat->args.capture.name) {
+                    // Temporarily add a rule that the backref name matches the
+                    // exact string of the original match (no replacements)
+                    ssize_t len = (ssize_t)(m1->end - m1->start);
+                    pat_t *backref = new_pat(f, m1->start, m1->end, len, len, BP_STRING);
+                    backref->args.string = m1->start;
+                    defs2 = with_def(defs, pat->args.ref.len, pat->args.ref.name, backref);
+                }
                 m2 = match(defs2, f, m1->end, pat->args.multiple.second, ignorecase);
                 free_defs(&defs2, defs);
             }
@@ -439,10 +387,6 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
             // match results.
             // OPTIMIZE: remove this if necessary
             return new_match(pat, m->start, m->end, m);
-        }
-        case BP_BACKREF: {
-            const char *end = match_backref(str, pat->args.backref, ignorecase);
-            return end ? new_match(pat, str, end, NULL) : NULL;
         }
         case BP_NODENT: {
             if (*str != '\n') return NULL;

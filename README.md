@@ -64,7 +64,7 @@ Pattern            | Meaning
 `5+ pat % sep`     | 5 or more occurrences of `pat`, separated by `sep` (e.g. `0+ int % ","` matches `1,2,3`)
 `*pat`             | 0 or more occurrences of `pat` (shorthand for `0+pat`)
 `+pat`             | 1 or more occurrences of `pat` (shorthand for `1+pat`)
-`<pat`             | `pat` matches just before the current position (backref)
+`<pat`             | `pat` matches just before the current position (lookbehind)
 `>pat`             | `pat` matches just in front of the current position (lookahead)
 `@pat`             | Capture `pat` (used for text replacement and backreferences)
 `@foo=pat`         | Let `foo` be the text of `pat` (used for text replacement and backreferences)
