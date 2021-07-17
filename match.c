@@ -116,10 +116,8 @@ match_t *next_match(def_t *defs, file_t *f, match_t *prev, pat_t *pat, pat_t *sk
         char *found = (ignorecase ? strcasestr : strstr)(str, tmp);
         if (found)
             str = found;
-        else if (&str[strlen(str)] == f->end)
-            str = f->end+1;
         else
-            str = &str[strlen(str)];
+            str += strlen(str); // Use += strlen here instead of f->end to handle files with NULL bytes
         free(tmp);
     }
 
