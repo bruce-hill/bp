@@ -333,7 +333,7 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
                     ssize_t len = (ssize_t)(m1->end - m1->start);
                     pat_t *backref = new_pat(f, m1->start, m1->end, (size_t)len, len, BP_STRING);
                     backref->args.string = m1->start;
-                    defs2 = with_def(defs, pat->args.ref.len, pat->args.ref.name, backref);
+                    defs2 = with_def(defs, m1->pat->args.capture.namelen, m1->pat->args.capture.name, backref);
                 }
                 m2 = match(defs2, f, m1->end, pat->args.multiple.second, ignorecase);
                 free_defs(&defs2, defs);
