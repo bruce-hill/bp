@@ -17,8 +17,6 @@ typedef struct {
     bool print_line_numbers:1;
 } printer_t;
 
-__attribute__((nonnull))
-void visualize_match(match_t *m);
 __attribute__((nonnull(1,2)))
 void print_match(FILE *out, printer_t *pr, match_t *m);
 __attribute__((nonnull))

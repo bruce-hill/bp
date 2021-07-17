@@ -24,6 +24,7 @@
 #include "files.h"
 #include "json.h"
 #include "match.h"
+#include "matchviz.h"
 #include "pattern.h"
 #include "print.h"
 #include "utils.h"

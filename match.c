@@ -288,7 +288,7 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
                     // Temporarily add a rule that the backref name matches the
                     // exact string of the original match (no replacements)
                     ssize_t len = (ssize_t)(m1->end - m1->start);
-                    pat_t *backref = new_pat(f, m1->start, m1->end, len, len, BP_STRING);
+                    pat_t *backref = new_pat(f, m1->start, m1->end, (size_t)len, len, BP_STRING);
                     backref->args.string = m1->start;
                     defs2 = with_def(defs, pat->args.ref.len, pat->args.ref.name, backref);
                 }
