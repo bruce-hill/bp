@@ -146,18 +146,21 @@ sequences are not allowed.
 `` ` ``*c*
 : The literal character *c* (e.g. `` `@ `` matches the "@" character)
 
-`` ` ``*c1*`,`*c2*
-: The literal character *c1* or *c2* (e.g. `` `a,e,i,o,u ``)
-
 `` ` ``*c1*`-`*c2*
 : The character range *c1* to *c2* (e.g. `` `a-z ``). Multiple ranges
 can be combined with a comma (e.g. `` `a-z,A-Z ``).
+
+`` ` ``*c1*`,`*c2*
+: Any one of the given character or character ranges *c1* or *c2* (e.g. `` `a,e,i,o,u,0-9 ``)
 
 `\`*esc*
 : An escape sequence (e.g. `\n`, `\x1F`, `\033`, etc.)
 
 `\`*esc1*`-`*esc2*
 : An escape sequence range from *esc1* to *esc2* (e.g. `\x00-x1F`)
+
+`\`*esc1*`,`*esc2*
+: Any one of the given escape sequences or ranges *esc1* or *esc2* (e.g. `\r,n,x01-x04`)
 
 `\N`
 : A special case escape that matches a "nodent": one or more newlines followed
