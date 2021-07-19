@@ -108,7 +108,7 @@ match_t *next_match(def_t *defs, file_t *f, match_t *prev, pat_t *pat, pat_t *sk
     // Performance optimization: if the pattern starts with a string literal,
     // we can just rely on the highly optimized strstr()/strcasestr()
     // implementations to skip past areas where we know we won't find a match.
-    if (first->type == BP_STRING) {
+    if (!skip && first->type == BP_STRING) {
         for (size_t i = 0; i < first->min_matchlen; i++)
             if (first->args.string[i] == '\0')
                 goto pattern_search;
