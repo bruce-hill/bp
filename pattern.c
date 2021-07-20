@@ -307,7 +307,7 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
                 const char *opstart = str;
                 unsigned char e = (unsigned char)unescapechar(str, &str);
                 if (str == opstart)
-                    file_err(f, start, str, "This isn't a valid escape sequence.");
+                    file_err(f, start, str+1, "This isn't a valid escape sequence.");
                 if (matchchar(&str, '-')) { // Escape range (e.g. \x00-\xFF)
                     if (next_char(f, str) != str+1)
                         file_err(f, start, next_char(f, str), "Sorry, UTF8 escape sequences are not supported in ranges.");
