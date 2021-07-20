@@ -88,7 +88,7 @@ char unescapechar(const char *escaped, const char **end)
         case 'a': ret = '\a'; break; case 'b': ret = '\b'; break;
         case 'n': ret = '\n'; break; case 'r': ret = '\r'; break;
         case 't': ret = '\t'; break; case 'v': ret = '\v'; break;
-        case 'e': ret = '\033'; break;
+        case 'e': ret = '\033'; break; case '\\': ret = '\\'; break;
         case 'x': { // Hex
             static const unsigned char hextable[255] = {
                 ['0']=0x10, ['1']=0x1, ['2']=0x2, ['3']=0x3, ['4']=0x4,
@@ -114,7 +114,10 @@ char unescapechar(const char *escaped, const char **end)
             }
             break;
         }
-        default: break;
+        default: {
+            if (end) *end = escaped;
+            return (char)0;
+        }
     }
     if (end) *end = &escaped[len];
     return (char)ret;

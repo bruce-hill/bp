@@ -90,8 +90,8 @@ literal strings, or strings that are primarily plain strings, with one or two
 patterns. `bp` is designed around this fact. The default mode for bp patterns
 is "string pattern mode". In string pattern mode, all characters are
 interpreted literally except for the backslash (`\`), which may be followed by
-a bp pattern (see the **PATTERNS** section below). Optionally, the bp pattern
-may be terminated by a semicolon (`;`).
+an escape or a bp pattern (see the **PATTERNS** section below). Optionally, the
+bp pattern may be terminated by a semicolon (`;`).
 
 
 # PATTERNS

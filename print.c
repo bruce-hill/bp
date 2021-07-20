@@ -162,12 +162,15 @@ static void _print_match(FILE *out, printer_t *pr, match_t *m)
                     }
                     continue;
                 }
+                const char *start = r;
                 char c = unescapechar(r, &r);
-                (void)fputc(c, out);
-                if (c == '\n') {
-                    ++line;
-                    pr->needs_line_number = 1;
-                }
+                if (r > start) {
+                    (void)fputc(c, out);
+                    if (c == '\n') {
+                        ++line;
+                        pr->needs_line_number = 1;
+                    }
+                } else (void)fputc('\\', out);
                 continue;
             } else if (*r == '\n') {
                 (void)fputc('\n', out);
