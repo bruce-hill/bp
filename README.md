@@ -50,7 +50,6 @@ Pattern            | Meaning
 `$`                | The end of a line
 `__`               | Zero or more whitespace characters (including newlines)
 `_`                | Zero or more whitespace characters (excluding newlines)
-`{foo}`            | The literal string `foo` with word boundaries on both ends
 `` `c ``           | The literal character `c`
 `` `a-z ``         | The character range `a` through `z`
 `` `a,b ``         | The character `a` or the character `b`

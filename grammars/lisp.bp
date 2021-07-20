@@ -9,7 +9,7 @@
 comment: ";" ..$
 string: `" ..%string-escape `"
 list: parens
-function-def: `(__{defun}__id
+function-def: `(__"defun"\b__id
 function: function-def ..%parens `)
 id-char: `A-Z,a-z,0-9,!,$,%,&,*,+,-,.,/,:,<,=,>,?,@,^,_,~
 id: !<`A-Z,a-z,0-9,!,$,%,&,*,+,-,.,/,:,<,=,>,?,@,^,_,~ +`A-Z,a-z,0-9,!,$,%,&,*,+,-,.,/,:,<,=,>,?,@,^,_,~

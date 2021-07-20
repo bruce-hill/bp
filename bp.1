@@ -151,11 +151,6 @@ The literal string \f[B]\[lq]foo\[rq]\f[R].
 Single and double quotes are treated the same.
 Escape sequences are not allowed.
 .TP
-\f[B]{foo}\f[R]
-The literal string \f[B]\[lq]foo\[rq]\f[R] with word boundaries on
-either end.
-Escape sequences are not allowed.
-.TP
 \f[B]\[ga]\f[R]\f[I]c\f[R]
 The literal character \f[I]c\f[R] (e.g.\ \f[B]\[ga]\[at]\f[R] matches
 the \[lq]\[at]\[rq] character)
@@ -186,6 +181,16 @@ Any one of the given escape sequences or ranges \f[I]esc1\f[R] or
 A special case escape that matches a \[lq]nodent\[rq]: one or more
 newlines followed by the same indentation that occurs on the current
 line.
+.TP
+\f[B]\[rs]i\f[R]
+An identifier character (e.g.\ alphanumeric characters or underscores).
+.TP
+\f[B]\[rs]I\f[R]
+An identifier character, not including numbers (e.g.\ alphabetic
+characters or underscores).
+.TP
+\f[B]\[rs]b\f[R]
+A word boundary.
 .TP
 \f[B]!\f[R] \f[I]pat\f[R]
 Not \f[I]pat\f[R]

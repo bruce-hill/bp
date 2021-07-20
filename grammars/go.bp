@@ -12,6 +12,6 @@ keyword:
     "break" / "default" / "func" / "interface" / "select" / "case" / "defer" / "go" /
     "map" / "struct" / "chan" / "else" / "goto" / "package" / "switch" / "const" /
     "fallthrough" / "if" / "range" / "type" / "continue" / "for" / "import" / "return" / "var"
-function-def: {func} __ id __ parens __ [id / parens] >(__`{)
+function-def: \b"func"\b __ id __ parens __ [id / parens] >(__`{)
 function: function-def __ braces
-import: {import} __ (parens / string)
+import: \b"import"\b __ (parens / string)

@@ -12,10 +12,11 @@ Def: @name=id __ `: __ (
     / (!)(..%\n>(`;/id_`:/$) => "Invalid definition: @0"))
 
 # This is used for command line arguments:
-String-pattern: ..%(\n / Nodent / Escape / `\ pat [`;])$$
+    String-pattern: ..%(\n / Nodent / Identifier-char / Identifier-start / Escape / `\ pat [`;])$$
 
 pat: simple-pat !(__("!~"/"~")) / suffixed-pat
-simple-pat: Upto-and / Dot / String / Chars / Nodent / Escape-range
+simple-pat: Upto-and / Dot / Word-boundary/ String / Chars / Nodent
+    / Identifier-char / Identifier-start / Escape-range
     / Escape / Repeat / Optional / No / After / Before / Capture  / Error / Empty-replacement
     / Start-of-File / Start-of-Line / End-of-File / End-of-Line / Ref / parens
 
@@ -31,7 +32,6 @@ Dot: `. !`.
 String: (
         `" @s=.. (`" / $ (!)=>"Expected closing quote here")
       / `' @s=.. (`' / $ (!)=>"Expected closing quote here")
-      / `{ @s=.. (`} / $ (!)=>"Expected closing brace here")
     )
 Chars: `` @+(Char-range/Char) % `,
 Char-range: @low=. `- (@high=. / (!)=>"Expected a second character to form a character range")
@@ -47,7 +47,10 @@ escape-sequence: (
       / `x 2 `0-9,a-f,A-F
     )
 No: `! (__@pat / (!)=>"Expected a pattern after the exclamation mark")
-Nodent: `\ `N
+Nodent: "\N"
+Word-boundary: "\b"
+Identifier-char: "\i"
+Identifier-start: "\I"
 Upto-and: ".." [__`%__@second=simple-pat] [__@first=simple-pat] 
 Repeat: (
         @min=(=>'0') (`*=>"-") @max=(=>'∞')

@@ -14,6 +14,8 @@
 // BP virtual machine pattern types
 enum pattype_e {
     BP_ANYCHAR = 1,
+    BP_ID_START,
+    BP_ID_CONTINUE,
     BP_STRING,
     BP_RANGE,
     BP_NOT,
@@ -33,6 +35,7 @@ enum pattype_e {
     BP_START_OF_LINE,
     BP_END_OF_FILE,
     BP_END_OF_LINE,
+    BP_WORD_BOUNDARY,
     BP_LEFTRECURSION,
     BP_ERROR,
 };

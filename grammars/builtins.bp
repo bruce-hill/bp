@@ -3,12 +3,6 @@
 nodent: \N !(\t/` )
 indent: \N (` /\t)
 dedent: $ !(nodent/indent)
-utf8-codepoint: (
-      \x00-x7f
-    / \xc0-xdf 1\x80-xbf
-    / \xe0-xef 2\x80-xbf
-    / \xf0-xf7 3\x80-xbf
-)
 crlf: \r\n
 cr: \r
 anglebraces: `< ..%(\n/anglebraces/string) `>
@@ -17,16 +11,10 @@ braces: `{ ..%(\n/braces/string) `}
 parens: `( ..%(\n/parens/string) `)
 string: `" ..%string-escape `" / `' ..%string-escape `'
 string-escape: `\ (`x 2 Hex / 1-3 `0-7 / `u 1-4 Hex / .)
-left-id-edge: !<id-char
-right-id-edge: !id-char
-id: left-id-edge !`0-9 !(keyword !id-char) +id-char
-id-char: `a-z,A-Z,_,0-9
-var: id
+id: \I *\i
+var: \I *\i
 keyword: !"" # No keywords defined by default
-left-word-edge: !<word-char
-right-word-edge: !word-char
-word-char: `a-z,A-Z,_,0-9
-word: left-word-edge +word-char
+word: \b +\i
 HEX: `0-9,A-F
 Hex: `0-9,a-f,A-F
 hex: `0-9,a-f

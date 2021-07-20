@@ -139,10 +139,6 @@ grammar file. See the **GRAMMAR FILES** section for more info.
 : The literal string **"foo"**. Single and double quotes are treated the same.
 Escape sequences are not allowed.
 
-`{foo}`
-: The literal string **"foo"** with word boundaries on either end. Escape
-sequences are not allowed.
-
 `` ` ``*c*
 : The literal character *c* (e.g. `` `@ `` matches the "@" character)
 
@@ -165,6 +161,15 @@ can be combined with a comma (e.g. `` `a-z,A-Z ``).
 `\N`
 : A special case escape that matches a "nodent": one or more newlines followed
 by the same indentation that occurs on the current line.
+
+`\i`
+: An identifier character (e.g. alphanumeric characters or underscores).
+
+`\I`
+: An identifier character, not including numbers (e.g. alphabetic characters or underscores).
+
+`\b`
+: A word boundary.
 
 `!` *pat*
 : Not *pat*

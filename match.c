@@ -81,8 +81,12 @@ static pat_t *first_pat(def_t *defs, pat_t *pat)
                 p = p->args.multiple.first; break;
             case BP_REPLACE:
                 p = p->args.replace.pat; break;
-            case BP_REF:
-                p = deref(defs, p); break;
+            case BP_REF: {
+                pat_t *p2 = deref(defs, p);
+                if (p2 == p) return p2;
+                p = p2;
+                break;
+            }
             default: return p;
         }
     }
@@ -122,7 +126,9 @@ match_t *next_match(def_t *defs, file_t *f, match_t *prev, pat_t *pat, pat_t *sk
     }
 
   pattern_search:
-    while (str <= f->end) {
+    if (str > f->end) return NULL;
+
+    do {
         match_t *m = match(defs, f, str, pat, ignorecase);
         if (m) return m;
         if (first->type == BP_START_OF_FILE) return NULL;
@@ -130,8 +136,8 @@ match_t *next_match(def_t *defs, file_t *f, match_t *prev, pat_t *pat, pat_t *sk
         if (skip && (s = match(defs, f, str, skip, ignorecase))) {
             str = s->end > str ? s->end : str + 1;
             recycle_if_unused(&s);
-        } else ++str;
-    }
+        } else str = next_char(f, str);
+    } while (str < f->end);
     return NULL;
 }
 
@@ -159,6 +165,12 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
         case BP_ANYCHAR: {
             return (str < f->end && *str != '\n') ? new_match(pat, str, next_char(f, str), NULL) : NULL;
         }
+        case BP_ID_START: {
+            return (str < f->end && isidstart(f, str)) ? new_match(pat, str, next_char(f, str), NULL) : NULL;
+        }
+        case BP_ID_CONTINUE: {
+            return (str < f->end && isidcontinue(f, str)) ? new_match(pat, str, next_char(f, str), NULL) : NULL;
+        }
         case BP_START_OF_FILE: {
             return (str == f->start) ? new_match(pat, str, str, NULL) : NULL;
         }
@@ -170,6 +182,9 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
         }
         case BP_END_OF_LINE: {
             return (str == f->end || *str == '\n') ? new_match(pat, str, str, NULL) : NULL;
+        }
+        case BP_WORD_BOUNDARY: {
+            return (isidcontinue(f, str) != isidcontinue(f, prev_char(f, str))) ? new_match(pat, str, str, NULL) : NULL;
         }
         case BP_STRING: {
             if (&str[pat->min_matchlen] > f->end) return NULL;

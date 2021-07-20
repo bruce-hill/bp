@@ -293,6 +293,15 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
                 if (matchchar(&str, 'N')) { // \N (nodent)
                     all = either_pat(f, all, new_pat(f, start, str, 1, -1, BP_NODENT));
                     continue;
+                } else if (matchchar(&str, 'i')) { // \i (identifier char)
+                    all = either_pat(f, all, new_pat(f, start, str, 1, -1, BP_ID_CONTINUE));
+                    continue;
+                } else if (matchchar(&str, 'I')) { // \I (identifier char, not including numbers)
+                    all = either_pat(f, all, new_pat(f, start, str, 1, -1, BP_ID_START));
+                    continue;
+                } else if (matchchar(&str, 'b')) { // \b word boundary
+                    all = either_pat(f, all, new_pat(f, start, str, 0, 0, BP_WORD_BOUNDARY));
+                    continue;
                 }
 
                 const char *opstart = str;
@@ -330,8 +339,8 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
             return all;
         }
         // String literal
-        case '"': case '\'': case '{': case '\002': {
-            char endquote = c == '{' ? '}' : (c == '\002' ? '\003' : c);
+        case '"': case '\'': case '\002': {
+            char endquote = c == '\002' ? '\003' : c;
             char *litstart = (char*)str;
             while (str < f->end && *str != endquote)
                 str = next_char(f, str);
@@ -340,18 +349,6 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
 
             pat_t *pat = new_pat(f, start, str, len, (ssize_t)len, BP_STRING);
             pat->args.string = litstart;
-            
-            if (c == '{') { // Surround with `|` word boundaries
-                pat_t *left = new_pat(f, start, start+1, 0, -1, BP_REF);
-                left->args.ref.name = "left-word-edge";
-                left->args.ref.len = strlen(left->args.ref.name);
-
-                pat_t *right = new_pat(f, str-1, str, 0, -1, BP_REF);
-                right->args.ref.name = "right-word-edge";
-                right->args.ref.len = strlen(right->args.ref.name);
-
-                pat = chain_together(f, left, chain_together(f, pat, right));
-            }
             return pat;
         }
         // Not <pat>
@@ -531,7 +528,10 @@ pat_t *bp_stringpattern(file_t *f, const char *str)
         pat_t *interp = NULL;
         for (; str < f->end; str = next_char(f, str)) {
             if (*str == '\\' && str+1 < f->end) {
-                interp = bp_simplepattern(f, str + 1);
+                if (str[1] == '\\' || isalnum(str[1]))
+                    interp = bp_simplepattern(f, str);
+                else
+                    interp = bp_simplepattern(f, str + 1);
                 if (interp) break;
                 // If there is no interpolated value, this is just a plain ol' regular backslash
             }
