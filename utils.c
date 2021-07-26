@@ -153,7 +153,7 @@ void xfree(void *p)
     if (*(void**)p == NULL)
         errx(EXIT_FAILURE, "attempt to free(NULL)");
     free(*(void**)p);
-    p = NULL;
+    *((void**)p) = NULL;
 }
 
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1
