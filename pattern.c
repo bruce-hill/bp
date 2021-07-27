@@ -33,6 +33,7 @@ static pat_t *bp_simplepattern(file_t *f, const char *str);
 //
 pat_t *new_pat(file_t *f, const char *start, const char *end, size_t minlen, ssize_t maxlen, enum pattype_e type)
 {
+    static size_t next_pat_id = 1;
     allocated_pat_t *tracker = new(allocated_pat_t);
     tracker->next = f->pats;
     f->pats = tracker;
@@ -41,6 +42,7 @@ pat_t *new_pat(file_t *f, const char *start, const char *end, size_t minlen, ssi
     tracker->pat.end = end;
     tracker->pat.min_matchlen = minlen;
     tracker->pat.max_matchlen = maxlen;
+    tracker->pat.id = next_pat_id++;
     return &tracker->pat;
 }
 

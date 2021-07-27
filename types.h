@@ -88,7 +88,7 @@ typedef struct pat_s {
         } leftrec;
         struct pat_s *pat;
     } args;
-    short int cache_balance;
+    size_t id;
 } pat_t;
 
 //

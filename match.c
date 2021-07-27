@@ -39,9 +39,8 @@ typedef struct {
     match_t **matches;
 } cache_t;
 
-static const size_t cache_sizes[] = {7, 17, 31, 61, 127, 509, 1021, 2039, 4093, 8191, 16529, 0}; // Prime numbers, roughly doubling
-static const short int CACHE_SUCKS = -50;
-static const double CACHE_MAX_OCCUPANCY = (double)2.0f;
+static const size_t cache_sizes[] = {127, 509, 1021, 2039, 4093, 8191, 16529, 0}; // Prime numbers, roughly doubling
+static const double CACHE_MAX_OCCUPANCY = (double).618f;
 
 cache_t cache = {0, 0, NULL};
 
@@ -92,20 +91,18 @@ static inline void remove_ownership(match_t** owner)
 
 static size_t hash(const char *str, pat_t *pat)
 {
-    return (size_t)((((unsigned long)pat)>>3) ^ ((unsigned long)str * 37));
+    return (size_t)str + 2*pat->id;
 }
 
 static match_t *cache_lookup(def_t *defs, const char *str, pat_t *pat)
 {
-    if (!cache.matches || pat->cache_balance <= CACHE_SUCKS) return NULL;
+    if (!cache.matches) return NULL;
     size_t h = hash(str, pat) % cache.size;
     for (match_t *c = cache.matches[h]; c; c = c->cache_next) {
         if (c->start == str && c->pat == pat && c->defs_id == defs->id) {
-            if (pat->cache_balance < SHRT_MAX - 4) pat->cache_balance += 4;
             return c;
         }
     }
-    if (pat->cache_balance > SHRT_MIN) --pat->cache_balance;
     return NULL;
 }
 
@@ -144,10 +141,20 @@ static void cache_save(match_t *m)
                     }
                     xfree(&old_cache.matches);
                 }
-                break;
+                goto store_hash;
             }
         }
+
+        size_t h = hash(m->start, m->pat) % cache.size;
+        for (int quota = 2; cache.matches[h] && quota > 0; --quota) {
+            match_t *last = cache.matches[h];
+            while (last->cache_next) last = last->cache_next;
+            cache_remove(last);
+        }
+
     }
+
+  store_hash:;
     size_t h = hash(m->start, m->pat) % cache.size;
     m->cache_home = &(cache.matches[h]);
     m->cache_next = cache.matches[h];
