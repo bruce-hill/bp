@@ -14,7 +14,7 @@ def_t *load_grammar(def_t *defs, file_t *f);
 __attribute__((pure, nonnull(3)))
 def_t *lookup(def_t *defs, size_t namelen, const char *name);
 __attribute__((nonnull(1)))
-void free_defs(def_t **defs, def_t *stop);
+def_t *free_defs(def_t *defs, def_t *stop);
 
 #endif
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1

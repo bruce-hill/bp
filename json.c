@@ -18,9 +18,8 @@ static int _json_match(const char *text, match_t *m, int comma, bool verbose)
 {
     if (!verbose) {
         if (m->pat->type != BP_REF && m->pat->type != BP_ERROR) {
-            for (match_t *child = m->child; child; child = child->nextsibling) {
-                comma |= _json_match(text, child, comma, verbose);
-            }
+            for (int i = 0; m->children && m->children[i]; i++)
+                comma |= _json_match(text, m->children[i], comma, verbose);
             return comma;
         }
     }
@@ -39,9 +38,8 @@ static int _json_match(const char *text, match_t *m, int comma, bool verbose)
     }
     printf("\",\"start\":%ld,\"end\":%ld,\"children\":[",
             m->start - text, m->end - text);
-    for (match_t *child = m->child; child; child = child->nextsibling) {
-        comma |= _json_match(text, child, comma, verbose);
-    }
+    for (int i = 0; m->children && m->children[i]; i++)
+        comma |= _json_match(text, m->children[i], comma, verbose);
     printf("]}");
     return 1;
 }

@@ -26,8 +26,9 @@ static void _visualize_matches(match_node_t *firstmatch, int depth, const char *
 static int height_of_match(match_t *m)
 {
     int height = 0;
-    for (match_t *c = m->child; c; c = c->nextsibling) {
-        int childheight = height_of_match(c);
+    for (int i = 0; m->children && m->children[i]; i++) {
+        match_t *child = m->children[i];
+        int childheight = height_of_match(child);
         if (childheight > height) height = childheight;
     }
     return 1 + height;
@@ -83,9 +84,9 @@ static void _visualize_matches(match_node_t *firstmatch, int depth, const char *
     // Print nonzero-width first:
     for (match_node_t *m = firstmatch; m; m = m->next) {
         if (RIGHT_TYPE(m)) {
-            for (match_t *c = m->m->child; c; c = c->nextsibling) {
+            for (int i = 0; m->m->children && m->m->children[i]; i++) {
                 *nextchild = new(match_node_t);
-                (*nextchild)->m = c;
+                (*nextchild)->m = m->m->children[i];
                 nextchild = &((*nextchild)->next);
             }
             if (m->m->end == m->m->start) continue;

@@ -305,37 +305,24 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
                 }
 
                 const char *opstart = str;
-                unsigned char e = (unsigned char)unescapechar(str, &str);
+                unsigned char e_low = (unsigned char)unescapechar(str, &str);
                 if (str == opstart)
                     file_err(f, start, str+1, "This isn't a valid escape sequence.");
+                unsigned char e_high = e_low;
                 if (matchchar(&str, '-')) { // Escape range (e.g. \x00-\xFF)
                     if (next_char(f, str) != str+1)
                         file_err(f, start, next_char(f, str), "Sorry, UTF8 escape sequences are not supported in ranges.");
                     const char *seqstart = str;
-                    unsigned char e2 = (unsigned char)unescapechar(str, &str);
+                    e_high = (unsigned char)unescapechar(str, &str);
                     if (str == seqstart)
                         file_err(f, seqstart, str+1, "This value isn't a valid escape sequence");
-                    if (e2 < e)
+                    if (e_high < e_low)
                         file_err(f, start, str, "Escape ranges should be low-to-high, but this is high-to-low.");
-                    pat_t *esc = new_pat(f, opstart, str, 1, 1, BP_RANGE);
-                    esc->args.range.low = e;
-                    esc->args.range.high = e2;
-                    all = either_pat(f, all, esc);
-                } else if (str > opstart) {
-                    pat_t *esc = new_pat(f, start, str, 1, 1, BP_STRING);
-                    char *s = xcalloc(sizeof(char), 2);
-                    s[0] = (char)e;
-                    esc->args.string = s;
-                    all = either_pat(f, all, esc);
-                } else {
-                    const char *next = next_char(f, opstart);
-                    size_t len = (size_t)(next-opstart);
-                    pat_t *esc = new_pat(f, start, next, len, (ssize_t)len, BP_STRING);
-                    char *s = xcalloc(sizeof(char), 1+len);
-                    memcpy(s, opstart, len);
-                    esc->args.string = s;
-                    all = either_pat(f, all, esc);
                 }
+                pat_t *esc = new_pat(f, start, str, 1, 1, BP_RANGE);
+                esc->args.range.low = e_low;
+                esc->args.range.high = e_high;
+                all = either_pat(f, all, esc);
             } while (matchchar(&str, ','));
 
             return all;

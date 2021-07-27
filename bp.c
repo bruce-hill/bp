@@ -55,7 +55,7 @@ static const char *usage = (
     " -g --grammar <grammar-file>      use the specified file as a grammar");
 
 // Used as a heuristic to check if a file is binary or text:
-#define CHECK_FIRST_N_BYTES 128
+#define CHECK_FIRST_N_BYTES 256
 
 // Flag-configurable options:
 typedef enum { CONFIRM_ASK, CONFIRM_ALL, CONFIRM_NONE } confirm_t;
@@ -167,13 +167,15 @@ static int is_text_file(const char *filename)
 static int print_matches_as_json(def_t *defs, file_t *f, pat_t *pattern)
 {
     static int matches = 0;
-    for (match_t *m = NULL; (m = next_match(defs, f, m, pattern, options.skip, options.ignorecase)); ) {
+    match_t *m = NULL;
+    while ((m = next_match(defs, f, m, pattern, options.skip, options.ignorecase))) {
         if (++matches > 1)
             printf(",\n");
         printf("{\"filename\":\"%s\",\"match\":", f->filename);
         json_match(f->start, m, options.verbose);
         printf("}");
     }
+    if (m) recycle_if_unused(&m);
     return matches;
 }
 
@@ -183,7 +185,8 @@ static int print_matches_as_json(def_t *defs, file_t *f, pat_t *pattern)
 static int explain_matches(def_t *defs, file_t *f, pat_t *pattern)
 {
     int matches = 0;
-    for (match_t *m = NULL; (m = next_match(defs, f, m, pattern, options.skip, options.ignorecase)); ) {
+    match_t *m = NULL;
+    while ((m = next_match(defs, f, m, pattern, options.skip, options.ignorecase))) {
         if (++matches == 1) {
             fprint_filename(stdout, f->filename);
         } else {
@@ -191,6 +194,7 @@ static int explain_matches(def_t *defs, file_t *f, pat_t *pattern)
         }
         visualize_match(m);
     }
+    if (m) recycle_if_unused(&m);
     return matches;
 }
 
@@ -238,7 +242,7 @@ static void confirm_replacements(file_t *f, match_t *m, confirm_t *confirm)
         { // Print the original
             printer_t pr = {.file = f, .context_lines = options.context_lines,
                 .use_color = true, .print_line_numbers = true};
-            print_match(tty_out, &pr, m->child);
+            print_match(tty_out, &pr, m->children[0]);
             // Print trailing context lines:
             print_match(tty_out, &pr, NULL);
         }
@@ -272,10 +276,8 @@ static void confirm_replacements(file_t *f, match_t *m, confirm_t *confirm)
     }
 
   check_children:
-    if (m->child)
-        confirm_replacements(f, m->child, confirm);
-    if (m->nextsibling)
-        confirm_replacements(f, m->nextsibling, confirm);
+    for (int i = 0; m->children && m->children[i]; i++)
+        confirm_replacements(f, m->children[i], confirm);
 }
 
 //
@@ -301,7 +303,8 @@ static int inplace_modify_file(def_t *defs, file_t *f, pat_t *pattern)
     FILE *dest = NULL; // Lazy-open this on the first match
     int matches = 0;
     confirm_t confirm_file = options.confirm;
-    for (match_t *m = NULL; (m = next_match(defs, f, m, pattern, options.skip, options.ignorecase)); ) {
+    match_t *m = NULL;
+    while ((m = next_match(defs, f, m, pattern, options.skip, options.ignorecase))) {
         ++matches;
         printer_t err_pr = {.file = f, .context_lines = 1, .use_color = true, .print_line_numbers = true};
         if (print_errors(&err_pr, m) > 0)
@@ -319,6 +322,7 @@ static int inplace_modify_file(def_t *defs, file_t *f, pat_t *pattern)
         confirm_replacements(f, m, &confirm_file);
         print_match(dest, &pr, m);
     }
+    if (m) recycle_if_unused(&m);
 
     if (dest) {
         // Print trailing context lines:
@@ -349,7 +353,8 @@ static int print_matches(def_t *defs, file_t *f, pat_t *pattern)
         .print_line_numbers = options.format == FORMAT_FANCY,
     };
 
-    for (match_t *m = NULL; (m = next_match(defs, f, m, pattern, options.skip, options.ignorecase)); ) {
+    match_t *m = NULL;
+    while ((m = next_match(defs, f, m, pattern, options.skip, options.ignorecase))) {
         printer_t err_pr = {.file = f, .context_lines = 1, .use_color = true, .print_line_numbers = true};
         if (print_errors(&err_pr, m) > 0)
             exit(EXIT_FAILURE);
@@ -360,6 +365,7 @@ static int print_matches(def_t *defs, file_t *f, pat_t *pattern)
         }
         print_match(stdout, &pr, m);
     }
+    if (m) recycle_if_unused(&m);
 
     if (matches > 0) {
         // Print trailing context lines:
@@ -399,10 +405,12 @@ static int process_file(def_t *defs, const char *filename, pat_t *pattern)
     } else {
         matches += print_matches(defs, f, pattern);
     }
+    fflush(stdout);
 
+    cache_destroy();
 #ifdef DEBUG_HEAP
     if (recycle_all_matches() != 0)
-        errx(EXIT_FAILURE, "Memory leak: there should no longer be any matches in use at this point.");
+        fprintf(stderr, "\033[33;1mMemory leak: there should no longer be any matches in use at this point.\033[0m\n");
 #endif
     destroy_file(&f);
     (void)fflush(stdout);
@@ -664,13 +672,14 @@ int main(int argc, char *argv[])
     // This code frees up all residual heap-allocated memory. Since the program
     // is about to exit, this step is unnecessary. However, it is useful for
     // tracking down memory leaks.
-    free_defs(&defs, NULL);
+    cache_destroy();
+    free_all_matches();
+    defs = free_defs(defs, NULL);
     while (loaded_files) {
         file_t *next = loaded_files->next;
         destroy_file(&loaded_files);
         loaded_files = next;
     }
-    free_all_matches();
 #endif
 
     exit(found > 0 ? EXIT_SUCCESS : EXIT_FAILURE);

@@ -13,31 +13,31 @@
 
 // BP virtual machine pattern types
 enum pattype_e {
-    BP_ANYCHAR = 1,
-    BP_ID_START,
-    BP_ID_CONTINUE,
-    BP_STRING,
-    BP_RANGE,
-    BP_NOT,
-    BP_UPTO,
-    BP_REPEAT,
-    BP_BEFORE,
-    BP_AFTER,
-    BP_CAPTURE,
-    BP_OTHERWISE,
-    BP_CHAIN,
-    BP_MATCH,
-    BP_NOT_MATCH,
-    BP_REPLACE,
-    BP_REF,
-    BP_NODENT,
-    BP_START_OF_FILE,
-    BP_START_OF_LINE,
-    BP_END_OF_FILE,
-    BP_END_OF_LINE,
-    BP_WORD_BOUNDARY,
-    BP_LEFTRECURSION,
-    BP_ERROR,
+    BP_ANYCHAR       = 1,
+    BP_ID_START      = 2,
+    BP_ID_CONTINUE   = 3,
+    BP_STRING        = 4,
+    BP_RANGE         = 5,
+    BP_NOT           = 6,
+    BP_UPTO          = 7,
+    BP_REPEAT        = 8,
+    BP_BEFORE        = 9,
+    BP_AFTER         = 10,
+    BP_CAPTURE       = 11,
+    BP_OTHERWISE     = 12,
+    BP_CHAIN         = 13,
+    BP_MATCH         = 14,
+    BP_NOT_MATCH     = 15,
+    BP_REPLACE       = 16,
+    BP_REF           = 17,
+    BP_NODENT        = 18,
+    BP_START_OF_FILE = 19,
+    BP_START_OF_LINE = 20,
+    BP_END_OF_FILE   = 21,
+    BP_END_OF_LINE   = 22,
+    BP_WORD_BOUNDARY = 23,
+    BP_LEFTRECURSION = 24,
+    BP_ERROR         = 25,
 };
 
 struct match_s; // forward declared to resolve circular struct defs
@@ -88,6 +88,7 @@ typedef struct pat_s {
         } leftrec;
         struct pat_s *pat;
     } args;
+    short int cache_balance;
 } pat_t;
 
 //
@@ -96,25 +97,29 @@ typedef struct pat_s {
 typedef struct match_s {
     // Where the match starts and ends (end is after the last character)
     const char *start, *end;
-    struct match_s *child, *nextsibling;
     pat_t *pat;
     // Intrusive linked list nodes for garbage collection:
     struct match_s *next;
 #ifdef DEBUG_HEAP
-    struct match_s **atme;
+    struct match_s **home;
 #endif
+    struct match_s *cache_next, **cache_home;
+    size_t defs_id;
     int refcount;
     // If skip_replacement is set to 1, that means the user wants to not print
     // the replaced text when printing this match:
     // TODO: this is a bit hacky, there is probably a better way to go about
     // this but it's less hacky that mutating the match objects more drastically
     bool skip_replacement:1;
+    struct match_s **children;
+    struct match_s *_children[3];
 } match_t;
 
 //
 // Pattern matching rule definition(s)
 //
 typedef struct def_s {
+    size_t id;
     size_t namelen;
     const char *name;
     pat_t *pat;

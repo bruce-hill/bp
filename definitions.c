@@ -11,12 +11,15 @@
 #include "pattern.h"
 #include "utils.h"
 
+static size_t next_id = 0;
+
 //
 // Return a new list of definitions with one added to the front
 //
 def_t *with_def(def_t *defs, size_t namelen, const char *name, pat_t *pat)
 {
     def_t *def = new(def_t);
+    def->id = next_id++;
     def->next = defs;
     def->namelen = namelen;
     def->name = name;
@@ -68,14 +71,15 @@ def_t *lookup(def_t *defs, size_t namelen, const char *name)
 //
 // Free all the given definitions up till (but not including) `stop`
 //
-void free_defs(def_t **defs, def_t *stop)
+def_t *free_defs(def_t *defs, def_t *stop)
 {
-    while (*defs != stop && *defs != NULL) {
-        def_t *next = (*defs)->next;
-        (*defs)->next = NULL;
-        free(*defs);
-        (*defs) = next;
+    while (defs != stop && defs != NULL) {
+        def_t *next = defs->next;
+        defs->next = NULL;
+        free(defs);
+        defs = next;
     }
+    return defs;
 }
 
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1

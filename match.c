@@ -4,6 +4,7 @@
 
 #include <ctype.h>
 #include <err.h>
+#include <limits.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -18,13 +19,9 @@
 
 #ifdef DEBUG_HEAP
 // Doubly-linked list operations:
-#define DLL_PREPEND(head, node) do { (node)->atme = &(head); (node)->next = head; if (head) (head)->atme = &(node)->next; head = node; } while(false)
-#define DLL_REMOVE(node) do { *(node)->atme = (node)->next; if ((node)->next) (node)->next->atme = (node)->atme; } while(false)
+#define DLL_PREPEND(head, node) do { (node)->home = &(head); (node)->next = head; if (head) (head)->home = &(node)->next; head = node; } while(false)
+#define DLL_REMOVE(node) do { *(node)->home = (node)->next; if ((node)->next) (node)->next->home = (node)->home; } while(false)
 #endif
-
-// Refcounting ownership-setting macros:
-#define ADD_OWNER(owner, m) do { owner = m; ++(m)->refcount; } while(false)
-#define REMOVE_OWNERSHIP(owner) do { if (owner) { --(owner)->refcount; recycle_if_unused(&(owner)); owner = NULL; } } while(false)
 
 // New match objects are either recycled from unused match objects or allocated
 // from the heap. While it is in use, the match object is stored in the
@@ -37,16 +34,152 @@ static match_t *unused_matches = NULL;
 static match_t *in_use_matches = NULL;
 #endif
 
+typedef struct {
+    size_t size, occupancy;
+    match_t **matches;
+} cache_t;
+
+static const size_t cache_sizes[] = {7, 17, 31, 61, 127, 509, 1021, 2039, 4093, 8191, 16529, 0}; // Prime numbers, roughly doubling
+static const short int CACHE_SUCKS = -50;
+static const double CACHE_MAX_OCCUPANCY = (double)2.0f;
+
+cache_t cache = {0, 0, NULL};
+
 __attribute__((nonnull(1)))
 static inline pat_t *deref(def_t *defs, pat_t *pat);
 __attribute__((returns_nonnull))
-static match_t *new_match(pat_t *pat, const char *start, const char *end, match_t *child);
+static match_t *new_match(def_t *defs, pat_t *pat, const char *start, const char *end, match_t *children[]);
 __attribute__((nonnull))
 static match_t *get_capture_by_num(match_t *m, int *n);
 __attribute__((nonnull, pure))
 static match_t *get_capture_by_name(match_t *m, const char *name);
 __attribute__((hot, nonnull(2,3,4)))
 static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool ignorecase);
+
+// Store a value and update its refcount
+static inline void add_owner(match_t** owner, match_t* owned)
+{
+    if (*owner != NULL)
+        errx(EXIT_FAILURE, "Ownership is being overwritten");
+    *owner = owned;
+    ++owned->refcount;
+}
+
+// Unstore a value and update its refcount
+static inline void remove_ownership(match_t** owner)
+{
+    if (*owner) {
+        --(*owner)->refcount;
+        if ((*owner)->refcount == 0)
+            recycle_if_unused(owner);
+        *owner = NULL;
+    }
+}
+
+// Helper method for concisely allocating children matches
+// static match_t** _alloc_children(size_t n, match_t* matches[])
+// {
+//     if (n == 0) return NULL;
+//     match_t **ret = xcalloc(n+1, sizeof(match_t*));
+//     for (size_t i = 0; i < n; i++)
+//         add_owner(&ret[i], matches[i]);
+//     return ret;
+// }
+
+// #define MATCHES(...) _alloc_children((sizeof((match_t*[]){__VA_ARGS__}))/sizeof(match_t*), (match_t*[]){__VA_ARGS__})
+
+#define MATCHES(...) (match_t*[]){__VA_ARGS__, NULL}
+
+static size_t hash(const char *str, pat_t *pat)
+{
+    return (size_t)((((unsigned long)pat)>>3) ^ ((unsigned long)str * 37));
+}
+
+static match_t *cache_lookup(def_t *defs, const char *str, pat_t *pat)
+{
+    if (!cache.matches || pat->cache_balance <= CACHE_SUCKS) return NULL;
+    size_t h = hash(str, pat) % cache.size;
+    for (match_t *c = cache.matches[h]; c; c = c->cache_next) {
+        if (c->start == str && c->pat == pat && c->defs_id == defs->id) {
+            if (pat->cache_balance < SHRT_MAX - 4) pat->cache_balance += 4;
+            return c;
+        }
+    }
+    if (pat->cache_balance > SHRT_MIN) --pat->cache_balance;
+    return NULL;
+}
+
+static void cache_remove(match_t *m)
+{
+    if (!m->cache_home) return;
+    *m->cache_home = m->cache_next;
+    if (m->cache_next) m->cache_next->cache_home = m->cache_home;
+    m->cache_next = NULL;
+    m->cache_home = NULL;
+    remove_ownership(&m);
+    --cache.occupancy;
+}
+
+static void cache_save(match_t *m)
+{
+    if ((double)(cache.occupancy + 1) >= ((double)cache.size) * CACHE_MAX_OCCUPANCY) {
+        cache_t old_cache = cache;
+        for (int s = 0; cache_sizes[s]; s++) {
+            if (cache_sizes[s] > cache.size) {
+                cache.size = cache_sizes[s];
+                cache.matches = xcalloc(cache.size, sizeof(match_t*));
+
+                // Rehash:
+                if (old_cache.matches) {
+                    for (size_t i = 0; i < old_cache.size; i++) {
+                        for (match_t *o; (o = old_cache.matches[i]); ) {
+                            *o->cache_home = o->cache_next;
+                            if (o->cache_next) o->cache_next->cache_home = o->cache_home;
+                            size_t h = hash(o->start, o->pat) % cache.size;
+                            o->cache_home = &(cache.matches[h]);
+                            o->cache_next = cache.matches[h];
+                            if (cache.matches[h]) cache.matches[h]->cache_home = &o->cache_next;
+                            cache.matches[h] = o;
+                        }
+                    }
+                    xfree(&old_cache.matches);
+                }
+                break;
+            }
+        }
+    }
+    size_t h = hash(m->start, m->pat) % cache.size;
+    m->cache_home = &(cache.matches[h]);
+    m->cache_next = cache.matches[h];
+    if (cache.matches[h]) cache.matches[h]->cache_home = &m->cache_next;
+    cache.matches[h] = NULL;
+    add_owner(&cache.matches[h], m);
+    ++cache.occupancy;
+}
+
+static void cache_prune(const char *start, const char *end)
+{
+    if (!cache.matches) return;
+    for (size_t i = 0; i < cache.size; i++) {
+        for (match_t *m = cache.matches[i], *next = NULL; m; m = next) {
+            next = m->cache_next;
+            if (m->start < start || (m->end ? m->end : m->start) > end)
+                cache_remove(m);
+        }
+    }
+}
+
+void cache_destroy(void)
+{
+    if (!cache.matches) return;
+    for (size_t i = 0; i < cache.size; i++) {
+        while (cache.matches[i])
+            cache_remove(cache.matches[i]);
+    }
+    cache.occupancy = 0;
+    xfree(&cache.matches);
+    cache.size = 0;
+}
 
 //
 // If the given pattern is a reference, look it up and return the referenced
@@ -101,9 +234,11 @@ match_t *next_match(def_t *defs, file_t *f, match_t *prev, pat_t *pat, pat_t *sk
     const char *str;
     if (prev) {
         str = prev->end > prev->start ? prev->end : prev->end + 1;
-        recycle_if_unused(&prev);
+        if (prev->refcount == 0) recycle_if_unused(&prev);
+        cache_prune(str, f->end);
     } else {
         str = f->start;
+        cache_destroy();
     }
 
     pat = deref(defs, pat);
@@ -163,40 +298,40 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
             }
         }
         case BP_ANYCHAR: {
-            return (str < f->end && *str != '\n') ? new_match(pat, str, next_char(f, str), NULL) : NULL;
+            return (str < f->end && *str != '\n') ? new_match(defs, pat, str, next_char(f, str), NULL) : NULL;
         }
         case BP_ID_START: {
-            return (str < f->end && isidstart(f, str)) ? new_match(pat, str, next_char(f, str), NULL) : NULL;
+            return (str < f->end && isidstart(f, str)) ? new_match(defs, pat, str, next_char(f, str), NULL) : NULL;
         }
         case BP_ID_CONTINUE: {
-            return (str < f->end && isidcontinue(f, str)) ? new_match(pat, str, next_char(f, str), NULL) : NULL;
+            return (str < f->end && isidcontinue(f, str)) ? new_match(defs, pat, str, next_char(f, str), NULL) : NULL;
         }
         case BP_START_OF_FILE: {
-            return (str == f->start) ? new_match(pat, str, str, NULL) : NULL;
+            return (str == f->start) ? new_match(defs, pat, str, str, NULL) : NULL;
         }
         case BP_START_OF_LINE: {
-            return (str == f->start || str[-1] == '\n') ? new_match(pat, str, str, NULL) : NULL;
+            return (str == f->start || str[-1] == '\n') ? new_match(defs, pat, str, str, NULL) : NULL;
         }
         case BP_END_OF_FILE: {
-            return (str == f->end) ? new_match(pat, str, str, NULL) : NULL;
+            return (str == f->end) ? new_match(defs, pat, str, str, NULL) : NULL;
         }
         case BP_END_OF_LINE: {
-            return (str == f->end || *str == '\n') ? new_match(pat, str, str, NULL) : NULL;
+            return (str == f->end || *str == '\n') ? new_match(defs, pat, str, str, NULL) : NULL;
         }
         case BP_WORD_BOUNDARY: {
-            return (isidcontinue(f, str) != isidcontinue(f, prev_char(f, str))) ? new_match(pat, str, str, NULL) : NULL;
+            return (isidcontinue(f, str) != isidcontinue(f, prev_char(f, str))) ? new_match(defs, pat, str, str, NULL) : NULL;
         }
         case BP_STRING: {
             if (&str[pat->min_matchlen] > f->end) return NULL;
             if (pat->min_matchlen > 0 && (ignorecase ? memicmp : memcmp)(str, pat->args.string, pat->min_matchlen) != 0)
                 return NULL;
-            return new_match(pat, str, str + pat->min_matchlen, NULL);
+            return new_match(defs, pat, str, str + pat->min_matchlen, NULL);
         }
         case BP_RANGE: {
             if (str >= f->end) return NULL;
             if ((unsigned char)*str < pat->args.range.low || (unsigned char)*str > pat->args.range.high)
                 return NULL;
-            return new_match(pat, str, str+1, NULL);
+            return new_match(defs, pat, str, str+1, NULL);
         }
         case BP_NOT: {
             match_t *m = match(defs, f, str, pat->args.pat, ignorecase);
@@ -204,10 +339,10 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
                 recycle_if_unused(&m);
                 return NULL;
             }
-            return new_match(pat, str, str, NULL);
+            return new_match(defs, pat, str, str, NULL);
         }
         case BP_UPTO: {
-            match_t *m = new_match(pat, str, str, NULL);
+            match_t *m = new_match(defs, pat, str, str, NULL);
             pat_t *target = deref(defs, pat->args.multiple.first),
                   *skip = deref(defs, pat->args.multiple.second);
             if (!target && !skip) {
@@ -216,7 +351,7 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
                 return m;
             }
 
-            match_t **dest = &m->child;
+            size_t child_cap = 0, nchildren = 0;
             for (const char *prev = NULL; prev < str; ) {
                 prev = str;
                 if (target) {
@@ -233,9 +368,12 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
                 if (skip) {
                     match_t *s = match(defs, f, str, skip, ignorecase);
                     if (s != NULL) {
-                        ADD_OWNER(*dest, s);
-                        dest = &s->nextsibling;
                         str = s->end;
+                        if (nchildren+2 >= child_cap) {
+                            m->children = xrealloc(m->children, sizeof(match_t*)*(child_cap += 5));
+                            for (size_t i = nchildren; i < child_cap; i++) m->children[i] = NULL;
+                        }
+                        add_owner(&m->children[nchildren++], s);
                         continue;
                     }
                 }
@@ -249,12 +387,12 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
             return NULL;
         }
         case BP_REPEAT: {
-            match_t *m = new_match(pat, str, str, NULL);
-            match_t **dest = &m->child;
+            match_t *m = new_match(defs, pat, str, str, NULL);
             size_t reps = 0;
             ssize_t max = pat->args.repetitions.max;
             pat_t *repeating = deref(defs, pat->args.repetitions.repeat_pat);
             pat_t *sep = deref(defs, pat->args.repetitions.sep);
+            size_t child_cap = 0, nchildren = 0;
             for (reps = 0; max == -1 || reps < (size_t)max; ++reps) {
                 const char *start = str;
                 // Separator
@@ -286,11 +424,18 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
                     break;
                 }
                 if (msep) {
-                    ADD_OWNER(*dest, msep);
-                    dest = &msep->nextsibling;
+                    if (nchildren+2 >= child_cap) {
+                        m->children = xrealloc(m->children, sizeof(match_t*)*(child_cap += 5));
+                        for (size_t i = nchildren; i < child_cap; i++) m->children[i] = NULL;
+                    }
+                    add_owner(&m->children[nchildren++], msep);
                 }
-                ADD_OWNER(*dest, mp);
-                dest = &mp->nextsibling;
+
+                if (nchildren+2 >= child_cap) {
+                    m->children = xrealloc(m->children, sizeof(match_t*)*(child_cap += 5));
+                    for (size_t i = nchildren; i < child_cap; i++) m->children[i] = NULL;
+                }
+                add_owner(&m->children[nchildren++], mp);
                 str = mp->end;
             }
 
@@ -320,7 +465,7 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
                 if (m && m->end != str)
                     recycle_if_unused(&m);
                 else if (m)
-                    return new_match(pat, str, str, m);
+                    return new_match(defs, pat, str, str, MATCHES(m));
                 if (pos == f->start) break;
                 // To prevent extreme performance degradation, don't keep
                 // walking backwards endlessly over newlines.
@@ -330,11 +475,11 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
         }
         case BP_BEFORE: {
             match_t *after = match(defs, f, str, pat->args.pat, ignorecase);
-            return after ? new_match(pat, str, str, after) : NULL;
+            return after ? new_match(defs, pat, str, str, MATCHES(after)) : NULL;
         }
         case BP_CAPTURE: {
             match_t *p = match(defs, f, str, pat->args.pat, ignorecase);
-            return p ? new_match(pat, str, p->end, p) : NULL;
+            return p ? new_match(defs, pat, str, p->end, MATCHES(p)) : NULL;
         }
         case BP_OTHERWISE: {
             match_t *m = match(defs, f, str, pat->args.multiple.first, ignorecase);
@@ -345,26 +490,39 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
             if (m1 == NULL) return NULL;
 
             match_t *m2;
-            { // Push backrefs and run matching, then cleanup
-                def_t *defs2 = defs;
-                if (m1->pat->type == BP_CAPTURE && m1->pat->args.capture.name) {
-                    // Temporarily add a rule that the backref name matches the
-                    // exact string of the original match (no replacements)
-                    ssize_t len = (ssize_t)(m1->end - m1->start);
-                    pat_t *backref = new_pat(f, m1->start, m1->end, (size_t)len, len, BP_STRING);
-                    backref->args.string = m1->start;
-                    defs2 = with_def(defs, m1->pat->args.capture.namelen, m1->pat->args.capture.name, backref);
-                }
-                m2 = match(defs2, f, m1->end, pat->args.multiple.second, ignorecase);
-                free_defs(&defs2, defs);
+            // Push backrefs and run matching, then cleanup
+            if (m1->pat->type == BP_CAPTURE && m1->pat->args.capture.name) {
+                // Temporarily add a rule that the backref name matches the
+                // exact string of the original match (no replacements)
+                size_t len = (size_t)(m1->end - m1->start);
+                pat_t *backref = new_pat(f, m1->start, m1->end, len, (ssize_t)len, BP_STRING);
+                backref->args.string = m1->start;
+                def_t *defs2 = with_def(defs, m1->pat->args.capture.namelen, m1->pat->args.capture.name, backref);
+
+                ++m1->refcount; {
+                    m2 = match(defs2, f, m1->end, pat->args.multiple.second, ignorecase);
+                    if (!m2) { // No need to keep the backref in memory if it didn't match
+                        for (struct allocated_pat_s **rem = &f->pats; *rem; rem = &(*rem)->next) {
+                            if (&(*rem)->pat == backref) {
+                                struct allocated_pat_s *tmp = *rem;
+                                *rem = (*rem)->next;
+                                free(tmp);
+                                break;
+                            }
+                        }
+                    }
+                    defs = free_defs(defs2, defs);
+                } --m1->refcount;
+            } else {
+                m2 = match(defs, f, m1->end, pat->args.multiple.second, ignorecase);
             }
 
             if (m2 == NULL) {
                 recycle_if_unused(&m1);
                 return NULL;
             }
-            ADD_OWNER(m1->nextsibling, m2);
-            return new_match(pat, str, m2->end, m1);
+
+            return new_match(defs, pat, str, m2->end, MATCHES(m1, m2));
         }
         case BP_MATCH: case BP_NOT_MATCH: {
             match_t *m1 = match(defs, f, str, pat->args.multiple.first, ignorecase);
@@ -376,12 +534,11 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
             slice_file(&slice, f, m1->start, m1->end);
             match_t *m2 = next_match(defs, &slice, NULL, pat->args.multiple.second, NULL, ignorecase);
             if ((!m2 && pat->type == BP_MATCH) || (m2 && pat->type == BP_NOT_MATCH)) {
-                recycle_if_unused(&m2);
+                if (m2) recycle_if_unused(&m2);
                 recycle_if_unused(&m1);
                 return NULL;
             }
-            if (pat->type == BP_MATCH) ADD_OWNER(m1->nextsibling, m2);
-            return new_match(pat, m1->start, m1->end, m1);
+            return new_match(defs, pat, m1->start, m1->end, (pat->type == BP_MATCH) ? MATCHES(m2) : NULL);
         }
         case BP_REPLACE: {
             match_t *p = NULL;
@@ -389,9 +546,12 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
                 p = match(defs, f, str, pat->args.replace.pat, ignorecase);
                 if (p == NULL) return NULL;
             }
-            return new_match(pat, str, p ? p->end : str, p);
+            return new_match(defs, pat, str, p ? p->end : str, MATCHES(p));
         }
         case BP_REF: {
+            match_t *cached = cache_lookup(defs, str, pat);
+            if (cached) return cached->end == NULL ? NULL : cached;
+
             def_t *def = lookup(defs, pat->args.ref.len, pat->args.ref.name);
             if (def == NULL)
                 errx(EXIT_FAILURE, "Unknown identifier: '%.*s'", (int)pat->args.ref.len, pat->args.ref.name);
@@ -419,12 +579,16 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
 
             const char *prev = str;
             match_t *m = match(&defs2, f, str, ref, ignorecase);
-            if (m == NULL) return NULL;
+            if (m == NULL) {
+                // Store placeholder:
+                cache_save(new_match(defs, pat, str, NULL, NULL));
+                return NULL;
+            }
 
             while (rec_op.args.leftrec.visits > 0) {
                 rec_op.args.leftrec.visits = 0;
-                REMOVE_OWNERSHIP(rec_op.args.leftrec.match);
-                ADD_OWNER(rec_op.args.leftrec.match, m);
+                remove_ownership(&rec_op.args.leftrec.match);
+                add_owner(&rec_op.args.leftrec.match, m);
                 prev = m->end;
                 match_t *m2 = match(&defs2, f, str, ref, ignorecase);
                 if (m2 == NULL) break;
@@ -435,21 +599,18 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
                 m = m2;
             }
 
-            if (rec_op.args.leftrec.match) {
-                // Ensure that `m` isn't garbage collected right now, but do
-                // clean up the recursive match result if it's not needed.
-                ++m->refcount;
-                REMOVE_OWNERSHIP(rec_op.args.leftrec.match);
-                --m->refcount;
-            }
-
-            if (!m)
-                errx(EXIT_FAILURE, "Match should be non-null at this point");
-            // This match wrapper mainly exists for record-keeping purposes and
-            // does not affect correctness. It also helps with visualization of
-            // match results.
+            // This match wrapper mainly exists for record-keeping purposes.
+            // However, it also keeps `m` from getting garbage collected with
+            // leftrec.match is GC'd. It also helps with visualization of match
+            // results.
             // OPTIMIZE: remove this if necessary
-            return new_match(pat, m->start, m->end, m);
+            match_t *wrap = new_match(defs, pat, m->start, m->end, MATCHES(m));
+            cache_save(wrap);
+
+            if (rec_op.args.leftrec.match)
+                remove_ownership(&rec_op.args.leftrec.match);
+
+            return wrap;
         }
         case BP_NODENT: {
             if (*str != '\n') return NULL;
@@ -472,11 +633,11 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
                 if (str[i] != denter || &str[i] >= f->end) return NULL;
             }
 
-            return new_match(pat, start, &str[dents], NULL);
+            return new_match(defs, pat, start, &str[dents], NULL);
         }
         case BP_ERROR: {
             match_t *p = pat->args.pat ? match(defs, f, str, pat->args.pat, ignorecase) : NULL;
-            return p ? new_match(pat, str, p->end, p) : NULL;
+            return p ? new_match(defs, pat, str, p->end, MATCHES(p)) : NULL;
         }
         default: {
             errx(EXIT_FAILURE, "Unknown pattern type: %u", pat->type);
@@ -493,9 +654,11 @@ static match_t *get_capture_by_num(match_t *m, int *n)
     if (*n == 0) return m;
     if (m->pat->type == BP_CAPTURE && *n == 1) return m;
     if (m->pat->type == BP_CAPTURE) --(*n);
-    for (match_t *c = m->child; c; c = c->nextsibling) {
-        match_t *cap = get_capture_by_num(c, n);
-        if (cap) return cap;
+    if (m->children) {
+        for (int i = 0; m->children[i]; i++) {
+            match_t *cap = get_capture_by_num(m->children[i], n);
+            if (cap) return cap;
+        }
     }
     return NULL;
 }
@@ -508,9 +671,11 @@ static match_t *get_capture_by_name(match_t *m, const char *name)
     if (m->pat->type == BP_CAPTURE && m->pat->args.capture.name
         && strncmp(m->pat->args.capture.name, name, m->pat->args.capture.namelen) == 0)
         return m;
-    for (match_t *c = m->child; c; c = c->nextsibling) {
-        match_t *cap = get_capture_by_name(c, name);
-        if (cap) return cap;
+    if (m->children) {
+        for (int i = 0; m->children[i]; i++) {
+            match_t *cap = get_capture_by_name(m->children[i], name);
+            if (cap) return cap;
+        }
     }
     return NULL;
 }
@@ -523,7 +688,7 @@ match_t *get_capture(match_t *m, const char **id)
 {
     if (isdigit(**id)) {
         int n = (int)strtol(*id, (char**)id, 10);
-        return get_capture_by_num(m->child, &n);
+        return get_capture_by_num(m, &n);
     } else {
         const char *end = after_name(*id);
         if (end == *id) return NULL;
@@ -539,7 +704,7 @@ match_t *get_capture(match_t *m, const char **id)
 //
 // Return a match object which can be used (may be allocated or recycled).
 //
-static match_t *new_match(pat_t *pat, const char *start, const char *end, match_t *child)
+static match_t *new_match(def_t *defs, pat_t *pat, const char *start, const char *end, match_t *children[])
 {
     match_t *m;
 
@@ -566,7 +731,13 @@ static match_t *new_match(pat_t *pat, const char *start, const char *end, match_
     m->pat = pat;
     m->start = start;
     m->end = end;
-    if (child) ADD_OWNER(m->child, child);
+    m->defs_id = defs->id;
+
+    if (children) {
+        for (int i = 0; children[i]; i++)
+            add_owner(&m->_children[i], children[i]);
+        m->children = m->_children;
+    }
     return m;
 }
 
@@ -583,8 +754,12 @@ void recycle_if_unused(match_t **at_m)
         return;
     }
 
-    REMOVE_OWNERSHIP(m->child);
-    REMOVE_OWNERSHIP(m->nextsibling);
+    if (m->children) {
+        for (int i = 0; m->children[i]; i++)
+            remove_ownership(&m->children[i]);
+        if (m->children != m->_children)
+            xfree(&m->children);
+    }
 
 #ifdef DEBUG_HEAP
     DLL_REMOVE(m); // Remove from in_use_matches
@@ -609,6 +784,8 @@ size_t recycle_all_matches(void)
     while (in_use_matches) {
         match_t *m = in_use_matches;
         DLL_REMOVE(m);
+        if (m->children && m->children != m->_children)
+            xfree(&m->children);
         DLL_PREPEND(unused_matches, m);
         ++count;
     }

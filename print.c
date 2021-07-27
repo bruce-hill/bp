@@ -109,7 +109,7 @@ static void _print_match(FILE *out, printer_t *pr, match_t *m)
     pr->pos = m->start;
     if (m->pat->type == BP_REPLACE) {
         if (m->skip_replacement) {
-            _print_match(out, pr, m->child);
+            _print_match(out, pr, m->children[0]);
             return;
         }
         size_t line = get_line_number(pr->file, m->start);
@@ -187,7 +187,8 @@ static void _print_match(FILE *out, printer_t *pr, match_t *m)
         print_line_number(out, pr, line > line_end ? 0 : line, pr->use_color ? color_normal : NULL);
     } else {
         const char *prev = m->start;
-        for (match_t *child = m->child; child; child = child->nextsibling) {
+        for (int i = 0; m->children && m->children[i]; i++) {
+            match_t *child = m->children[i];
             // Skip children from e.g. zero-width matches like >@foo
             if (!(prev <= child->start && child->start <= m->end &&
                   prev <= child->end && child->end <= m->end))
@@ -262,8 +263,8 @@ int print_errors(printer_t *pr, match_t *m)
         fprint_line(stderr, pr->file, m->start, m->end, " ");
         return 1;
     }
-    if (m->child) ret += print_errors(pr, m->child);
-    if (m->nextsibling) ret += print_errors(pr, m->nextsibling);
+    for (int i = 0; m->children && m->children[i]; i++)
+        ret += print_errors(pr, m->children[i]);
     return ret;
 }
 
