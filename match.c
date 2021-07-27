@@ -39,8 +39,8 @@ typedef struct {
     match_t **matches;
 } cache_t;
 
-static const size_t cache_sizes[] = {127, 509, 1021, 2039, 4093, 8191, 16529, 0}; // Prime numbers, roughly doubling
-static const double CACHE_MAX_OCCUPANCY = (double).618f;
+static const double CACHE_MAX_OCCUPANCY = (double)1.618f;
+#define MAX_CACHE_SIZE (1<<14)
 
 cache_t cache = {0, 0, NULL};
 
@@ -97,7 +97,7 @@ static size_t hash(const char *str, pat_t *pat)
 static match_t *cache_lookup(def_t *defs, const char *str, pat_t *pat)
 {
     if (!cache.matches) return NULL;
-    size_t h = hash(str, pat) % cache.size;
+    size_t h = hash(str, pat) & (cache.size-1);
     for (match_t *c = cache.matches[h]; c; c = c->cache_next) {
         if (c->start == str && c->pat == pat && c->defs_id == defs->id) {
             return c;
@@ -120,42 +120,37 @@ static void cache_remove(match_t *m)
 static void cache_save(match_t *m)
 {
     if ((double)(cache.occupancy + 1) >= ((double)cache.size) * CACHE_MAX_OCCUPANCY) {
-        cache_t old_cache = cache;
-        for (int s = 0; cache_sizes[s]; s++) {
-            if (cache_sizes[s] > cache.size) {
-                cache.size = cache_sizes[s];
-                cache.matches = xcalloc(cache.size, sizeof(match_t*));
+        if (cache.size == MAX_CACHE_SIZE) {
+            size_t h = hash(m->start, m->pat) & (cache.size-1);
+            for (int quota = 2; cache.matches[h] && quota > 0; --quota) {
+                match_t *last = cache.matches[h];
+                while (last->cache_next) last = last->cache_next;
+                cache_remove(last);
+            }
+        } else {
+            cache_t old_cache = cache;
+            cache.size = old_cache.size == 0 ? 16 : 2*old_cache.size;
+            cache.matches = xcalloc(cache.size, sizeof(match_t*));
 
-                // Rehash:
-                if (old_cache.matches) {
-                    for (size_t i = 0; i < old_cache.size; i++) {
-                        for (match_t *o; (o = old_cache.matches[i]); ) {
-                            *o->cache_home = o->cache_next;
-                            if (o->cache_next) o->cache_next->cache_home = o->cache_home;
-                            size_t h = hash(o->start, o->pat) % cache.size;
-                            o->cache_home = &(cache.matches[h]);
-                            o->cache_next = cache.matches[h];
-                            if (cache.matches[h]) cache.matches[h]->cache_home = &o->cache_next;
-                            cache.matches[h] = o;
-                        }
+            // Rehash:
+            if (old_cache.matches) {
+                for (size_t i = 0; i < old_cache.size; i++) {
+                    for (match_t *o; (o = old_cache.matches[i]); ) {
+                        *o->cache_home = o->cache_next;
+                        if (o->cache_next) o->cache_next->cache_home = o->cache_home;
+                        size_t h = hash(o->start, o->pat) & (cache.size-1);
+                        o->cache_home = &(cache.matches[h]);
+                        o->cache_next = cache.matches[h];
+                        if (cache.matches[h]) cache.matches[h]->cache_home = &o->cache_next;
+                        cache.matches[h] = o;
                     }
-                    xfree(&old_cache.matches);
                 }
-                goto store_hash;
+                free(old_cache.matches);
             }
         }
-
-        size_t h = hash(m->start, m->pat) % cache.size;
-        for (int quota = 2; cache.matches[h] && quota > 0; --quota) {
-            match_t *last = cache.matches[h];
-            while (last->cache_next) last = last->cache_next;
-            cache_remove(last);
-        }
-
     }
 
-  store_hash:;
-    size_t h = hash(m->start, m->pat) % cache.size;
+    size_t h = hash(m->start, m->pat) & (cache.size-1);
     m->cache_home = &(cache.matches[h]);
     m->cache_next = cache.matches[h];
     if (cache.matches[h]) cache.matches[h]->cache_home = &m->cache_next;
