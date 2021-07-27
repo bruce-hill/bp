@@ -39,7 +39,6 @@ typedef struct {
     match_t **matches;
 } cache_t;
 
-static const double CACHE_MAX_OCCUPANCY = (double)1.618f;
 #define MAX_CACHE_SIZE (1<<14)
 
 cache_t cache = {0, 0, NULL};
@@ -89,7 +88,7 @@ static inline void remove_ownership(match_t** owner)
 
 #define MATCHES(...) (match_t*[]){__VA_ARGS__, NULL}
 
-static size_t hash(const char *str, pat_t *pat)
+static inline size_t hash(const char *str, pat_t *pat)
 {
     return (size_t)str + 2*pat->id;
 }
@@ -119,10 +118,10 @@ static void cache_remove(match_t *m)
 
 static void cache_save(match_t *m)
 {
-    if ((double)(cache.occupancy + 1) >= ((double)cache.size) * CACHE_MAX_OCCUPANCY) {
+    if (cache.occupancy+1 > 3*cache.size) {
         if (cache.size == MAX_CACHE_SIZE) {
             size_t h = hash(m->start, m->pat) & (cache.size-1);
-            for (int quota = 2; cache.matches[h] && quota > 0; --quota) {
+            for (int quota = 2; cache.matches[h] && quota > 0; quota--) {
                 match_t *last = cache.matches[h];
                 while (last->cache_next) last = last->cache_next;
                 cache_remove(last);
