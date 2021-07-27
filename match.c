@@ -98,9 +98,8 @@ static match_t *cache_lookup(def_t *defs, const char *str, pat_t *pat)
     if (!cache.matches) return NULL;
     size_t h = hash(str, pat) & (cache.size-1);
     for (match_t *c = cache.matches[h]; c; c = c->cache_next) {
-        if (c->start == str && c->pat == pat && c->defs_id == defs->id) {
+        if (c->pat == pat && c->defs_id == defs->id && c->start == str)
             return c;
-        }
     }
     return NULL;
 }
