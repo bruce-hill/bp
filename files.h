@@ -10,14 +10,14 @@
 
 #define file_err(f, ...) do { fprint_line(stderr, f, __VA_ARGS__); exit(EXIT_FAILURE); } while(false)
 
-struct allocated_pat_s; // declared in types.h
+struct pat_s; // declared in types.h
 
 typedef struct file_s {
     struct file_s *next;
     const char *filename;
     char *memory, **lines, *start, *end;
     size_t nlines;
-    struct allocated_pat_s *pats;
+    struct pat_s *pats;
     bool mmapped:1;
 } file_t;
 

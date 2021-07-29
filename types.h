@@ -46,6 +46,7 @@ struct match_s; // forward declared to resolve circular struct defs
 // A struct reperesenting a BP virtual machine operation
 //
 typedef struct pat_s {
+    struct pat_s *next;
     enum pattype_e type;
     const char *start, *end;
     // The bounds of the match length (used for backtracking)
@@ -125,15 +126,6 @@ typedef struct def_s {
     pat_t *pat;
     struct def_s *next;
 } def_t;
-
-//
-// Structure used for tracking allocated patterns, which must be freed when the
-// file is freed.
-//
-typedef struct allocated_pat_s {
-    struct allocated_pat_s *next;
-    pat_t pat;
-} allocated_pat_t;
 
 #endif
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1

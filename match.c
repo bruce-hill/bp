@@ -497,14 +497,14 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
                 size_t len = (size_t)(m1->end - m1->start);
                 pat_t *backref = new_pat(f, m1->start, m1->end, len, (ssize_t)len, BP_STRING);
                 backref->args.string = m1->start;
-                def_t *defs2 = with_def(defs, m1->pat->args.capture.namelen, m1->pat->args.capture.name, backref);
 
+                def_t *defs2 = with_def(defs, m1->pat->args.capture.namelen, m1->pat->args.capture.name, backref);
                 ++m1->refcount; {
                     m2 = match(defs2, f, m1->end, pat->args.multiple.second, ignorecase);
                     if (!m2) { // No need to keep the backref in memory if it didn't match
-                        for (struct allocated_pat_s **rem = &f->pats; *rem; rem = &(*rem)->next) {
-                            if (&(*rem)->pat == backref) {
-                                struct allocated_pat_s *tmp = *rem;
+                        for (pat_t **rem = &f->pats; *rem; rem = &(*rem)->next) {
+                            if ((*rem) == backref) {
+                                pat_t *tmp = *rem;
                                 *rem = (*rem)->next;
                                 free(tmp);
                                 break;
