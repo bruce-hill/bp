@@ -238,7 +238,6 @@ match_t *next_match(def_t *defs, file_t *f, match_t *prev, pat_t *pat, pat_t *sk
         cache_prune(str, f->end);
     } else {
         str = f->start;
-        cache_destroy();
     }
 
     pat = deref(defs, pat);
