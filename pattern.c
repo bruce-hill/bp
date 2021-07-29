@@ -279,7 +279,7 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
                     all = either_pat(f, all, pat);
                 } else {
                     size_t len = (size_t)(str - c1_loc);
-                    pat_t *pat = new_pat(f, c1_loc, str, len, (ssize_t)len, BP_STRING);
+                    pat_t *pat = new_pat(f, start, str, len, (ssize_t)len, BP_STRING);
                     pat->args.string = c1_loc;
                     all = either_pat(f, all, pat);
                 }
