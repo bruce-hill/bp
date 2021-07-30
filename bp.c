@@ -271,7 +271,7 @@ static void confirm_replacements(file_t *f, match_t *m, confirm_t *confirm)
                 default: goto retry;
             }
         }
-        if (answer) xfree(&answer);
+        if (answer) delete(&answer);
         fprintf(tty_out, "\n");
     }
 
@@ -473,7 +473,7 @@ static int process_git_files(def_t *defs, pat_t *pattern, int argc, char *argv[]
         if (path[len-1] == '\n') path[len-1] = '\0';
         found += process_file(defs, path, pattern);
     }
-    if (path) xfree(&path);
+    if (path) delete(&path);
     check_nonnegative(fclose(fp), "Failed to close read end of pipe");
     int status;
     while (waitpid(child, &status, 0) != child) continue;

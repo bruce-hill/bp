@@ -37,7 +37,7 @@ int check_nonnegative(int i, const char *err_msg, ...);
 __attribute__((nonnull))
 int memicmp(const void *s1, const void *s2, size_t n);
 __attribute__((nonnull))
-void xfree(void *p);
+void delete(void *p);
 
 #endif
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1

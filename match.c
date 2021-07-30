@@ -185,7 +185,7 @@ void cache_destroy(void)
             cache_remove(cache.matches[i]);
     }
     cache.occupancy = 0;
-    xfree(&cache.matches);
+    delete(&cache.matches);
     cache.size = 0;
 }
 
@@ -701,7 +701,7 @@ match_t *get_capture(match_t *m, const char **id)
         if (end == *id) return NULL;
         char *name = strndup(*id, (size_t)(end-*id));
         match_t *cap = get_capture_by_name(m, name);
-        xfree(&name);
+        delete(&name);
         *id = end;
         if (**id == ';') ++(*id);
         return cap;
@@ -754,7 +754,7 @@ void recycle_if_unused(match_t **at_m)
         for (int i = 0; m->children[i]; i++)
             remove_ownership(&m->children[i]);
         if (m->children != m->_children)
-            xfree(&m->children);
+            delete(&m->children);
     }
 
     list_remove(m, &m->gc);
@@ -773,7 +773,7 @@ size_t recycle_all_matches(void)
         match_t *m = in_use_matches;
         list_remove(m, &m->gc);
         if (m->children && m->children != m->_children)
-            xfree(&m->children);
+            delete(&m->children);
         list_prepend(&unused_matches, m, &m->gc);
         ++count;
     }

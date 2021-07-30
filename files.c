@@ -167,13 +167,11 @@ file_t *spoof_file(file_t **files, const char *filename, const char *text, ssize
 //
 void destroy_file(file_t **f)
 {
-    if ((*f)->filename) {
-        xfree(&((*f)->filename));
-    }
+    if ((*f)->filename)
+        delete(&((*f)->filename));
 
-    if ((*f)->lines) {
-        xfree(&((*f)->lines));
-    }
+    if ((*f)->lines)
+        delete(&((*f)->lines));
 
     if ((*f)->memory) {
         if ((*f)->mmapped) {
@@ -181,16 +179,16 @@ void destroy_file(file_t **f)
                               "Failure to un-memory-map some memory");
             (*f)->memory = NULL;
         } else {
-            xfree(&((*f)->memory));
+            delete(&((*f)->memory));
         }
     }
 
     for (pat_t *next; (*f)->pats; (*f)->pats = next) {
         next = (*f)->pats->next;
-        xfree(&(*f)->pats);
+        delete(&(*f)->pats);
     }
 
-    xfree(f);
+    delete(f);
 }
 
 //

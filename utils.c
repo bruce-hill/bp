@@ -169,7 +169,7 @@ int memicmp(const void *v1, const void *v2, size_t n)
 //
 // Free memory, but also set the pointer to NULL for safety
 //
-void xfree(void *p)
+void delete(void *p)
 {
     if (*(void**)p == NULL)
         errx(EXIT_FAILURE, "attempt to free(NULL)");
