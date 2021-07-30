@@ -12,9 +12,14 @@
 
 #include "match.h"
 
+#define S1(x) #x
+#define S2(x) S1(x)
+#define __LOCATION__ __FILE__ ":" S2(__LINE__)
+
 #define streq(a, b) (strcmp(a, b) == 0)
-#define new(t) memcheck(calloc(1, sizeof(t)))
-#define grow(arr,n) memcheck(realloc(arr,sizeof(arr[0])*(n)))
+#define new(t) check_nonnull(calloc(1, sizeof(t)), __LOCATION__ ": `new(" #t ")` allocation failure")
+#define checked_strdup(s) check_nonnull(strdup(s), __LOCATION__ ": `checked_strdup(" #s ")` allocation failure")
+#define grow(arr,n) check_nonnull(realloc(arr,sizeof(arr[0])*(n)), __LOCATION__ ": `groaw(" #arr ", " #n ")` allocation failure")
 
 __attribute__((nonnull(1)))
 char unescapechar(const char *escaped, const char **end);
@@ -27,7 +32,7 @@ bool matchchar(const char **str, char c);
 __attribute__((nonnull))
 bool matchstr(const char **str, const char *target);
 __attribute__((returns_nonnull))
-void *memcheck(/*@null@*/ /*@out@*/ void *p);
+void *check_nonnull(void *p, const char *err_msg, ...);
 __attribute__((nonnull))
 int memicmp(const void *s1, const void *s2, size_t n);
 __attribute__((nonnull))

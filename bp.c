@@ -458,7 +458,7 @@ static int process_git_files(def_t *defs, pat_t *pattern, int argc, char *argv[]
     if (child == -1)
         err(EXIT_FAILURE, "Failed to fork");
     if (child == 0) {
-        const char **git_args = memcheck(calloc((size_t)(2+argc+1), sizeof(char*)));
+        const char **git_args = new(char*[2+argc+1]);
         int g = 0;
         git_args[g++] = "git";
         git_args[g++] = "ls-files";

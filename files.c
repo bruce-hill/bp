@@ -88,7 +88,7 @@ file_t *load_file(file_t **files, const char *filename)
     }
     size_t length;
     file_t *f = new(file_t);
-    f->filename = memcheck(strdup(filename));
+    f->filename = checked_strdup(filename);
 
     struct stat sb;
     if (fstat(fd, &sb) == -1)
@@ -150,7 +150,7 @@ file_t *spoof_file(file_t **files, const char *filename, const char *text, ssize
     if (filename == NULL) filename = "";
     file_t *f = new(file_t);
     size_t len = _len == -1 ? strlen(text) : (size_t)_len;
-    f->filename = memcheck(strdup(filename));
+    f->filename = checked_strdup(filename);
     f->memory = new(char[len+1]);
     memcpy(f->memory, text, len);
     f->start = &f->memory[0];

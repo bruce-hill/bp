@@ -4,6 +4,7 @@
 
 #include <ctype.h>
 #include <err.h>
+#include <stdarg.h>
 #include <stdlib.h>
 #include <unistd.h>
 
@@ -124,12 +125,17 @@ char unescapechar(const char *escaped, const char **end)
 }
 
 //
-// Fail and exit if a memory value is NULL
+// If the given argument is NULL, print the error message and exit with
+// failure. Otherwise return the given argument.
 //
-void *memcheck(void *p)
+void *check_nonnull(void *p, const char *err_msg, ...)
 {
-    if (p == NULL)
-        err(EXIT_FAILURE, "memory allocation failure");
+    if (p == NULL) {
+        va_list args;
+        va_start(args, err_msg);
+        verr(EXIT_FAILURE, err_msg, args);
+        va_end(args);
+    }
     return p;
 }
 
