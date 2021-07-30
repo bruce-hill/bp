@@ -408,10 +408,8 @@ static int process_file(def_t *defs, const char *filename, pat_t *pattern)
     fflush(stdout);
 
     cache_destroy();
-#ifdef DEBUG_HEAP
     if (recycle_all_matches() != 0)
         fprintf(stderr, "\033[33;1mMemory leak: there should no longer be any matches in use at this point.\033[0m\n");
-#endif
     destroy_file(&f);
     (void)fflush(stdout);
     return matches;
@@ -668,7 +666,6 @@ int main(int argc, char *argv[])
     if (tty_out) { (void)fclose(tty_out); tty_out = NULL; }
     if (tty_in) { (void)fclose(tty_in); tty_in = NULL; }
 
-#ifdef DEBUG_HEAP
     // This code frees up all residual heap-allocated memory. Since the program
     // is about to exit, this step is unnecessary. However, it is useful for
     // tracking down memory leaks.
@@ -680,7 +677,6 @@ int main(int argc, char *argv[])
         destroy_file(&loaded_files);
         loaded_files = next;
     }
-#endif
 
     exit(found > 0 ? EXIT_SUCCESS : EXIT_FAILURE);
 }

@@ -45,8 +45,7 @@ clean:
 test: $(NAME)
 	./$(NAME) -g ./grammars/bp.bp -p Grammar ./grammars/bp.bp
 
-leaktest:
-	make G=-ggdb O=-O0 EXTRA=-DDEBUG_HEAP clean bp
+leaktest: bp
 	valgrind --leak-check=full ./bp -l -g ./grammars/bp.bp -p Grammar ./grammars/bp.bp
 
 splint:

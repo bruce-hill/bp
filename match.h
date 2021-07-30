@@ -15,10 +15,8 @@ __attribute__((nonnull))
 match_t *get_capture(match_t *m, const char **id);
 __attribute__((nonnull))
 void recycle_if_unused(match_t **at_m);
-#ifdef DEBUG_HEAP
 size_t free_all_matches(void);
 size_t recycle_all_matches(void);
-#endif
 void cache_destroy(void);
 
 #endif

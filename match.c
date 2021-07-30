@@ -763,7 +763,6 @@ void recycle_if_unused(match_t **at_m)
     *at_m = NULL;
 }
 
-#ifdef DEBUG_HEAP
 //
 // Force all match objects into the pool of unused match objects.
 //
@@ -796,6 +795,5 @@ size_t free_all_matches(void)
     }
     return count;
 }
-#endif
 
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1
