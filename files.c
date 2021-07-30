@@ -30,13 +30,13 @@ static void populate_lines(file_t *f, size_t len)
 {
     // Calculate line numbers:
     size_t linecap = 10;
-    f->lines = xcalloc(sizeof(const char*), linecap);
+    f->lines = new(const char*[linecap]);
     f->nlines = 0;
     char *p = f->memory;
     for (size_t n = 0; p && p < &f->memory[len]; ++n) {
         ++f->nlines;
         if (n >= linecap)
-            f->lines = xrealloc(f->lines, sizeof(const char*)*(linecap *= 2));
+            f->lines = grow(f->lines, linecap *= 2);
         f->lines[n] = p;
         do {
             char *nl = strchr(p, '\n');
@@ -107,13 +107,14 @@ file_t *load_file(file_t **files, const char *filename)
     {
         size_t capacity = 1000;
         length = 0;
-        f->memory = xcalloc(sizeof(char), capacity);
+        f->memory = new(char[capacity]);
         ssize_t just_read;
-        while ((just_read=read(fd, &f->memory[length], capacity - length)) > 0) {
+        while ((just_read=read(fd, &f->memory[length], (capacity-1) - length)) > 0) {
             length += (size_t)just_read;
-            if (length >= capacity)
-                f->memory = xrealloc(f->memory, sizeof(char)*(capacity *= 2) + 1);
+            if (length >= capacity-1)
+                f->memory = grow(f->memory, capacity *= 2);
         }
+        f->memory[length] = '\0';
     }
 
   finished_loading:
@@ -150,7 +151,7 @@ file_t *spoof_file(file_t **files, const char *filename, const char *text, ssize
     file_t *f = new(file_t);
     size_t len = _len == -1 ? strlen(text) : (size_t)_len;
     f->filename = memcheck(strdup(filename));
-    f->memory = xcalloc(len+1, sizeof(char));
+    f->memory = new(char[len+1]);
     memcpy(f->memory, text, len);
     f->start = &f->memory[0];
     f->end = &f->memory[len];

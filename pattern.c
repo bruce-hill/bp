@@ -563,7 +563,7 @@ pat_t *bp_replacement(file_t *f, pat_t *replacepat, const char *replacement)
         }
     }
     size_t rlen = (size_t)(p-replacement);
-    char *rcpy = xcalloc(sizeof(char), rlen + 1);
+    char *rcpy = new(char[rlen + 1]);
     memcpy(rcpy, replacement, rlen);
     pat->args.replace.text = rcpy;
     pat->args.replace.len = rlen;

@@ -14,8 +14,7 @@
 
 #define streq(a, b) (strcmp(a, b) == 0)
 #define new(t) memcheck(calloc(1, sizeof(t)))
-#define xcalloc(a,b) memcheck(calloc(a,b))
-#define xrealloc(a,b) memcheck(realloc(a,b))
+#define grow(arr,n) memcheck(realloc(arr,sizeof(arr[0])*(n)))
 
 __attribute__((nonnull(1)))
 char unescapechar(const char *escaped, const char **end);

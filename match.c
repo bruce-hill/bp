@@ -136,7 +136,7 @@ static void cache_save(match_t *m)
         } else {
             cache_t old_cache = cache;
             cache.size = old_cache.size == 0 ? 16 : 2*old_cache.size;
-            cache.matches = xcalloc(cache.size, sizeof(match_t*));
+            cache.matches = new(match_t*[cache.size]);
 
             // Rehash:
             if (old_cache.matches) {
@@ -377,7 +377,7 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
                     if (s != NULL) {
                         str = s->end;
                         if (nchildren+2 >= child_cap) {
-                            m->children = xrealloc(m->children, sizeof(match_t*)*(child_cap += 5));
+                            m->children = grow(m->children, child_cap += 5);
                             for (size_t i = nchildren; i < child_cap; i++) m->children[i] = NULL;
                         }
                         add_owner(&m->children[nchildren++], s);
@@ -432,14 +432,14 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
                 }
                 if (msep) {
                     if (nchildren+2 >= child_cap) {
-                        m->children = xrealloc(m->children, sizeof(match_t*)*(child_cap += 5));
+                        m->children = grow(m->children, child_cap += 5);
                         for (size_t i = nchildren; i < child_cap; i++) m->children[i] = NULL;
                     }
                     add_owner(&m->children[nchildren++], msep);
                 }
 
                 if (nchildren+2 >= child_cap) {
-                    m->children = xrealloc(m->children, sizeof(match_t*)*(child_cap += 5));
+                    m->children = grow(m->children, child_cap += 5);
                     for (size_t i = nchildren; i < child_cap; i++) m->children[i] = NULL;
                 }
                 add_owner(&m->children[nchildren++], mp);
