@@ -17,12 +17,6 @@
 #include "utils.h"
 #include "utf8.h"
 
-#ifdef DEBUG_HEAP
-// Doubly-linked list operations:
-#define DLL_PREPEND(head, node) do { (node)->home = &(head); (node)->next = head; if (head) (head)->home = &(node)->next; head = node; } while(false)
-#define DLL_REMOVE(node) do { *(node)->home = (node)->next; if ((node)->next) (node)->next->home = (node)->home; } while(false)
-#endif
-
 // New match objects are either recycled from unused match objects or allocated
 // from the heap. While it is in use, the match object is stored in the
 // `in_use_matches` linked list. Once it is no longer needed, it is moved to
@@ -30,9 +24,7 @@
 // additional calls to malloc/free. Thus, it is an invariant that every match
 // object is in one of these two lists:
 static match_t *unused_matches = NULL;
-#ifdef DEBUG_HEAP
 static match_t *in_use_matches = NULL;
-#endif
 
 typedef struct {
     size_t size, occupancy;
@@ -40,6 +32,8 @@ typedef struct {
 } cache_t;
 
 #define MAX_CACHE_SIZE (1<<14)
+
+#define MATCHES(...) (match_t*[]){__VA_ARGS__, NULL}
 
 cache_t cache = {0, 0, NULL};
 
@@ -74,19 +68,33 @@ static inline void remove_ownership(match_t** owner)
     }
 }
 
-// Helper method for concisely allocating children matches
-// static match_t** _alloc_children(size_t n, match_t* matches[])
-// {
-//     if (n == 0) return NULL;
-//     match_t **ret = xcalloc(n+1, sizeof(match_t*));
-//     for (size_t i = 0; i < n; i++)
-//         add_owner(&ret[i], matches[i]);
-//     return ret;
-// }
+// Prepend to a doubly linked list
+static inline void list_prepend(match_t **head, match_t *m, match_dll_t *node)
+{
+    if (node->home)
+        errx(1, "Node already has a home");
+    node->home = head;
+    node->next = *head;
+    if (*head) {
+        match_dll_t *head_node = (match_dll_t*)((char*)(*head) + ((char*)node - (char*)m));
+        head_node->home = &node->next;
+    }
+    *head = m;
+}
 
-// #define MATCHES(...) _alloc_children((sizeof((match_t*[]){__VA_ARGS__}))/sizeof(match_t*), (match_t*[]){__VA_ARGS__})
-
-#define MATCHES(...) (match_t*[]){__VA_ARGS__, NULL}
+// Remove from a doubly linked list
+static inline void list_remove(match_t *m, match_dll_t *node)
+{
+    if (!node->home)
+        errx(1, "Attempt to remove something that isn't in a list");
+    *node->home = node->next;
+    if (node->next) {
+        match_dll_t *next_node = (match_dll_t*)((char*)(node->next) + ((char*)node - (char*)m));
+        next_node->home = node->home;
+    }
+    node->home = NULL;
+    node->next = NULL;
+}
 
 static inline size_t hash(const char *str, pat_t *pat)
 {
@@ -97,7 +105,7 @@ static match_t *cache_lookup(def_t *defs, const char *str, pat_t *pat)
 {
     if (!cache.matches) return NULL;
     size_t h = hash(str, pat) & (cache.size-1);
-    for (match_t *c = cache.matches[h]; c; c = c->cache_next) {
+    for (match_t *c = cache.matches[h]; c; c = c->cache.next) {
         if (c->pat == pat && c->defs_id == defs->id && c->start == str)
             return c;
     }
@@ -106,11 +114,11 @@ static match_t *cache_lookup(def_t *defs, const char *str, pat_t *pat)
 
 static void cache_remove(match_t *m)
 {
-    if (!m->cache_home) return;
-    *m->cache_home = m->cache_next;
-    if (m->cache_next) m->cache_next->cache_home = m->cache_home;
-    m->cache_next = NULL;
-    m->cache_home = NULL;
+    if (!m->cache.home) return;
+    *m->cache.home = m->cache.next;
+    if (m->cache.next) m->cache.next->cache.home = m->cache.home;
+    m->cache.next = NULL;
+    m->cache.home = NULL;
     remove_ownership(&m);
     --cache.occupancy;
 }
@@ -122,7 +130,7 @@ static void cache_save(match_t *m)
             size_t h = hash(m->start, m->pat) & (cache.size-1);
             for (int quota = 2; cache.matches[h] && quota > 0; quota--) {
                 match_t *last = cache.matches[h];
-                while (last->cache_next) last = last->cache_next;
+                while (last->cache.next) last = last->cache.next;
                 cache_remove(last);
             }
         } else {
@@ -134,12 +142,12 @@ static void cache_save(match_t *m)
             if (old_cache.matches) {
                 for (size_t i = 0; i < old_cache.size; i++) {
                     for (match_t *o; (o = old_cache.matches[i]); ) {
-                        *o->cache_home = o->cache_next;
-                        if (o->cache_next) o->cache_next->cache_home = o->cache_home;
+                        *o->cache.home = o->cache.next;
+                        if (o->cache.next) o->cache.next->cache.home = o->cache.home;
                         size_t h = hash(o->start, o->pat) & (cache.size-1);
-                        o->cache_home = &(cache.matches[h]);
-                        o->cache_next = cache.matches[h];
-                        if (cache.matches[h]) cache.matches[h]->cache_home = &o->cache_next;
+                        o->cache.home = &(cache.matches[h]);
+                        o->cache.next = cache.matches[h];
+                        if (cache.matches[h]) cache.matches[h]->cache.home = &o->cache.next;
                         cache.matches[h] = o;
                     }
                 }
@@ -149,9 +157,9 @@ static void cache_save(match_t *m)
     }
 
     size_t h = hash(m->start, m->pat) & (cache.size-1);
-    m->cache_home = &(cache.matches[h]);
-    m->cache_next = cache.matches[h];
-    if (cache.matches[h]) cache.matches[h]->cache_home = &m->cache_next;
+    m->cache.home = &(cache.matches[h]);
+    m->cache.next = cache.matches[h];
+    if (cache.matches[h]) cache.matches[h]->cache.home = &m->cache.next;
     cache.matches[h] = NULL;
     add_owner(&cache.matches[h], m);
     ++cache.occupancy;
@@ -162,7 +170,7 @@ static void cache_prune(const char *start, const char *end)
     if (!cache.matches) return;
     for (size_t i = 0; i < cache.size; i++) {
         for (match_t *m = cache.matches[i], *next = NULL; m; m = next) {
-            next = m->cache_next;
+            next = m->cache.next;
             if (m->start < start || (m->end ? m->end : m->start) > end)
                 cache_remove(m);
         }
@@ -706,26 +714,15 @@ match_t *get_capture(match_t *m, const char **id)
 static match_t *new_match(def_t *defs, pat_t *pat, const char *start, const char *end, match_t *children[])
 {
     match_t *m;
-
-#ifdef DEBUG_HEAP
     if (unused_matches) {
         m = unused_matches;
-        DLL_REMOVE(m);
+        list_remove(m, &m->gc);
         memset(m, 0, sizeof(match_t));
     } else {
         m = new(match_t);
     }
     // Keep track of the object:
-    DLL_PREPEND(in_use_matches, m);
-#else
-    if (unused_matches) {
-        m = unused_matches;
-        unused_matches = unused_matches->next;
-        (void)memset(m, 0, sizeof(match_t));
-    } else {
-        m = new(match_t);
-    }
-#endif
+    list_prepend(&in_use_matches, m, &m->gc);
 
     m->pat = pat;
     m->start = start;
@@ -760,16 +757,9 @@ void recycle_if_unused(match_t **at_m)
             xfree(&m->children);
     }
 
-#ifdef DEBUG_HEAP
-    DLL_REMOVE(m); // Remove from in_use_matches
+    list_remove(m, &m->gc);
     (void)memset(m, 0, sizeof(match_t));
-    DLL_PREPEND(unused_matches, m);
-#else
-    (void)memset(m, 0, sizeof(match_t));
-    m->next = unused_matches;
-    unused_matches = m;
-#endif
-
+    list_prepend(&unused_matches, m, &m->gc);
     *at_m = NULL;
 }
 
@@ -782,10 +772,10 @@ size_t recycle_all_matches(void)
     size_t count = 0;
     while (in_use_matches) {
         match_t *m = in_use_matches;
-        DLL_REMOVE(m);
+        list_remove(m, &m->gc);
         if (m->children && m->children != m->_children)
             xfree(&m->children);
-        DLL_PREPEND(unused_matches, m);
+        list_prepend(&unused_matches, m, &m->gc);
         ++count;
     }
     return count;
@@ -800,7 +790,7 @@ size_t free_all_matches(void)
     recycle_all_matches();
     while (unused_matches) {
         match_t *m = unused_matches;
-        DLL_REMOVE(m);
+        list_remove(m, &m->gc);
         free(m);
         ++count;
     }

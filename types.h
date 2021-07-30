@@ -92,6 +92,12 @@ typedef struct pat_s {
     size_t id;
 } pat_t;
 
+typedef struct {
+    struct match_s **home, *next;
+} match_dll_t;
+
+// #define MATCH_FROM(node, name) ((match_t*)((char*)node + (size_t)(&((match_t*)0)->name)))
+
 //
 // Pattern matching result object
 //
@@ -99,12 +105,8 @@ typedef struct match_s {
     // Where the match starts and ends (end is after the last character)
     const char *start, *end;
     pat_t *pat;
-    // Intrusive linked list nodes for garbage collection:
-    struct match_s *next;
-#ifdef DEBUG_HEAP
-    struct match_s **home;
-#endif
-    struct match_s *cache_next, **cache_home;
+    // Intrusive linked list nodes for garbage collection and cache buckets:
+    match_dll_t gc, cache;
     size_t defs_id;
     int refcount;
     // If skip_replacement is set to 1, that means the user wants to not print
