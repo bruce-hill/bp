@@ -33,6 +33,7 @@ __attribute__((nonnull))
 bool matchstr(const char **str, const char *target);
 __attribute__((returns_nonnull))
 void *check_nonnull(void *p, const char *err_msg, ...);
+int check_nonnegative(int i, const char *err_msg, ...);
 __attribute__((nonnull))
 int memicmp(const void *s1, const void *s2, size_t n);
 __attribute__((nonnull))

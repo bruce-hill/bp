@@ -311,9 +311,7 @@ static int inplace_modify_file(def_t *defs, file_t *f, pat_t *pattern)
             exit(EXIT_FAILURE);
         // Lazy-open file for writing upon first match:
         if (dest == NULL) {
-            dest = fopen(f->filename, "w");
-            if (!dest)
-                err(EXIT_FAILURE, "Failed to open %s for modification", f->filename);
+            dest = check_nonnull(fopen(f->filename, "w"), "Failed to open %s for modification", f->filename);
             backup_file = f;
             modifying_file = dest;
             if (options.confirm == CONFIRM_ASK && f->filename)
@@ -428,7 +426,7 @@ static int process_dir(def_t *defs, const char *dirname, pat_t *pattern)
         errx(EXIT_FAILURE, "Filename is too long: %s/*", dirname);
     int status = glob(globpath, 0, NULL, &globbuf);
     if (status == GLOB_ABORTED || status == GLOB_NOSPACE)
-        err(EXIT_FAILURE, "Failed to get directory contents: %s", dirname);
+        errx(EXIT_FAILURE, "Failed to get directory contents: %s", dirname);
     if (status != GLOB_NOMATCH) {
         struct stat statbuf;
         for (size_t i = 0; i < globbuf.gl_pathc; i++) {
@@ -452,29 +450,21 @@ __attribute__((nonnull(2)))
 static int process_git_files(def_t *defs, pat_t *pattern, int argc, char *argv[])
 {
     int fds[2];
-    if (pipe(fds) != 0)
-        err(EXIT_FAILURE, "Failed to create pipe");
-    pid_t child = fork();
-    if (child == -1)
-        err(EXIT_FAILURE, "Failed to fork");
+    check_nonnegative(pipe(fds), "Failed to create pipe");
+    pid_t child = check_nonnegative(fork(), "Failed to fork");
     if (child == 0) {
         const char **git_args = new(char*[2+argc+1]);
         int g = 0;
         git_args[g++] = "git";
         git_args[g++] = "ls-files";
         while (*argv) git_args[g++] = *(argv++);
-        if (dup2(fds[STDOUT_FILENO], STDOUT_FILENO) != STDOUT_FILENO)
-            err(EXIT_FAILURE, "Failed to hook up pipe to stdout");
-        if (close(fds[STDIN_FILENO]) != 0)
-            err(EXIT_FAILURE, "Failed to close read end of pipe");
+        check_nonnegative(dup2(fds[STDOUT_FILENO], STDOUT_FILENO), "Failed to hook up pipe to stdout");
+        check_nonnegative(close(fds[STDIN_FILENO]), "Failed to close read end of pipe");
         (void)execvp("git", (char**)git_args);
         _exit(EXIT_FAILURE);
     }
-    if (close(fds[STDOUT_FILENO]) != 0)
-        err(EXIT_FAILURE, "Failed to close write end of pipe");
-    FILE *fp = fdopen(fds[STDIN_FILENO], "r");
-    if (fp == NULL)
-        err(EXIT_FAILURE, "Could not open file descriptor");
+    check_nonnegative(close(fds[STDOUT_FILENO]), "Failed to close write end of pipe");
+    FILE *fp = check_nonnull(fdopen(fds[STDIN_FILENO], "r"), "Could not open pipe file descriptor");
     char *path = NULL;
     size_t size = 0;
     ssize_t len = 0;
@@ -484,8 +474,7 @@ static int process_git_files(def_t *defs, pat_t *pattern, int argc, char *argv[]
         found += process_file(defs, path, pattern);
     }
     if (path) xfree(&path);
-    if (fclose(fp) != 0)
-        err(EXIT_FAILURE, "Failed to close read end of pipe");
+    check_nonnegative(fclose(fp), "Failed to close read end of pipe");
     int status;
     while (waitpid(child, &status, 0) != child) continue;
     if (!((WIFEXITED(status) == 1) && (WEXITSTATUS(status) == 0)))
@@ -627,12 +616,10 @@ int main(int argc, char *argv[])
     int signals[] = {SIGTERM, SIGINT, SIGXCPU, SIGXFSZ, SIGVTALRM, SIGPROF, SIGSEGV, SIGTSTP};
     struct sigaction sa = {.sa_handler = &sig_handler, .sa_flags = (int)(SA_NODEFER | SA_RESETHAND)};
     for (size_t i = 0; i < sizeof(signals)/sizeof(signals[0]); i++)
-        if (sigaction(signals[i], &sa, NULL) != 0)
-            err(EXIT_FAILURE, "Failed to set signal handler");
+        check_nonnegative(sigaction(signals[i], &sa, NULL), "Failed to set signal handler");
 
     // Handle exit() calls gracefully:
-    if (atexit(&cleanup) != 0)
-        err(EXIT_FAILURE, "Failed to set cleanup handler at exit");
+    check_nonnegative(atexit(&cleanup), "Failed to set cleanup handler at exit");
 
     // User input/output is handled through /dev/tty so that normal unix pipes
     // can work properly while simultaneously asking for user input.

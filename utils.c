@@ -140,6 +140,21 @@ void *check_nonnull(void *p, const char *err_msg, ...)
 }
 
 //
+// If the given argument is negative, print the error message and exit with
+// failure. Otherwise return the given argument.
+//
+int check_nonnegative(int i, const char *err_msg, ...)
+{
+    if (i < 0) {
+        va_list args;
+        va_start(args, err_msg);
+        verr(EXIT_FAILURE, err_msg, args);
+        va_end(args);
+    }
+    return i;
+}
+
+//
 // Case-insensitive memory comparison
 //
 int memicmp(const void *v1, const void *v2, size_t n)

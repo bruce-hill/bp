@@ -118,10 +118,8 @@ file_t *load_file(file_t **files, const char *filename)
     }
 
   finished_loading:
-    if (fd != STDIN_FILENO) {
-        if (close(fd) != 0)
-            err(EXIT_FAILURE, "Failed to close file");
-    }
+    if (fd != STDIN_FILENO)
+        check_nonnegative(close(fd), "Failed to close file");
     f->start = &f->memory[0];
     f->end = &f->memory[length];
     populate_lines(f, length);
@@ -179,8 +177,8 @@ void destroy_file(file_t **f)
 
     if ((*f)->memory) {
         if ((*f)->mmapped) {
-            if (munmap((*f)->memory, (size_t)((*f)->end - (*f)->memory)) != 0)
-                err(EXIT_FAILURE, "Failure to un-memory-map some memory");
+            check_nonnegative(munmap((*f)->memory, (size_t)((*f)->end - (*f)->memory)),
+                              "Failure to un-memory-map some memory");
             (*f)->memory = NULL;
         } else {
             xfree(&((*f)->memory));
