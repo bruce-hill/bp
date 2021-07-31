@@ -24,17 +24,18 @@ static const char *current_color = NULL;
 __attribute__((nonnull(1,2)))
 static inline void print_line_number(FILE *out, printer_t *pr, size_t line_number, const char *color)
 {
-    if (!pr->print_line_numbers) return;
     if (!pr->needs_line_number) return;
-    if (line_number == 0) {
-        if (color) fprintf(out, "\033[0;2m     \033(0\x78\033(B%s", color);
-        else fprintf(out, "     |");
-    } else {
-        if (color) fprintf(out, "\033[0;2m%5lu\033(0\x78\033(B%s", line_number, color);
-        else fprintf(out, "%5lu|", line_number);
+    if (pr->print_line_numbers) {
+        if (line_number == 0) {
+            if (color) fprintf(out, "\033[0;2m     \033(0\x78\033(B%s", color);
+            else fprintf(out, "     |");
+        } else {
+            if (color) fprintf(out, "\033[0;2m%5lu\033(0\x78\033(B%s", line_number, color);
+            else fprintf(out, "%5lu|", line_number);
+        }
+        current_color = color;
     }
     pr->needs_line_number = 0;
-    current_color = color;
 }
 
 // 
@@ -243,7 +244,7 @@ void print_match(FILE *out, printer_t *pr, match_t *m)
         const char *after_last = context_after(pr, pr->pos);
         print_between(out, pr, pr->pos, after_last, pr->use_color ? color_normal : NULL);
         // Guarantee trailing newline
-        if (!pr->needs_line_number || !pr->print_line_numbers) fprintf(out, "\n");
+        if (!pr->needs_line_number) fprintf(out, "\n");
     }
     if (pr->use_color) fprintf(out, "%s", color_normal);
 }
