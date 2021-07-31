@@ -17,5 +17,5 @@ keyword:
     "volatile" / "while"
 function-def: ^_ 2+(id / keyword / `*) % __ parens (__`; / >(__`{))
 function: function-def __ braces
-macro: ^"#define"\b ..$ *(<`\ \n..$)
-import: ^"#include"\b __ (string / `<..`>)
+macro: ^"#define"| ..$ *(<`\ \n..$)
+import: ^"#include"| __ (string / `<..`>)

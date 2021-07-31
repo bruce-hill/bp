@@ -168,8 +168,11 @@ by the same indentation that occurs on the current line.
 `\I`
 : An identifier character, not including numbers (e.g. alphabetic characters or underscores).
 
+`|`
+: A word boundary (i.e. the edge of a word).
+
 `\b`
-: A word boundary.
+: Alias for `|` (word boundary)
 
 `!` *pat*
 : Not *pat*

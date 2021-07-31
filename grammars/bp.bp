@@ -48,7 +48,7 @@ escape-sequence: (
     )
 No: `! (__@pat / (!)=>"Expected a pattern after the exclamation mark")
 Nodent: "\N"
-Word-boundary: "\b"
+Word-boundary: `| / "\b"
 Identifier-char: "\i"
 Identifier-start: "\I"
 Upto-and: ".." [__(`%/`=)__@second=simple-pat] [__@first=simple-pat] 

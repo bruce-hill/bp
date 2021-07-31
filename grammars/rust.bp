@@ -13,6 +13,6 @@ keyword:
     "false" / "fn" / "for" / "if" / "impl" / "in" / "let" / "loop" / "match" /
     "mod" / "move" / "mut" / "pub" / "ref" / "return" / "self" / "Self" / "static" /
     "struct" / "super" / "trait" / "true" / "type" / "unsafe" / "use" / "where" / "while"
-function-def: \b"fn"\b __ id __ parens __ ["->"__(id / parens)] >(__`{)
+function-def: |"fn"| __ id __ parens __ ["->"__(id / parens)] >(__`{)
 function: function-def __ braces
-import: \b"use"\b _ *(id / braces) % "::" _ `;
+import: |"use"| _ *(id / braces) % "::" _ `;

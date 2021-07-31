@@ -13,11 +13,11 @@ keyword:
  "and" / "break" / "do" / "else" / "elseif" / "end" / "false" / "for" /
  "function" / "goto" / "if" / "in" / "local" / "nil" / "not" / "or" /
  "repeat" / "return" / "then" / "true" / "until" / "while"
-function-def: \b"function"\b[_id (*(`.id)[`:id])]_ parens
+function-def: |"function"|[_id (*(`.id)[`:id])]_ parens
 block: function / if-block / while-block / for-block / repeat-block / do-block
-repeat-block: \b"repeat"\b ..%(comment/string/\n) (\b"until"\b)
-do-block: \b"do"\b ..%(comment/string/block/\n) (\b"end"\b)
-for-block: \b"for"\b ..%\n >(\b"do"\b) do-block
-while-block: \b"while"\b ..%\n >(\b"do"\b) do-block
-if-block: \b"if"\b ..%\n \b"then"\b ..%(comment/string/\n) (\b"end"\b)
-function: function-def ..%(comment/string/block/\n) (\b"end"\b)
+repeat-block: |"repeat"| ..%(comment/string/\n) (|"until"|)
+do-block: |"do"| ..%(comment/string/block/\n) (|"end"|)
+for-block: |"for"| ..%\n >(|"do"|) do-block
+while-block: |"while"| ..%\n >(|"do"|) do-block
+if-block: |"if"| ..%\n |"then"| ..%(comment/string/\n) (|"end"|)
+function: function-def ..%(comment/string/block/\n) (|"end"|)

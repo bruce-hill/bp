@@ -332,6 +332,10 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
 
             return all;
         }
+        // Word boundary
+        case '|': {
+            return new_pat(f, start, str, 0, 0, BP_WORD_BOUNDARY);
+        }
         // String literal
         case '"': case '\'': case '\002': {
             char endquote = c == '\002' ? '\003' : c;
