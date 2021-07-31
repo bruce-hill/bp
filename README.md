@@ -41,8 +41,9 @@ Pattern            | Meaning
 `"foo"`, `'foo'`   | The literal string `foo`. There are no escape sequences within strings.
 `pat1 pat2`        | `pat1` followed by `pat2`
 `pat1 / pat2`      | `pat1` if it matches, otherwise `pat2`
-`..pat`            | Any text up to and including `pat` (except newlines)
+`.. pat`           | Any text up to and including `pat` (except newlines)
 `.. % skip pat`    | Any text up to and including `pat` (except newlines), skipping over instances of `skip`
+`.. = repeat pat`  | Any number of repetitions of `repeat` up to and including `pat`
 `.`                | Any single character (except newline)
 `^^`               | The start of the input
 `^`                | The start of a line

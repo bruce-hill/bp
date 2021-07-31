@@ -237,6 +237,15 @@ over instances of \f[I]skip\f[R]
 opening quote, up to closing quote, skipping over backslash followed by
 a single character)
 .TP
+\f[B].. =\f[R] \f[I]only\f[R] \f[I]pat\f[R]
+Any number of repetitions of the pattern \f[I]only\f[R] up to and
+including \f[I]pat\f[R] (e.g.\ \f[B]\[dq]f\[dq] ..=abc \[dq]k\[dq]\f[R]
+matches the letter \[lq]f\[rq] followed by some alphabetic characters
+and then a \[lq]k\[rq], which would match \[lq]fork\[rq], but not
+\[lq]free kit\[rq]) This is essentially a \[lq]non-greedy\[rq] version
+of \f[B]*\f[R], and \f[B].. pat\f[R] can be thought of as the special
+case of \f[B]..=. pat\f[R]
+.TP
 \f[B]<\f[R] \f[I]pat\f[R]
 Matches at the current position if \f[I]pat\f[R] matches immediately
 before the current position (lookbehind).

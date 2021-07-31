@@ -51,7 +51,7 @@ Nodent: "\N"
 Word-boundary: "\b"
 Identifier-char: "\i"
 Identifier-start: "\I"
-Upto-and: ".." [__`%__@second=simple-pat] [__@first=simple-pat] 
+Upto-and: ".." [__(`%/`=)__@second=simple-pat] [__@first=simple-pat] 
 Repeat: (
         @min=(=>'0') (`*=>"-") @max=(=>'∞')
       / @min=int __ `- __ @max=int

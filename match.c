@@ -348,7 +348,7 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
             }
             return new_match(defs, pat, str, str, NULL);
         }
-        case BP_UPTO: {
+        case BP_UPTO: case BP_UPTO_STRICT: {
             match_t *m = new_match(defs, pat, str, str, NULL);
             pat_t *target = deref(defs, pat->args.multiple.first),
                   *skip = deref(defs, pat->args.multiple.second);
@@ -387,7 +387,7 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
                 // This isn't in the for() structure because there needs to
                 // be at least once chance to match the pattern, even if
                 // we're at the end of the string already (e.g. "..$").
-                if (str < f->end && *str != '\n')
+                if (str < f->end && *str != '\n' && pat->type != BP_UPTO_STRICT)
                     str = next_char(f, str);
             }
             recycle_if_unused(&m);

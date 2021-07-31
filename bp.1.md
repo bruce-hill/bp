@@ -207,6 +207,13 @@ etc.)
 of *skip* (e.g. `'"' ..%('\' .) '"'` opening quote, up to closing quote,
 skipping over backslash followed by a single character)
 
+`.. =` *only* *pat*
+: Any number of repetitions of the pattern *only* up to and including *pat*
+(e.g. `"f" ..=abc "k"` matches the letter "f" followed by some alphabetic
+characters and then a "k", which would match "fork", but not "free kit") This
+is essentially a "non-greedy" version of `*`, and `.. pat` can be thought of as
+the special case of `..=. pat`
+
 `<` *pat*
 : Matches at the current position if *pat* matches immediately before the
 current position (lookbehind). Conceptually, you can think of this as creating

@@ -153,7 +153,7 @@ pat_t *chain_together(file_t *f, pat_t *first, pat_t *second)
     // If `first` is an UPTO operator (..) or contains one, then let it know
     // that `second` is what it's up *to*.
     for (pat_t *p = first; p; ) {
-        if (p->type == BP_UPTO) {
+        if (p->type == BP_UPTO || p->type == BP_UPTO_STRICT) {
             p->args.multiple.first = second;
             p->min_matchlen = second->min_matchlen;
             p->max_matchlen = -1;
@@ -238,13 +238,14 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
             if (*str == '.') { // ".."
                 pat_t *skip = NULL;
                 str = next_char(f, str);
-                if (matchchar(&str, '%')) {
+                char skipper = *str;
+                if (matchchar(&str, '%') || matchchar(&str, '=')) {
                     skip = bp_simplepattern(f, str);
                     if (!skip)
-                        file_err(f, str, str, "There should be a pattern to skip here after the '%%'");
+                        file_err(f, str, str, "There should be a pattern to skip here after the '%c'", skipper);
                     str = skip->end;
                 }
-                pat_t *upto = new_pat(f, start, str, 0, -1, BP_UPTO);
+                pat_t *upto = new_pat(f, start, str, 0, -1, skipper == '=' ? BP_UPTO_STRICT : BP_UPTO);
                 upto->args.multiple.second = skip;
                 return upto;
             } else {
