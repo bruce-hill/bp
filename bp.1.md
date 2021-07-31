@@ -17,8 +17,13 @@ syntax.
 
 # OPTIONS
 
-`-v`, `--verbose`
-: Print debugging information.
+`-p`, `--pattern` *pat*
+: Give a pattern in BP syntax instead of string syntax (equivalent to `bp
+'\(pat)'`
+
+`-w`, `--word` *word*
+: Surround a string pattern with word boundaries (equivalent to `bp
+'\|word\|'`)
 
 `-e`, `--explain`
 : Print a visual explanation of the matches.
@@ -69,7 +74,7 @@ occur).
 includes neither, and *auto* (the default) uses *fancy* formatting only when
 the output is a TTY.
 
-`--help`
+`-h`, `--help`
 : Print the usage and exit.
 
 *pattern*

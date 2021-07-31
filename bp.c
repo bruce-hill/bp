@@ -48,6 +48,7 @@ static const char *usage = (
     " -C --confirm                     ask for confirmation on each replacement\n"
     " -l --list-files                  list filenames only\n"
     " -p --pattern <pat>               provide a pattern (equivalent to bp '\\(<pat>)')\n"
+    " -w --word <string-pat>           find words matching the given string pattern\n"
     " -r --replace <replacement>       replace the input pattern with the given replacement\n"
     " -s --skip <skip-pattern>         skip over the given pattern when looking for matches\n"
     " -c --context <context>           set number of lines of context to print (all: the whole file, 0: only the match, 1: the line, N: N lines of context)\n"
@@ -559,6 +560,13 @@ int main(int argc, char *argv[])
                     str = after_spaces(p->end);
                 }
             }
+        } else if (FLAG("-w")     || FLAG("--word")) {
+            check_nonnegative(asprintf(&flag, "\\|%s\\|", flag), "Could not allocate memory");
+            file_t *arg_file = spoof_file(&loaded_files, "<word pattern>", flag, -1);
+            delete(&flag);
+            pat_t *p = bp_stringpattern(arg_file, arg_file->start);
+            if (!p) errx(EXIT_FAILURE, "Pattern failed to compile: %s", flag);
+            pattern = chain_together(arg_file, pattern, p);
         } else if (FLAG("-s")     || FLAG("--skip")) {
             file_t *arg_file = spoof_file(&loaded_files, "<skip argument>", flag, -1);
             pat_t *s = bp_pattern(arg_file, arg_file->start);
@@ -588,8 +596,7 @@ int main(int argc, char *argv[])
             if (pattern != NULL) break;
             file_t *arg_file = spoof_file(&loaded_files, "<pattern argument>", argv[0], -1);
             pat_t *p = bp_stringpattern(arg_file, arg_file->start);
-            if (!p)
-                errx(EXIT_FAILURE, "Pattern failed to compile: %s", argv[0]);
+            if (!p) errx(EXIT_FAILURE, "Pattern failed to compile: %s", argv[0]);
             pattern = chain_together(arg_file, pattern, p);
             ++argv;
         } else {

@@ -15,8 +15,13 @@ bp - Bruce\[aq]s Parsing Expression Grammar tool
 custom syntax.
 .SH OPTIONS
 .TP
-\f[B]-v\f[R], \f[B]--verbose\f[R]
-Print debugging information.
+\f[B]-p\f[R], \f[B]--pattern\f[R] \f[I]pat\f[R]
+Give a pattern in BP syntax instead of string syntax (equivalent to
+\f[B]bp \[aq]\[rs](pat)\[aq]\f[R]
+.TP
+\f[B]-w\f[R], \f[B]--word\f[R] \f[I]word\f[R]
+Surround a string pattern with word boundaries (equivalent to
+\f[B]bp \[aq]\[rs]|word\[rs]|\[aq]\f[R])
 .TP
 \f[B]-e\f[R], \f[B]--explain\f[R]
 Print a visual explanation of the matches.
@@ -73,7 +78,7 @@ Set the output format.
 includes neither, and \f[I]auto\f[R] (the default) uses \f[I]fancy\f[R]
 formatting only when the output is a TTY.
 .TP
-\f[B]--help\f[R]
+\f[B]-h\f[R], \f[B]--help\f[R]
 Print the usage and exit.
 .TP
 \f[I]pattern\f[R]
