@@ -546,20 +546,9 @@ int main(int argc, char *argv[])
             defs = load_grammar(defs, f); // Keep in memory for debug output
         } else if (FLAG("-p")     || FLAG("--pattern")) {
             file_t *arg_file = spoof_file(&loaded_files, "<pattern argument>", flag, -1);
-            for (const char *str = arg_file->start; str < arg_file->end; ) {
-                def_t *d = bp_definition(defs, arg_file, str);
-                if (d) {
-                    defs = d;
-                    str = after_spaces(d->pat->end);
-                } else {
-                    pat_t *p = bp_pattern(arg_file, str);
-                    if (!p)
-                        file_err(arg_file, str, arg_file->end,
-                                 "Failed to compile this part of the argument");
-                    pattern = chain_together(arg_file, pattern, p);
-                    str = after_spaces(p->end);
-                }
-            }
+            pat_t *p = bp_pattern(arg_file, arg_file->start);
+            if (!p) file_err(arg_file, arg_file->start, arg_file->end, "Failed to compile this part of the argument");
+            pattern = chain_together(arg_file, pattern, p);
         } else if (FLAG("-w")     || FLAG("--word")) {
             check_nonnegative(asprintf(&flag, "\\|%s\\|", flag), "Could not allocate memory");
             file_t *arg_file = spoof_file(&loaded_files, "<word pattern>", flag, -1);

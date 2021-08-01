@@ -19,7 +19,8 @@ const char *after_spaces(const char *str)
     // Skip whitespace and comments:
   skip_whitespace:
     switch (*str) {
-        case ' ': case '\r': case '\n': case '\t': {
+        // case ' ': case '\r': case '\n': case '\t': {
+        case ' ': case '\t': {
             ++str;
             goto skip_whitespace;
         }

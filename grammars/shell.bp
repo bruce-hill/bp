@@ -10,10 +10,9 @@ comment: `#..$
 string: `" ..%(string-escape / subcommand / \n) `" / `' ..%\n `' / "<<" _ @delim=id _$ ..%\n (^delim$)
 string-escape: `\ `",`
 subcommand: `` ..%\n `` / "$" (parens/braces)
-keyword:
-    "echo" / "read" / "set" / "unset" / "readonly" / "shift" / "export" / "if" / "fi" /
+keyword: ("echo" / "read" / "set" / "unset" / "readonly" / "shift" / "export" / "if" / "fi" /
     "else" / "while" / "do" / "done" / "for" / "until" / "case" / "esac" / "break" /
-    "continue" / "exit" / "return" / "trap" / "wait" / "eval" / "exec" / "ulimit" / "umask"
+    "continue" / "exit" / "return" / "trap" / "wait" / "eval" / "exec" / "ulimit" / "umask")
 function-def: ^_ ["function"_] id _ `(_`) >(__`{)
 function: function-def __ braces
 var: `$ (id / braces)

@@ -106,7 +106,7 @@ static match_t *cache_lookup(def_t *defs, const char *str, pat_t *pat)
     if (!cache.matches) return NULL;
     size_t h = hash(str, pat) & (cache.size-1);
     for (match_t *c = cache.matches[h]; c; c = c->cache.next) {
-        if (c->pat == pat && c->defs_id == defs->id && c->start == str)
+        if (c->pat == pat && c->defs_id == (defs?defs->id:0) && c->start == str)
             return c;
     }
     return NULL;
@@ -291,6 +291,12 @@ match_t *next_match(def_t *defs, file_t *f, match_t *prev, pat_t *pat, pat_t *sk
 static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool ignorecase)
 {
     switch (pat->type) {
+        case BP_DEFINITION: {
+            def_t *defs2 = with_def(defs, pat->args.def.namelen, pat->args.def.name, pat->args.def.def);
+            match_t *m = match(defs2, f, str, pat->args.def.pat ? pat->args.def.pat : pat->args.def.def, ignorecase);
+            defs = free_defs(defs2, defs);
+            return m;
+        }
         case BP_LEFTRECURSION: {
             // Left recursion occurs when a pattern directly or indirectly
             // invokes itself at the same position in the text. It's handled as
@@ -727,7 +733,7 @@ static match_t *new_match(def_t *defs, pat_t *pat, const char *start, const char
     m->pat = pat;
     m->start = start;
     m->end = end;
-    m->defs_id = defs->id;
+    m->defs_id = (defs?defs->id:0);
 
     if (children) {
         for (int i = 0; children[i]; i++)

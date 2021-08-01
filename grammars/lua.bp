@@ -9,10 +9,9 @@
 comment: "--" (`[ @eqs=*`= `[ ..%\n (`]eqs`]) / ..$)
 string: `"..%string-escape `" / `' ..%string-escape `' / `[ @eqs=*`= `[ ..%\n (`]eqs`])
 table: `{ ..%(table/string/comment/\n) `}
-keyword:
- "and" / "break" / "do" / "else" / "elseif" / "end" / "false" / "for" /
- "function" / "goto" / "if" / "in" / "local" / "nil" / "not" / "or" /
- "repeat" / "return" / "then" / "true" / "until" / "while"
+keyword: ("and" / "break" / "do" / "else" / "elseif" / "end" / "false" / "for" /
+    "function" / "goto" / "if" / "in" / "local" / "nil" / "not" / "or" /
+    "repeat" / "return" / "then" / "true" / "until" / "while")
 function-def: |"function"|[_id (*(`.id)[`:id])]_ parens
 block: function / if-block / while-block / for-block / repeat-block / do-block
 repeat-block: |"repeat"| ..%(comment/string/\n) (|"until"|)

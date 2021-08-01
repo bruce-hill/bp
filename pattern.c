@@ -8,24 +8,27 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "definitions.h"
 #include "files.h"
 #include "pattern.h"
 #include "utils.h"
 #include "utf8.h"
 
 __attribute__((nonnull))
-static pat_t *expand_replacements(file_t *f, pat_t *replace_pat);
+static pat_t *bp_pattern_nl(file_t *f, const char *str, bool allow_nl);
 __attribute__((nonnull))
-static pat_t *expand_chain(file_t *f, pat_t *first);
+static pat_t *expand_replacements(file_t *f, pat_t *replace_pat, bool allow_nl);
 __attribute__((nonnull))
-static pat_t *expand_choices(file_t *f, pat_t *first);
+static pat_t *expand_chain(file_t *f, pat_t *first, bool allow_nl);
+__attribute__((nonnull))
+static pat_t *expand_choices(file_t *f, pat_t *first, bool allow_nl);
 __attribute__((nonnull))
 static pat_t *_bp_simplepattern(file_t *f, const char *str);
 __attribute__((nonnull(1,2,3,6)))
 static pat_t *new_range(file_t *f, const char *start, const char *end, size_t min, ssize_t max, pat_t *repeating, pat_t *sep);
 __attribute__((nonnull(1,2)))
 static pat_t *bp_simplepattern(file_t *f, const char *str);
+
+#define SKIP_NL_SPACES(str) for (str = after_spaces(str); *str == '\n' || *str == '\r'; ) str = after_spaces(++str)
 
 //
 // Allocate a new pattern for this file (ensuring it will be automatically
@@ -68,11 +71,13 @@ static pat_t *new_range(file_t *f, const char *start, const char *end, size_t mi
 // Take a pattern and expand it into a chain of patterns if it's followed by
 // any patterns (e.g. "`x `y"), otherwise return the original input.
 //
-static pat_t *expand_chain(file_t *f, pat_t *first)
+static pat_t *expand_chain(file_t *f, pat_t *first, bool allow_nl)
 {
-    pat_t *second = bp_simplepattern(f, first->end);
+    const char *str = first->end;
+    if (allow_nl) SKIP_NL_SPACES(str);
+    pat_t *second = bp_simplepattern(f, str);
     if (second == NULL) return first;
-    second = expand_chain(f, second);
+    second = expand_chain(f, second, allow_nl);
     if (second->end <= first->end)
         file_err(f, second->end, second->end,
                  "This chain is not parsing properly");
@@ -82,10 +87,12 @@ static pat_t *expand_chain(file_t *f, pat_t *first)
 //
 // Match trailing => replacements (with optional pattern beforehand)
 //
-static pat_t *expand_replacements(file_t *f, pat_t *replace_pat)
+static pat_t *expand_replacements(file_t *f, pat_t *replace_pat, bool allow_nl)
 {
     const char *str = replace_pat->end;
+    if (allow_nl) SKIP_NL_SPACES(str);
     while (matchstr(&str, "=>")) {
+        if (allow_nl) SKIP_NL_SPACES(str);
         const char *repstr;
         size_t replen;
         if (matchchar(&str, '"') || matchchar(&str, '\'')) {
@@ -121,18 +128,24 @@ static pat_t *expand_replacements(file_t *f, pat_t *replace_pat)
 // chain of choices if it's followed by any "/"-separated patterns (e.g.
 // "`x/`y"), otherwise return the original input.
 //
-static pat_t *expand_choices(file_t *f, pat_t *first)
+static pat_t *expand_choices(file_t *f, pat_t *first, bool allow_nl)
 {
-    first = expand_chain(f, first);
-    first = expand_replacements(f, first);
+    first = expand_chain(f, first, allow_nl);
+    first = expand_replacements(f, first, allow_nl);
     const char *str = first->end;
+    if (allow_nl) SKIP_NL_SPACES(str);
     if (!matchchar(&str, '/')) return first;
+    if (allow_nl) SKIP_NL_SPACES(str);
     pat_t *second = bp_simplepattern(f, str);
+    if (second) {
+        str = second->end;
+        if (allow_nl) SKIP_NL_SPACES(str);
+    }
     if (matchstr(&str, "=>"))
-        second = expand_replacements(f, second ? second : new_pat(f, str-2, str-2, 0, 0, BP_STRING));
+        second = expand_replacements(f, second ? second : new_pat(f, str-2, str-2, 0, 0, BP_STRING), allow_nl);
     if (!second)
         file_err(f, str, str, "There should be a pattern here after a '/'");
-    second = expand_choices(f, second);
+    second = expand_choices(f, second, allow_nl);
     return either_pat(f, first, second);
 }
 
@@ -187,7 +200,7 @@ pat_t *either_pat(file_t *f, pat_t *first, pat_t *second)
 }
 
 //
-// Wrapper for _bp_simplepattern() that expands any postfix operators
+// Wrapper for _bp_simplepattern() that expands any postfix operators (~, !~)
 //
 static pat_t *bp_simplepattern(file_t *f, const char *str)
 {
@@ -416,27 +429,29 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
             if (matchstr(&str, "!)")) { // (!) errors
                 pat_t *pat = bp_simplepattern(f, str);
                 if (!pat) pat = new_pat(f, str, str, 0, 0, BP_STRING);
-                pat = expand_replacements(f, pat);
+                pat = expand_replacements(f, pat, false);
                 pat_t *error = new_pat(f, start, pat->end, pat->min_matchlen, pat->max_matchlen, BP_ERROR);
                 error->args.pat = pat;
                 return error;
             }
 
-            pat_t *pat = bp_pattern(f, str);
+            pat_t *pat = bp_pattern_nl(f, str, true);
             if (!pat)
                 file_err(f, str, str, "There should be a valid pattern after this parenthesis.");
             str = pat->end;
-            (void)matchchar(&str, ')');
+            SKIP_NL_SPACES(str);
+            if (!matchchar(&str, ')')) file_err(f, str, str, "Missing paren: )");
             pat->start = start;
             pat->end = str;
             return pat;
         }
         // Square brackets
         case '[': {
-            pat_t *maybe = bp_pattern(f, str);
+            pat_t *maybe = bp_pattern_nl(f, str, true);
             if (!maybe)
                 file_err(f, str, str, "There should be a valid pattern after this square bracket.");
             str = maybe->end;
+            SKIP_NL_SPACES(str);
             (void)matchchar(&str, ']');
             return new_range(f, start, str, 0, 1, maybe, NULL);
         }
@@ -488,28 +503,30 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
                 return new_pat(f, start, str, 0, 0, BP_END_OF_FILE);
             return new_pat(f, start, str, 0, 0, BP_END_OF_LINE);
         }
-        // Whitespace:
-        case '_': {
-            size_t namelen = 1;
-            if (matchchar(&str, '_')) // double __ (whitespace with newlines)
-                ++namelen;
-            if (matchchar(&str, ':')) return NULL; // Don't match definitions
+        default: {
+            // Reference
+            if (!isalpha(c) && c != '_') return NULL;
+            str = after_name(start);
+            size_t namelen = (size_t)(str - start);
+            if (matchchar(&str, ':')) { // Definitions
+                pat_t *def = bp_pattern_nl(f, str, false);
+                if (!def) file_err(f, str, f->end, "Could not parse this definition.");
+                str = def->end;
+                (void)matchchar(&str, ';'); // Optional semicolon
+                SKIP_NL_SPACES(str);
+                pat_t *pat = bp_pattern_nl(f, str, false);
+                if (pat) str = pat->end;
+                else pat = def;
+                pat_t *ret = new_pat(f, start, str, pat->min_matchlen, pat->max_matchlen, BP_DEFINITION);
+                ret->args.def.name = start;
+                ret->args.def.namelen = namelen;
+                ret->args.def.def = def;
+                ret->args.def.pat = pat;
+                return ret;
+            }
             pat_t *ref = new_pat(f, start, str, 0, -1, BP_REF);
             ref->args.ref.name = start;
             ref->args.ref.len = namelen;
-            return ref;
-        }
-        default: {
-            // Reference
-            if (!isalpha(c)) return NULL;
-            --str;
-            const char *refname = str;
-            str = after_name(str);
-            if (matchchar(&str, ':')) // Don't match definitions
-                return NULL;
-            pat_t *ref = new_pat(f, start, str, 0, -1, BP_REF);
-            ref->args.ref.name = refname;
-            ref->args.ref.len = (size_t)(str - refname);
             return ref;
         }
     }
@@ -575,32 +592,23 @@ pat_t *bp_replacement(file_t *f, pat_t *replacepat, const char *replacement)
     return pat;
 }
 
+static pat_t *bp_pattern_nl(file_t *f, const char *str, bool allow_nl)
+{
+    SKIP_NL_SPACES(str);
+    pat_t *pat = bp_simplepattern(f, str);
+    if (pat != NULL) pat = expand_choices(f, pat, allow_nl);
+    SKIP_NL_SPACES(str);
+    if (matchstr(&str, "=>"))
+        pat = expand_replacements(f, pat ? pat : new_pat(f, str-2, str-2, 0, 0, BP_STRING), allow_nl);
+    return pat;
+}
+
 //
 // Compile a string representing a BP pattern into a pattern object.
 //
 pat_t *bp_pattern(file_t *f, const char *str)
 {
-    pat_t *pat = bp_simplepattern(f, str);
-    if (pat != NULL) pat = expand_choices(f, pat);
-    if (matchstr(&str, "=>"))
-        pat = expand_replacements(f, pat ? pat : new_pat(f, str-2, str-2, 0, 0, BP_STRING));
-    return pat;
-}
-
-//
-// Match a definition (id__`:__pattern)
-//
-def_t *bp_definition(def_t *defs, file_t *f, const char *str)
-{
-    const char *name = after_spaces(str);
-    str = after_name(name);
-    if (!str) return NULL;
-    size_t namelen = (size_t)(str - name);
-    if (!matchchar(&str, ':')) return NULL;
-    pat_t *defpat = bp_pattern(f, str);
-    if (!defpat) return NULL;
-    (void)matchchar(&defpat->end, ';'); // TODO: verify this is safe to mutate
-    return with_def(defs, namelen, name, defpat);
+    return bp_pattern_nl(f, str, false);
 }
 
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1

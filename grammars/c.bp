@@ -9,12 +9,11 @@
 comment: "//" .. $ / "/*" ..%\n "*/"
 string: `" ..%string-escape `"
 string-escape: `\ (`x 2 Hex / 1-3 `0-7 / .)
-keyword:
-    "auto" / "break" / "case" / "char" / "const" / "continue" / "default" / "do" /
+keyword: ("auto" / "break" / "case" / "char" / "const" / "continue" / "default" / "do" /
     "double" / "else" / "enum" / "extern" / "float" / "for" / "goto" / "if" /
     "int" / "long" / "register" / "return" / "short" / "signed" / "sizeof" /
     "static" / "struct" / "switch" / "typedef" / "union" / "unsigned" / "void" /
-    "volatile" / "while"
+    "volatile" / "while")
 function-def: ^_ 2+(id / keyword / `*) % __ parens (__`; / >(__`{))
 function: function-def __ braces
 macro: ^"#define"| ..$ *(<`\ \n..$)

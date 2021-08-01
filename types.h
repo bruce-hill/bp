@@ -37,8 +37,9 @@ enum pattype_e {
     BP_END_OF_FILE   = 22,
     BP_END_OF_LINE   = 23,
     BP_WORD_BOUNDARY = 24,
-    BP_LEFTRECURSION = 25,
-    BP_ERROR         = 26,
+    BP_DEFINITION    = 25,
+    BP_LEFTRECURSION = 26,
+    BP_ERROR         = 27,
 };
 
 struct match_s; // forward declared to resolve circular struct defs
@@ -59,6 +60,11 @@ typedef struct pat_s {
             const char *name;
             size_t len;
         } ref;
+        struct {
+            const char *name;
+            size_t namelen;
+            struct pat_s *def, *pat;
+        } def;
         struct {
             unsigned char low, high;
         } range;

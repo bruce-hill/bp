@@ -33,26 +33,16 @@ def_t *with_def(def_t *defs, size_t namelen, const char *name, pat_t *pat)
 //
 def_t *load_grammar(def_t *defs, file_t *f)
 {
-    const char *src = f->start;
-    src = after_spaces(src);
-    while (src < f->end) {
-        const char *name = src;
-        src = after_name(name);
-        if (src <= name)
-            file_err(f, name, src, "Invalid name for definition: %s", name);
-        size_t namelen = (size_t)(src - name);
-        if (!matchchar(&src, ':'))
-            errx(EXIT_FAILURE, "Expected ':' in definition");
-        pat_t *pat = bp_pattern(f, src);
-        if (pat == NULL) break;
-        defs = with_def(defs, namelen, name, pat);
-        src = pat->end;
-        src = after_spaces(src);
-        if (matchchar(&src, ';'))
-            src = after_spaces(src);
+    const char *str = after_spaces(f->start);
+    while (*str == '\r' || *str == '\n') str = after_spaces(++str);
+    pat_t *pat = bp_pattern(f, str);
+    if (!pat) file_err(f, str, f->end, "Could not parse this file");
+    if (pat->end < f->end) file_err(f, pat->end, f->end, "Could not parse this part of the file");
+    for (pat_t *p = pat; p && p->type == BP_DEFINITION; p = p->args.def.pat) {
+        // printf("Def '%.*s': %.*s\n", (int)p->args.def.namelen, p->args.def.name,
+        //        (int)(p->args.def.def->end - p->args.def.def->start), p->args.def.def->start);
+        defs = with_def(defs, p->args.def.namelen, p->args.def.name, p->args.def.def);
     }
-    if (src < f->end)
-        file_err(f, src, NULL, "Invalid BP pattern");
     return defs;
 }
 

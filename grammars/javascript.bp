@@ -8,8 +8,7 @@
 
 comment: "//" .. $ / "/*" ..%\n "*/"
 string: `" ..%string-escape `" / `' ..%string-escape `' / `/ ..%string-escape `/
-keyword:
-    "abstract" / "arguments" / "await" / "boolean" / "break" / "byte" / "case" /
+keyword: ("abstract" / "arguments" / "await" / "boolean" / "break" / "byte" / "case" /
     "catch" / "char" / "class" / "const" / "continue" / "debugger" / "default" /
     "delete" / "do" / "double" / "else" / "enum" / "eval" / "export" / "extends" /
     "false" / "final" / "finally" / "float" / "for" / "function" / "goto" / "if" /
@@ -17,7 +16,7 @@ keyword:
     "long" / "native" / "new" / "null" / "package" / "private" / "protected" /
     "public" / "return" / "short" / "static" / "super" / "switch" / "synchronized" /
     "this" / "throw" / "throws" / "transient" / "true" / "try" / "typeof" / "var" /
-    "void" / "volatile" / "while" / "with" / "yield"
+    "void" / "volatile" / "while" / "with" / "yield")
 function-def: |"function"| __ [id__] parens / (id / parens) __ "=>"
 function: function-def __ braces
 import: |"import"| ..%braces (`; / $)
