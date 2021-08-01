@@ -33,8 +33,7 @@ def_t *with_def(def_t *defs, size_t namelen, const char *name, pat_t *pat)
 //
 def_t *load_grammar(def_t *defs, file_t *f)
 {
-    const char *str = after_spaces(f->start);
-    while (*str == '\r' || *str == '\n') str = after_spaces(++str);
+    const char *str = after_spaces(f->start, true);
     pat_t *pat = bp_pattern(f, str);
     if (!pat) file_err(f, str, f->end, "Could not parse this file");
     if (pat->end < f->end) file_err(f, pat->end, f->end, "Could not parse this part of the file");

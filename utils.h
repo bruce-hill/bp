@@ -26,11 +26,11 @@ char unescapechar(const char *escaped, const char **end);
 __attribute__((pure, nonnull))
 const char *after_name(const char *str);
 __attribute__((pure, nonnull, returns_nonnull))
-const char *after_spaces(const char *str);
+const char *after_spaces(const char *str, bool skip_nl);
 __attribute__((nonnull))
-bool matchchar(const char **str, char c);
+bool matchchar(const char **str, char c, bool skip_nl);
 __attribute__((nonnull))
-bool matchstr(const char **str, const char *target);
+bool matchstr(const char **str, const char *target, bool skip_nl);
 __attribute__((returns_nonnull))
 void *check_nonnull(void *p, const char *err_msg, ...);
 int check_nonnegative(int i, const char *err_msg, ...);

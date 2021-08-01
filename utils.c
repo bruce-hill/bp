@@ -5,6 +5,7 @@
 #include <ctype.h>
 #include <err.h>
 #include <stdarg.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <unistd.h>
 
@@ -14,12 +15,14 @@
 // Helper function to skip past all spaces (and comments)
 // Returns a pointer to the first non-space character.
 //
-const char *after_spaces(const char *str)
+const char *after_spaces(const char *str, bool skip_nl)
 {
     // Skip whitespace and comments:
   skip_whitespace:
     switch (*str) {
-        // case ' ': case '\r': case '\n': case '\t': {
+        case '\r': case '\n':
+            if (!skip_nl) break;
+            __attribute__ ((fallthrough));
         case ' ': case '\t': {
             ++str;
             goto skip_whitespace;
@@ -54,11 +57,11 @@ const char *after_name(const char *str)
 //
 // Check if a character is found and if so, move past it.
 //
-bool matchchar(const char **str, char c)
+bool matchchar(const char **str, char c, bool skip_nl)
 {
-    const char *next = after_spaces(*str);
+    const char *next = after_spaces(*str, skip_nl);
     if (*next == c) {
-        *str = &next[1];
+        *str = next + 1;
         return true;
     }
     return false;
@@ -67,9 +70,9 @@ bool matchchar(const char **str, char c)
 //
 // Check if a string is found and if so, move past it.
 //
-bool matchstr(const char **str, const char *target)
+bool matchstr(const char **str, const char *target, bool skip_nl)
 {
-    const char *next = after_spaces(*str);
+    const char *next = after_spaces(*str, skip_nl);
     if (strncmp(next, target, strlen(target)) == 0) {
         *str = &next[strlen(target)];
         return true;

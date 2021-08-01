@@ -562,7 +562,7 @@ int main(int argc, char *argv[])
             if (!s) {
                 fprint_line(stdout, arg_file, arg_file->start, arg_file->end,
                             "Failed to compile the skip argument");
-            } else if (after_spaces(s->end) < arg_file->end) {
+            } else if (after_spaces(s->end, true) < arg_file->end) {
                 fprint_line(stdout, arg_file, s->end, arg_file->end,
                             "Failed to compile part of the skip argument");
             }
