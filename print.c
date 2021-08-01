@@ -130,7 +130,7 @@ static void _print_match(FILE *out, printer_t *pr, match_t *m)
             // Capture substitution
             if (*r == '@' && r[1] && r[1] != '@') {
                 ++r;
-                match_t *cap = get_capture(m, &r);
+                match_t *cap = get_capture(m->children[0], &r);
                 if (cap != NULL) {
                     _print_match(out, pr, cap);
                     if (pr->use_color && current_color != color_replace) {

@@ -43,6 +43,7 @@ clean:
 	rm -f $(NAME) $(OBJFILES)
 
 test: $(NAME)
+	./$(NAME) Comment -r '[@0]'
 	./$(NAME) -g ./grammars/bp.bp -p Grammar ./grammars/bp.bp
 
 leaktest: bp
