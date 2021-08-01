@@ -17,14 +17,14 @@
 typedef struct file_s {
     struct file_s *next;
     const char *filename;
-    char *memory, **lines, *start, *end;
+    char *mmapped, *allocated;
+    char **lines, *start, *end;
     size_t nlines;
     struct pat_s *pats;
     struct {
         size_t size, occupancy;
         match_t **matches;
     } cache;
-    bool mmapped:1;
 } file_t;
 
 __attribute__((nonnull(2)))

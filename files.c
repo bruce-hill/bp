@@ -18,23 +18,19 @@
 #include "pattern.h"
 #include "utils.h"
 
-__attribute__((nonnull))
-static void populate_lines(file_t *f, size_t len);
-__attribute__((pure, nonnull))
-static size_t get_char_number(file_t *f, const char *p);
-
 //
 // In the file object, populate the `lines` array with pointers to the
 // beginning of each line.
 //
-static void populate_lines(file_t *f, size_t len)
+__attribute__((nonnull))
+static void populate_lines(file_t *f)
 {
     // Calculate line numbers:
     size_t linecap = 10;
     f->lines = new(const char*[linecap]);
     f->nlines = 0;
-    char *p = f->memory;
-    for (size_t n = 0; p && p < &f->memory[len]; ++n) {
+    char *p = f->start;
+    for (size_t n = 0; p && p < f->end; ++n) {
         ++f->nlines;
         if (n >= linecap)
             f->lines = grow(f->lines, linecap *= 2);
@@ -44,9 +40,9 @@ static void populate_lines(file_t *f, size_t len)
             if (nl) {
                 p = nl+1;
                 break;
-            } else if (p < &f->memory[len])
+            } else if (p < f->end)
                 p += strlen(p)+1;
-        } while (p < &f->memory[len]);
+        } while (p < f->end);
     }
 }
 
@@ -87,43 +83,42 @@ file_t *load_file(file_t **files, const char *filename)
         }
         return NULL;
     }
-    size_t length;
     file_t *f = new(file_t);
     f->filename = checked_strdup(filename);
 
     struct stat sb;
     if (fstat(fd, &sb) == -1)
-        goto skip_mmap;
+        goto read_file;
 
-    f->memory = mmap(NULL, (size_t)sb.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
-    if (f->memory == MAP_FAILED)
-        goto skip_mmap;
-
-    f->mmapped = true;
-    length = (size_t)sb.st_size;
+    f->mmapped = mmap(NULL, (size_t)sb.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+    if (f->mmapped == MAP_FAILED) {
+        f->mmapped = NULL;
+        goto read_file;
+    }
+    f->start = f->mmapped;
+    f->end = &f->mmapped[sb.st_size];
     goto finished_loading;
 
-  skip_mmap:
-    f->mmapped = false;
+  read_file:
     {
-        size_t capacity = 1000;
-        length = 0;
-        f->memory = new(char[capacity]);
+        size_t capacity = 1000, length = 0;
+        f->allocated = new(char[capacity]);
         ssize_t just_read;
-        while ((just_read=read(fd, &f->memory[length], (capacity-1) - length)) > 0) {
+        while ((just_read=read(fd, &f->allocated[length], (capacity-1) - length)) > 0) {
             length += (size_t)just_read;
             if (length >= capacity-1)
-                f->memory = grow(f->memory, capacity *= 2);
+                f->allocated = grow(f->allocated, capacity *= 2);
         }
-        f->memory[length] = '\0';
+        f->allocated[length] = '\0';
+        f->start = f->allocated;
+        f->end = &f->allocated[length];
     }
 
   finished_loading:
     if (fd != STDIN_FILENO)
         check_nonnegative(close(fd), "Failed to close file");
-    f->start = &f->memory[0];
-    f->end = &f->memory[length];
-    populate_lines(f, length);
+
+    populate_lines(f);
     if (files != NULL) {
         f->next = *files;
         *files = f;
@@ -136,7 +131,10 @@ file_t *load_file(file_t **files, const char *filename)
 //
 void slice_file(file_t *slice, file_t *src, const char *start, const char *end)
 {
-    memcpy(slice, src, sizeof(file_t));
+    memset(slice, 0, sizeof(file_t));
+    slice->filename = src->filename;
+    slice->lines = src->lines;
+    slice->nlines = src->nlines;
     slice->start = (char*)start;
     slice->end = (char*)end;
 }
@@ -150,11 +148,11 @@ file_t *spoof_file(file_t **files, const char *filename, const char *text, ssize
     file_t *f = new(file_t);
     size_t len = _len == -1 ? strlen(text) : (size_t)_len;
     f->filename = checked_strdup(filename);
-    f->memory = new(char[len+1]);
-    memcpy(f->memory, text, len);
-    f->start = &f->memory[0];
-    f->end = &f->memory[len];
-    populate_lines(f, len);
+    f->allocated = new(char[len+1]);
+    memcpy(f->allocated, text, len);
+    f->start = &f->allocated[0];
+    f->end = &f->allocated[len];
+    populate_lines(f);
     if (files != NULL) {
         f->next = *files;
         *files = f;
@@ -166,32 +164,32 @@ file_t *spoof_file(file_t **files, const char *filename, const char *text, ssize
 // Free a file and all memory contained inside its members, then set the input
 // pointer to NULL.
 //
-void destroy_file(file_t **f)
+void destroy_file(file_t **at_f)
 {
-    if ((*f)->filename)
-        delete(&((*f)->filename));
+    file_t *f = (file_t*)*at_f;
+    if (f->filename)
+        delete(&f->filename);
 
-    if ((*f)->lines)
-        delete(&((*f)->lines));
+    if (f->lines)
+        delete(&f->lines);
 
-    if ((*f)->memory) {
-        if ((*f)->mmapped) {
-            check_nonnegative(munmap((*f)->memory, (size_t)((*f)->end - (*f)->memory)),
-                              "Failure to un-memory-map some memory");
-            (*f)->memory = NULL;
-        } else {
-            delete(&((*f)->memory));
-        }
+    if (f->allocated)
+        delete(&f->allocated);
+
+    if (f->mmapped) {
+        check_nonnegative(munmap(f->mmapped, (size_t)(f->end - f->mmapped)),
+                          "Failure to un-memory-map some memory");
+        f->mmapped = NULL;
     }
 
-    cache_destroy(*f);
+    cache_destroy(f);
 
-    for (pat_t *next; (*f)->pats; (*f)->pats = next) {
-        next = (*f)->pats->next;
-        delete(&(*f)->pats);
+    for (pat_t *next; f->pats; f->pats = next) {
+        next = f->pats->next;
+        delete(&f->pats);
     }
 
-    delete(f);
+    delete(at_f);
 }
 
 //
@@ -215,15 +213,6 @@ size_t get_line_number(file_t *f, const char *p)
 }
 
 //
-// Given a pointer, determine which character offset within the line it points to.
-//
-static size_t get_char_number(file_t *f, const char *p)
-{
-    size_t linenum = get_line_number(f, p);
-    return 1 + (size_t)(p - f->lines[linenum-1]);
-}
-
-//
 // Return a pointer to the line with the specified line number.
 //
 const char *get_line(file_t *f, size_t line_number)
@@ -238,13 +227,12 @@ const char *get_line(file_t *f, size_t line_number)
 //
 void fprint_line(FILE *dest, file_t *f, const char *start, const char *end, const char *fmt, ...)
 {
-    if (start < f->memory) start = f->memory;
+    if (start < f->start) start = f->start;
     if (start > f->end) start = f->end;
-    if (end < f->memory) end = f->memory;
+    if (end < f->start) end = f->start;
     if (end > f->end) end = f->end;
     size_t linenum = get_line_number(f, start);
     const char *line = get_line(f, linenum);
-    size_t charnum = get_char_number(f, start);
     fprintf(dest, "\033[1m%s:%lu:\033[0m ", f->filename[0] ? f->filename : "stdin", linenum);
 
     va_list args;
@@ -257,8 +245,8 @@ void fprint_line(FILE *dest, file_t *f, const char *start, const char *end, cons
     if (end == NULL || end > eol) end = eol;
     fprintf(dest, "\033[2m%5lu\033(0\x78\033(B\033[0m%.*s\033[41;30m%.*s\033[0m%.*s\n",
             linenum,
-            (int)charnum - 1, line,
-            (int)(end - &line[charnum-1]), &line[charnum-1],
+            (int)(start - line), line,
+            (int)(end - start), start,
             (int)(eol - end), end);
     fprintf(dest, "      \033[34;1m");
     const char *p = line;
