@@ -7,8 +7,6 @@
 #include <stdbool.h>
 #include <sys/types.h>
 
-#include "files.h"
-
 #define UNBOUNDED(pat) ((pat)->max_matchlen == -1)
 
 // BP virtual machine pattern types

@@ -14,6 +14,7 @@
 #include <unistd.h>
 
 #include "files.h"
+#include "match.h"
 #include "pattern.h"
 #include "utils.h"
 
@@ -183,6 +184,8 @@ void destroy_file(file_t **f)
         }
     }
 
+    cache_destroy(*f);
+
     for (pat_t *next; (*f)->pats; (*f)->pats = next) {
         next = (*f)->pats->next;
         delete(&(*f)->pats);
@@ -268,6 +271,128 @@ void fprint_line(FILE *dest, file_t *f, const char *start, const char *end, cons
         else
             (void)fputc('^', dest);
     fprintf(dest, "\033[0m\n");
+}
+
+//
+// Hash a string position/pattern.
+//
+static inline size_t hash(const char *str, pat_t *pat)
+{
+    return (size_t)str + 2*pat->id;
+}
+
+//
+// Check if we have memoized a pattern match at the given position for the
+// given definitions. If a result has been memoized, set *result to the
+// memoized value and return true, otherwise return false.
+//
+bool cache_get(file_t *f, def_t *defs, const char *str, pat_t *pat, match_t **result)
+{
+    if (!f->cache.matches) return NULL;
+    size_t h = hash(str, pat) & (f->cache.size-1);
+    for (match_t *c = f->cache.matches[h]; c; c = c->cache.next) {
+        if (c->pat == pat && c->defs_id == (defs?defs->id:0) && c->start == str) {
+            // If c->end == NULL, that means no match occurs here
+            *result = c->end == NULL ? NULL : c;
+            return true;
+        }
+    }
+    return false;
+}
+
+//
+// Remove an item from the cache.
+//
+static void cache_remove(file_t *f, match_t *m)
+{
+    if (!m->cache.home) return;
+    *m->cache.home = m->cache.next;
+    if (m->cache.next) m->cache.next->cache.home = m->cache.home;
+    m->cache.next = NULL;
+    m->cache.home = NULL;
+    if (--m->refcount == 0) recycle_if_unused(&m);
+    --f->cache.occupancy;
+}
+
+//
+// Save a match in the cache.
+//
+void cache_save(file_t *f, def_t *defs, const char *str, pat_t *pat, match_t *m)
+{
+    // As a convention, a match with {.pat=pat, .start=str, .end==NULL} is used
+    // to memoize the fact that `pat` will *not* match at `str`.
+    if (m == NULL) m = new_match(defs, pat, str, NULL, NULL);
+
+    if (f->cache.occupancy+1 > 3*f->cache.size) {
+        if (f->cache.size == MAX_CACHE_SIZE) {
+            size_t h = hash(m->start, m->pat) & (f->cache.size-1);
+            for (int quota = 2; f->cache.matches[h] && quota > 0; quota--) {
+                match_t *last = f->cache.matches[h];
+                while (last->cache.next) last = last->cache.next;
+                cache_remove(f, last);
+            }
+        } else {
+            match_t **old_matches = f->cache.matches;
+            size_t old_size = f->cache.size;
+            f->cache.size = old_size == 0 ? 16 : 2*old_size;
+            f->cache.matches = new(match_t*[f->cache.size]);
+
+            // Rehash:
+            if (old_matches) {
+                for (size_t i = 0; i < old_size; i++) {
+                    for (match_t *o; (o = old_matches[i]); ) {
+                        *o->cache.home = o->cache.next;
+                        if (o->cache.next) o->cache.next->cache.home = o->cache.home;
+                        size_t h = hash(o->start, o->pat) & (f->cache.size-1);
+                        o->cache.home = &(f->cache.matches[h]);
+                        o->cache.next = f->cache.matches[h];
+                        if (f->cache.matches[h]) f->cache.matches[h]->cache.home = &o->cache.next;
+                        f->cache.matches[h] = o;
+                    }
+                }
+                free(old_matches);
+            }
+        }
+    }
+
+    size_t h = hash(m->start, m->pat) & (f->cache.size-1);
+    m->cache.home = &(f->cache.matches[h]);
+    m->cache.next = f->cache.matches[h];
+    if (f->cache.matches[h]) f->cache.matches[h]->cache.home = &m->cache.next;
+    f->cache.matches[h] = m;
+    ++m->refcount;
+    ++f->cache.occupancy;
+}
+
+//
+// Remove all items from the cache that do not overlap `start` and `end`.
+// (This is used to remove useless items from the cache)
+//
+void cache_prune(file_t *f, const char *start, const char *end)
+{
+    if (!f->cache.matches) return;
+    for (size_t i = 0; i < f->cache.size; i++) {
+        for (match_t *m = f->cache.matches[i], *next = NULL; m; m = next) {
+            next = m->cache.next;
+            if (m->start < start || (m->end ? m->end : m->start) > end)
+                cache_remove(f, m);
+        }
+    }
+}
+
+//
+// Clear and deallocate the cache.
+//
+void cache_destroy(file_t *f)
+{
+    if (!f->cache.matches) return;
+    for (size_t i = 0; i < f->cache.size; i++) {
+        while (f->cache.matches[i])
+            cache_remove(f, f->cache.matches[i]);
+    }
+    f->cache.occupancy = 0;
+    delete(&f->cache.matches);
+    f->cache.size = 0;
 }
 
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1

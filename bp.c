@@ -406,7 +406,7 @@ static int process_file(def_t *defs, const char *filename, pat_t *pattern)
     }
     fflush(stdout);
 
-    cache_destroy();
+    cache_destroy(f);
     if (recycle_all_matches() != 0)
         fprintf(stderr, "\033[33;1mMemory leak: there should no longer be any matches in use at this point.\033[0m\n");
     destroy_file(&f);
@@ -624,6 +624,10 @@ int main(int argc, char *argv[])
         tty_out = fopen("/dev/tty", "w");
     }
 
+    // No need for these caches anymore:
+    for (file_t *f = loaded_files; f; f = f->next)
+        cache_destroy(f);
+
     int found = 0;
     if (options.mode == MODE_JSON) printf("[");
     if (options.git_mode) { // Get the list of files from `git --ls-files ...`
@@ -652,7 +656,6 @@ int main(int argc, char *argv[])
     // This code frees up all residual heap-allocated memory. Since the program
     // is about to exit, this step is unnecessary. However, it is useful for
     // tracking down memory leaks.
-    cache_destroy();
     free_all_matches();
     defs = free_defs(defs, NULL);
     while (loaded_files) {

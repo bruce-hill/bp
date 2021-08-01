@@ -26,21 +26,10 @@
 static match_t *unused_matches = NULL;
 static match_t *in_use_matches = NULL;
 
-typedef struct {
-    size_t size, occupancy;
-    match_t **matches;
-} cache_t;
-
-#define MAX_CACHE_SIZE (1<<14)
-
 #define MATCHES(...) (match_t*[]){__VA_ARGS__, NULL}
-
-cache_t cache = {0, 0, NULL};
 
 __attribute__((nonnull(1)))
 static inline pat_t *deref(def_t *defs, pat_t *pat);
-__attribute__((returns_nonnull))
-static match_t *new_match(def_t *defs, pat_t *pat, const char *start, const char *end, match_t *children[]);
 __attribute__((nonnull))
 static match_t *get_capture_by_num(match_t *m, int *n);
 __attribute__((nonnull, pure))
@@ -94,99 +83,6 @@ static inline void list_remove(match_t *m, match_dll_t *node)
     }
     node->home = NULL;
     node->next = NULL;
-}
-
-static inline size_t hash(const char *str, pat_t *pat)
-{
-    return (size_t)str + 2*pat->id;
-}
-
-static match_t *cache_lookup(def_t *defs, const char *str, pat_t *pat)
-{
-    if (!cache.matches) return NULL;
-    size_t h = hash(str, pat) & (cache.size-1);
-    for (match_t *c = cache.matches[h]; c; c = c->cache.next) {
-        if (c->pat == pat && c->defs_id == (defs?defs->id:0) && c->start == str)
-            return c;
-    }
-    return NULL;
-}
-
-static void cache_remove(match_t *m)
-{
-    if (!m->cache.home) return;
-    *m->cache.home = m->cache.next;
-    if (m->cache.next) m->cache.next->cache.home = m->cache.home;
-    m->cache.next = NULL;
-    m->cache.home = NULL;
-    remove_ownership(&m);
-    --cache.occupancy;
-}
-
-static void cache_save(match_t *m)
-{
-    if (cache.occupancy+1 > 3*cache.size) {
-        if (cache.size == MAX_CACHE_SIZE) {
-            size_t h = hash(m->start, m->pat) & (cache.size-1);
-            for (int quota = 2; cache.matches[h] && quota > 0; quota--) {
-                match_t *last = cache.matches[h];
-                while (last->cache.next) last = last->cache.next;
-                cache_remove(last);
-            }
-        } else {
-            cache_t old_cache = cache;
-            cache.size = old_cache.size == 0 ? 16 : 2*old_cache.size;
-            cache.matches = new(match_t*[cache.size]);
-
-            // Rehash:
-            if (old_cache.matches) {
-                for (size_t i = 0; i < old_cache.size; i++) {
-                    for (match_t *o; (o = old_cache.matches[i]); ) {
-                        *o->cache.home = o->cache.next;
-                        if (o->cache.next) o->cache.next->cache.home = o->cache.home;
-                        size_t h = hash(o->start, o->pat) & (cache.size-1);
-                        o->cache.home = &(cache.matches[h]);
-                        o->cache.next = cache.matches[h];
-                        if (cache.matches[h]) cache.matches[h]->cache.home = &o->cache.next;
-                        cache.matches[h] = o;
-                    }
-                }
-                free(old_cache.matches);
-            }
-        }
-    }
-
-    size_t h = hash(m->start, m->pat) & (cache.size-1);
-    m->cache.home = &(cache.matches[h]);
-    m->cache.next = cache.matches[h];
-    if (cache.matches[h]) cache.matches[h]->cache.home = &m->cache.next;
-    cache.matches[h] = NULL;
-    add_owner(&cache.matches[h], m);
-    ++cache.occupancy;
-}
-
-static void cache_prune(const char *start, const char *end)
-{
-    if (!cache.matches) return;
-    for (size_t i = 0; i < cache.size; i++) {
-        for (match_t *m = cache.matches[i], *next = NULL; m; m = next) {
-            next = m->cache.next;
-            if (m->start < start || (m->end ? m->end : m->start) > end)
-                cache_remove(m);
-        }
-    }
-}
-
-void cache_destroy(void)
-{
-    if (!cache.matches) return;
-    for (size_t i = 0; i < cache.size; i++) {
-        while (cache.matches[i])
-            cache_remove(cache.matches[i]);
-    }
-    cache.occupancy = 0;
-    delete(&cache.matches);
-    cache.size = 0;
 }
 
 //
@@ -243,7 +139,7 @@ match_t *next_match(def_t *defs, file_t *f, match_t *prev, pat_t *pat, pat_t *sk
     if (prev) {
         str = prev->end > prev->start ? prev->end : prev->end + 1;
         if (prev->refcount == 0) recycle_if_unused(&prev);
-        cache_prune(str, f->end);
+        cache_prune(f, str, f->end);
     } else {
         str = f->start;
     }
@@ -470,20 +366,24 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
             file_t slice;
             slice_file(&slice, f, f->start, str);
             for (const char *pos = &str[-(long)back->min_matchlen];
-              pos >= f->start && (back->max_matchlen == -1 || pos >= &str[-(long)back->max_matchlen]);
+              pos >= f->start && (back->max_matchlen == -1 || pos >= &str[-(int)back->max_matchlen]);
               pos = prev_char(f, pos)) {
+                cache_destroy(&slice);
                 slice.start = (char*)pos;
                 match_t *m = match(defs, &slice, pos, back, ignorecase);
                 // Match should not go past str (i.e. (<"AB" "B") should match "ABB", but not "AB")
                 if (m && m->end != str)
                     recycle_if_unused(&m);
-                else if (m)
+                else if (m) {
+                    cache_destroy(&slice);
                     return new_match(defs, pat, str, str, MATCHES(m));
+                }
                 if (pos == f->start) break;
                 // To prevent extreme performance degradation, don't keep
                 // walking backwards endlessly over newlines.
                 if (back->max_matchlen == -1 && *pos == '\n') break;
             }
+            cache_destroy(&slice);
             return NULL;
         }
         case BP_BEFORE: {
@@ -548,9 +448,11 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
             match_t *m2 = next_match(defs, &slice, NULL, pat->args.multiple.second, NULL, ignorecase);
             if ((!m2 && pat->type == BP_MATCH) || (m2 && pat->type == BP_NOT_MATCH)) {
                 if (m2) recycle_if_unused(&m2);
+                cache_destroy(&slice);
                 recycle_if_unused(&m1);
                 return NULL;
             }
+            cache_destroy(&slice);
             return new_match(defs, pat, m1->start, m1->end, (pat->type == BP_MATCH) ? MATCHES(m2) : NULL);
         }
         case BP_REPLACE: {
@@ -562,8 +464,9 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
             return new_match(defs, pat, str, p ? p->end : str, MATCHES(p));
         }
         case BP_REF: {
-            match_t *cached = cache_lookup(defs, str, pat);
-            if (cached) return cached->end == NULL ? NULL : cached;
+            match_t *cached;
+            if (cache_get(f, defs, str, pat, &cached))
+                return cached;
 
             def_t *def = lookup(defs, pat->args.ref.len, pat->args.ref.name);
             if (def == NULL)
@@ -593,8 +496,7 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
             const char *prev = str;
             match_t *m = match(&defs2, f, str, ref, ignorecase);
             if (m == NULL) {
-                // Store placeholder:
-                cache_save(new_match(defs, pat, str, NULL, NULL));
+                cache_save(f, defs, str, pat, NULL);
                 return NULL;
             }
 
@@ -618,7 +520,7 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
             // results.
             // OPTIMIZE: remove this if necessary
             match_t *wrap = new_match(defs, pat, m->start, m->end, MATCHES(m));
-            cache_save(wrap);
+            cache_save(f, defs, str, pat, wrap);
 
             if (rec_op.args.leftrec.match)
                 remove_ownership(&rec_op.args.leftrec.match);
@@ -717,7 +619,7 @@ match_t *get_capture(match_t *m, const char **id)
 //
 // Return a match object which can be used (may be allocated or recycled).
 //
-static match_t *new_match(def_t *defs, pat_t *pat, const char *start, const char *end, match_t *children[])
+match_t *new_match(def_t *defs, pat_t *pat, const char *start, const char *end, match_t *children[])
 {
     match_t *m;
     if (unused_matches) {
