@@ -453,7 +453,7 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
                 return NULL;
             }
             cache_destroy(&slice);
-            return new_match(defs, pat, m1->start, m1->end, (pat->type == BP_MATCH) ? MATCHES(m2) : NULL);
+            return new_match(defs, pat, m1->start, m1->end, (pat->type == BP_MATCH) ? MATCHES(m1, m2) : NULL);
         }
         case BP_REPLACE: {
             match_t *p = NULL;
