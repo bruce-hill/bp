@@ -543,10 +543,9 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
             }
 
             // Subsequent indentation:
-            while (*str == '\n') ++str;
-            for (int i = 0; i < dents; i++) {
-                if (str[i] != denter || &str[i] >= f->end) return NULL;
-            }
+            while (*str == '\n' || *str == '\n') ++str;
+            for (int i = 0; i < dents; i++)
+                if (&str[i] >= f->end || str[i] != denter) return NULL;
 
             return new_match(defs, pat, start, &str[dents], NULL);
         }
