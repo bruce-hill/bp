@@ -8,6 +8,8 @@
 #include "utf8.h"
 
 #define ARRAY_LEN(a) (sizeof(a)/sizeof((a)[0]))
+#define likely(x) __builtin_expect((x), 1)
+#define unlikely(x) __builtin_expect((x), 0)
 
 static const uint32_t XID_Start[][2] = {
     {0x0041,0x005A}, {0x0061,0x007A}, {0x00AA,0x00AA}, {0x00B5,0x00B5}, {0x00BA,0x00BA}, {0x00C0,0x00D6}, {0x00D8,0x00F6}, {0x00F8,0x01BA},
@@ -181,15 +183,15 @@ static const uint32_t XID_Continue_only[][2] = {
 //
 const char *next_char(file_t *f, const char *str)
 {
-    if (__builtin_expect(str+1 <= f->end && (str[0] & 0x80) == 0x0, 1))
+    if (likely(str+1 <= f->end) && likely((str[0] & 0x80) == 0x0))
         return str+1;
-    if (__builtin_expect(str+2 <= f->end && (str[0] & 0xe0) == 0xc0, 1))
+    if (likely(str+2 <= f->end) && (str[0] & 0xe0) == 0xc0)
         return str+2;
-    if (__builtin_expect(str+3 <= f->end && (str[0] & 0xf0) == 0xe0, 1))
+    if (likely(str+3 <= f->end) && (str[0] & 0xf0) == 0xe0)
         return str+3;
-    if (__builtin_expect(str+4 <= f->end && (str[0] & 0xf8) == 0xf0, 1))
+    if (likely(str+4 <= f->end) && (str[0] & 0xf8) == 0xf0)
         return str+4;
-    return __builtin_expect(str+1 <= f->end, 1) ? str+1 : f->end;
+    return likely(str+1 <= f->end) ? str+1 : f->end;
 }
 
 //
@@ -198,15 +200,15 @@ const char *next_char(file_t *f, const char *str)
 //
 const char *prev_char(file_t *f, const char *str)
 {
-    if (__builtin_expect(str-1 >= f->start && (str[-1] & 0x80) == 0x0, 1))
+    if (likely(str-1 >= f->start) && likely((str[-1] & 0x80) == 0x0))
         return str-1;
-    if (__builtin_expect(str-2 >= f->start && (str[-2] & 0xe0) == 0xc0, 1))
+    if (likely(str-2 >= f->start) && (str[-2] & 0xe0) == 0xc0)
         return str-2;
-    if (__builtin_expect(str-3 >= f->start && (str[-3] & 0xf0) == 0xe0, 1))
+    if (likely(str-3 >= f->start) && (str[-3] & 0xf0) == 0xe0)
         return str-3;
-    if (__builtin_expect(str-4 >= f->start && (str[-4] & 0xf8) == 0xf0, 1))
+    if (likely(str-4 >= f->start) && (str[-4] & 0xf8) == 0xf0)
         return str-4;
-    return __builtin_expect(str-1 >= f->start, 1) ? str-1 : f->start;
+    return likely(str-1 >= f->start) ? str-1 : f->start;
 }
 
 static uint32_t get_codepoint(file_t *f, const char *str)
@@ -217,9 +219,8 @@ static uint32_t get_codepoint(file_t *f, const char *str)
     unsigned char c1 = (unsigned char)str[0];
     int seqlen;
     uint32_t codepoint;
-    if ((c1 & 0x80) == 0) {
-        codepoint = (uint32_t) (c1 & 0x7F);
-        seqlen = 1;
+    if (likely((c1 & 0x80) == 0)) {
+        return (uint32_t) c1;
     } else if ((c1 & 0xE0) == 0xC0) {
         codepoint = (uint32_t) (c1 & 0x1F);
         seqlen = 2;
@@ -234,7 +235,7 @@ static uint32_t get_codepoint(file_t *f, const char *str)
     }
 
     for (int i = 1; i < seqlen; ++i) {
-        if (&str[i] >= f->end || (str[i] & 0xC0) != 0x80)
+        if (unlikely(&str[i] >= f->end || (str[i] & 0xC0) != 0x80))
             return (uint32_t)-1;
         codepoint = ((codepoint << 6) | (uint32_t)(str[i] & 0x3F));
     }
@@ -260,9 +261,9 @@ static bool find_in_ranges(uint32_t codepoint, const uint32_t ranges[][2], size_
 
 bool isidstart(file_t *f, const char *str)
 {
-    if (__builtin_expect(str >= f->end, 0)) return false;
+    if (unlikely(str >= f->end)) return false;
     else if (isalpha(*str) || *str == '_') return true;
-    else if (__builtin_expect((unsigned char)*str < 0x80u, 1)) return false;
+    else if (likely((*str & 0x80) == 0)) return false;
     uint32_t codepoint = get_codepoint(f, str);
     return codepoint != (uint32_t)-1
         && find_in_ranges(codepoint, XID_Start, ARRAY_LEN(XID_Start));
@@ -270,9 +271,9 @@ bool isidstart(file_t *f, const char *str)
 
 bool isidcontinue(file_t *f, const char *str)
 {
-    if (__builtin_expect(str >= f->end, 0)) return false;
+    if (unlikely(str >= f->end)) return false;
     else if (isalnum(*str) || *str == '_') return true;
-    else if (__builtin_expect((unsigned char)*str < 0x80u, 1)) return false;
+    else if (likely((*str & 0x80) == 0)) return false;
     uint32_t codepoint = get_codepoint(f, str);
     return codepoint != (uint32_t)-1
         && (find_in_ranges(codepoint, XID_Start, ARRAY_LEN(XID_Start))
