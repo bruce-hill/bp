@@ -129,6 +129,22 @@ Testing for these grammar files (other than `builtins`) is iffy at this point,
 so use at your own risk! These grammar files are only approximations of syntax.
 
 
+## Code Layout
+
+File            | Description
+----------------|-----------------------------------------------------
+[bp.c]          | The main program.
+[definitions.c] | Defining pattern rules.
+[explain.c]     | Printing a visual explanation of a match.
+[files.c]       | Loading files and match memoization.
+[json.c]        | JSON output of matches.
+[match.c]       | Pattern matching code (match a pattern against an input string).
+[pattern.c]     | Pattern loading code (build a pattern out of an input string).
+[print.c]       | Print pattern match results.
+[utf8.c]        | UTF-8 helper code.
+[utils.c]       | Miscellaneous helper functions.
+
+
 ## Performance
 
 Currently, `bp` is super slow compared to hyper-optimized regex tools like
