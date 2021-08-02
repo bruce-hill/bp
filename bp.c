@@ -45,13 +45,13 @@ static const char *usage = (
     " -j --json                        print matches as a list of JSON objects\n"
     " -i --ignore-case                 preform matching case-insensitively\n"
     " -I --inplace                     modify a file in-place\n"
-    " -C --confirm                     ask for confirmation on each replacement\n"
+    " -c --confirm                     ask for confirmation on each replacement\n"
     " -l --list-files                  list filenames only\n"
     " -p --pattern <pat>               provide a pattern (equivalent to bp '\\(<pat>)')\n"
     " -w --word <string-pat>           find words matching the given string pattern\n"
     " -r --replace <replacement>       replace the input pattern with the given replacement\n"
     " -s --skip <skip-pattern>         skip over the given pattern when looking for matches\n"
-    " -c --context <context>           set number of lines of context to print (all: the whole file, 0: only the match, 1: the line, N: N lines of context)\n"
+    " -C --context <context>           set number of lines of context to print (all: the whole file, 0: only the match, 1: the line, N: N lines of context)\n"
     " -f --format auto|fancy|plain     set the output format\n"
     " -g --grammar <grammar-file>      use the specified file as a grammar");
 
@@ -515,7 +515,7 @@ int main(int argc, char *argv[])
             options.mode = MODE_JSON;
         } else if (BOOLFLAG("-I") || BOOLFLAG("--inplace")) {
             options.mode = MODE_INPLACE;
-        } else if (BOOLFLAG("-C") || BOOLFLAG("--confirm")) {
+        } else if (BOOLFLAG("-c") || BOOLFLAG("--confirm")) {
             options.confirm = CONFIRM_ASK;
         } else if (BOOLFLAG("-G") || BOOLFLAG("--git")) {
             options.git_mode = true;
@@ -566,7 +566,7 @@ int main(int argc, char *argv[])
                             "Failed to compile part of the skip argument");
             }
             options.skip = either_pat(arg_file, options.skip, s);
-        } else if (FLAG("-c")     || FLAG("--context")) {
+        } else if (FLAG("-C")     || FLAG("--context")) {
             if (streq(flag, "all")) {
                 options.context_lines = ALL_CONTEXT;
             } else if (streq(flag, "none")) {

@@ -42,7 +42,7 @@ themselves.
 : Perform filtering or replacement in-place (i.e. overwrite files with new
 content).
 
-`-C`, `--confirm`
+`-c`, `--confirm`
 : During in-place modification of a file, confirm before each modification.
 
 `-r`, `--replace` *replacement*
@@ -61,7 +61,7 @@ for more info.
 : Use `git` to get a list of files. Remaining file arguments (if any) are
 passed to `git --ls-files` instead of treated as literal files.
 
-`-c`, `--context` *N*
+`-C`, `--context` *N*
 : The number of lines of context to print. If *N* is 0, print only the
 exact text of the matches. If *N* is **"all"**, print the entire file.
 Otherwise, if *N* is a positive integer, print the whole line on which

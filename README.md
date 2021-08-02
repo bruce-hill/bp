@@ -15,14 +15,14 @@ It's written in pure C with no dependencies.
 * `-v` `--verbose` print verbose debugging info
 * `-i` `--ignore-case` perform a case-insensitive match
 * `-I` `--inplace` perform replacements or filtering in-place on files
-* `-C` `--confirm` during replacement, confirm before each replacement
+* `-c` `--confirm` during replacement, confirm before each replacement
 * `-e` `--explain` print an explanation of the matches
 * `-j` `--json` print matches as JSON objects
 * `-l` `--list-files` print only filenames containing matches
 * `-p` `--pattern <pat>` provide a pattern (equivalent to `bp '\(<pat>)'`)
 * `-r` `--replace <replacement>` replace the input pattern with the given replacement
 * `-s` `--skip <skip pattern>` skip over the given pattern when looking for matches
-* `-c` `--context <N>` change how many lines of context are printed (`0`: no context, `all`: the whole file, `<N>` matching lines and `<N-1>` lines before/after)
+* `-C` `--context <N>` change how many lines of context are printed (`0`: no context, `all`: the whole file, `<N>` matching lines and `<N-1>` lines before/after)
 * `-g` `--grammar <grammar file>` use the specified file as a grammar
 * `-G` `--git` get filenames from git
 * `-f` `--format` `auto|plain|fancy` set the output format (`fancy` includes colors and line numbers)
