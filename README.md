@@ -147,19 +147,20 @@ File                           | Description
 
 ## Performance
 
-Currently, `bp` is super slow compared to hyper-optimized regex tools like
-`grep` and `ripgrep`. `bp` is **not** matching regular expressions, so this is
-not strictly a fair comparison. By definition, regular expressions can be
-implemented using finite state machines, which are very efficient. Most regex
-tools also add the additional restriction that matches must be within a single
-line. `bp` on the other hand, uses parsing expression grammars, which can match
-arbitrarily complicated or nested structures, requiring a dynamic call stack
-and potentially unbounded memory use. This makes `bp` patterns much more
-expressive, but harder to optimize. At this point in time, `bp`'s
-implementation also uses a fairly naive virtual machine written in C, which is
-not very heavily optimized. As a result, `bp` runs quite fast over thousands of
-lines of code, reasonably fast over tens of thousands of lines of code, and
-pretty slow over millions of lines of code.
+Currently, `bp`'s speed is comparable to hyper-optimized regex tools like
+`grep`, `ag`, and `ripgrep` when it comes to simple patterns that begin with
+string literals, but `bp`'s performance may be noticeably slower for complex
+patterns on large quantities of text. The aforementioned regular expression
+tools are usually implemented as efficient finite state machines, but `bp` is
+more expressive and capable of matching arbitrarily nested patterns, which
+precludes the possibility of using a finite state machine. Instead, `bp` uses a
+fairly simple recursive virtual machine implementation with memoization. `bp`
+also has a decent amount of overhead because of the metadata used for
+visualizing and explaining pattern matches, as well as performing string
+replacements. Overall, I would say that `bp` is a great drop-in replacement for
+common shell scripting tasks, but you may want to keep the other tools around
+in case you have to search through a truly massive codebase for something
+complex.
 
 
 ## License
