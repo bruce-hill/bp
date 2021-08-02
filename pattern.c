@@ -197,9 +197,7 @@ static pat_t *bp_simplepattern(file_t *f, const char *str)
 {
     pat_t *pat = _bp_simplepattern(f, str);
     if (pat == NULL) return pat;
-
-    if (pat->end == NULL)
-        errx(EXIT_FAILURE, "pat->end is uninitialized!");
+    str = pat->end;
 
     // Expand postfix operators (if any)
     while (str < f->end) {
