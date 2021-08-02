@@ -133,8 +133,8 @@ so use at your own risk! These grammar files are only approximations of syntax.
 
 File            | Description
 ----------------|-----------------------------------------------------
-[bp.c]          | The main program.
-[definitions.c] | Defining pattern rules.
+[bp.c]()          | The main program.
+[](definitions.c) | Defining pattern rules.
 [explain.c]     | Printing a visual explanation of a match.
 [files.c]       | Loading files and match memoization.
 [json.c]        | JSON output of matches.
