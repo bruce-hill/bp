@@ -62,15 +62,22 @@ Use \f[B]git\f[R] to get a list of files.
 Remaining file arguments (if any) are passed to \f[B]git --ls-files\f[R]
 instead of treated as literal files.
 .TP
+\f[B]-B\f[R], \f[B]--context-before\f[R] \f[I]N\f[R]
+The number of lines of context to print before each match (default: 0).
+See \f[B]--context\f[R] below for details on \f[B]none\f[R] or
+\f[B]all\f[R].
+.TP
+\f[B]-A\f[R], \f[B]--context-after\f[R] \f[I]N\f[R]
+The number of lines of context to print after each match (default: 0).
+See \f[B]--context\f[R] below for details on \f[B]none\f[R] or
+\f[B]all\f[R].
+.TP
 \f[B]-C\f[R], \f[B]--context\f[R] \f[I]N\f[R]
-The number of lines of context to print.
-If \f[I]N\f[R] is 0, print only the exact text of the matches.
-If \f[I]N\f[R] is \f[B]\[lq]all\[rq]\f[R], print the entire file.
-Otherwise, if \f[I]N\f[R] is a positive integer, print the whole line on
-which matches occur, as well as the \f[I]N-1\f[R] lines before and after
-the match.
-The default value for this argument is \f[B]1\f[R] (print whole lines
-where matches occur).
+The number of lines to print before and after each match (default: 0).
+If \f[I]N\f[R] is \f[B]none\f[R], print only the exact text of the
+matches.
+If \f[I]N\f[R] is \f[B]\[lq]all\[rq]\f[R], print all text before and
+after each match.
 .TP
 \f[B]-f\f[R], \f[B]--format\f[R] \f[I]auto\f[R]|\f[I]fancy\f[R]|\f[I]plain\f[R]
 Set the output format.

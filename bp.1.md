@@ -61,13 +61,19 @@ for more info.
 : Use `git` to get a list of files. Remaining file arguments (if any) are
 passed to `git --ls-files` instead of treated as literal files.
 
+`-B`, `--context-before` *N*
+: The number of lines of context to print before each match (default: 0). See
+`--context` below for details on `none` or `all`.
+
+`-A`, `--context-after` *N*
+: The number of lines of context to print after each match (default: 0). See
+`--context` below for details on `none` or `all`.
+
+
 `-C`, `--context` *N*
-: The number of lines of context to print. If *N* is 0, print only the
-exact text of the matches. If *N* is **"all"**, print the entire file.
-Otherwise, if *N* is a positive integer, print the whole line on which
-matches occur, as well as the *N-1* lines before and after the match. The
-default value for this argument is **1** (print whole lines where matches
-occur).
+: The number of lines to print before and after each match (default: 0). If *N*
+is `none`, print only the exact text of the matches. If *N* is **"all"**, print
+all text before and after each match.
 
 `-f`, `--format` *auto*\|*fancy*\|*plain*
 : Set the output format. *fancy* includes colors and line numbers, *plain*

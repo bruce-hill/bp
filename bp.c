@@ -51,7 +51,9 @@ static const char *usage = (
     " -w --word <string-pat>           find words matching the given string pattern\n"
     " -r --replace <replacement>       replace the input pattern with the given replacement\n"
     " -s --skip <skip-pattern>         skip over the given pattern when looking for matches\n"
-    " -C --context <context>           set number of lines of context to print (all: the whole file, 0: only the match, 1: the line, N: N lines of context)\n"
+    " -B --context-before <n>          set number of lines of context to print before the match\n"
+    " -B --context-after <n>           set number of lines of context to print after the match\n"
+    " -C --context <context>           set number of lines of context to print before and after the match\n"
     " -f --format auto|fancy|plain     set the output format\n"
     " -g --grammar <grammar-file>      use the specified file as a grammar");
 
@@ -60,17 +62,16 @@ static const char *usage = (
 
 // Flag-configurable options:
 typedef enum { CONFIRM_ASK, CONFIRM_ALL, CONFIRM_NONE } confirm_t;
-#define USE_DEFAULT_CONTEXT -2
-#define ALL_CONTEXT -1
 static struct {
-    int context_lines;
+    int context_before, context_after;
     bool ignorecase, verbose, git_mode;
     confirm_t confirm;
     enum { MODE_NORMAL, MODE_LISTFILES, MODE_INPLACE, MODE_JSON, MODE_EXPLAIN } mode;
     enum { FORMAT_AUTO, FORMAT_FANCY, FORMAT_PLAIN } format;
     pat_t *skip;
 } options = {
-    .context_lines = USE_DEFAULT_CONTEXT,
+    .context_before = USE_DEFAULT_CONTEXT,
+    .context_after = USE_DEFAULT_CONTEXT,
     .ignorecase = false,
     .verbose = false,
     .confirm = CONFIRM_ALL,
@@ -240,15 +241,17 @@ static void confirm_replacements(file_t *f, match_t *m, confirm_t *confirm)
         }
 
         { // Print the original
-            printer_t pr = {.file = f, .context_lines = options.context_lines,
+            printer_t pr = {.file = f, .context_before = options.context_before,
+                .context_after = options.context_after,
                 .use_color = true, .print_line_numbers = true};
             print_match(tty_out, &pr, m->children[0]);
             // Print trailing context lines:
             print_match(tty_out, &pr, NULL);
         }
-        if (options.context_lines > 1) fprintf(tty_out, "\n");
+        if (options.context_before > 1 || options.context_after > 1) fprintf(tty_out, "\n");
         { // Print the replacement
-            printer_t pr = {.file = f, .context_lines = options.context_lines,
+            printer_t pr = {.file = f, .context_before = options.context_before,
+                .context_after = options.context_after,
                 .use_color = true, .print_line_numbers = true};
             print_match(tty_out, &pr, m);
             // Print trailing context lines:
@@ -295,7 +298,8 @@ static int inplace_modify_file(def_t *defs, file_t *f, pat_t *pattern)
 
     printer_t pr = {
         .file = f,
-        .context_lines = ALL_CONTEXT,
+        .context_before = ALL_CONTEXT,
+        .context_after = ALL_CONTEXT,
         .use_color = false,
         .print_line_numbers = false,
     };
@@ -306,8 +310,7 @@ static int inplace_modify_file(def_t *defs, file_t *f, pat_t *pattern)
     match_t *m = NULL;
     while ((m = next_match(defs, f, m, pattern, options.skip, options.ignorecase))) {
         ++matches;
-        printer_t err_pr = {.file = f, .context_lines = 1, .use_color = true, .print_line_numbers = true};
-        if (print_errors(&err_pr, m) > 0)
+        if (print_errors(f, m) > 0)
             exit(EXIT_FAILURE);
         // Lazy-open file for writing upon first match:
         if (dest == NULL) {
@@ -346,15 +349,15 @@ static int print_matches(def_t *defs, file_t *f, pat_t *pattern)
     int matches = 0;
     printer_t pr = {
         .file = f,
-        .context_lines = options.context_lines,
+        .context_before = options.context_before,
+        .context_after = options.context_after,
         .use_color = options.format == FORMAT_FANCY,
         .print_line_numbers = options.format == FORMAT_FANCY,
     };
 
     match_t *m = NULL;
     while ((m = next_match(defs, f, m, pattern, options.skip, options.ignorecase))) {
-        printer_t err_pr = {.file = f, .context_lines = 1, .use_color = true, .print_line_numbers = true};
-        if (print_errors(&err_pr, m) > 0)
+        if (print_errors(f, m) > 0)
             exit(EXIT_FAILURE);
 
         if (++matches == 1) {
@@ -482,6 +485,16 @@ static int process_git_files(def_t *defs, pat_t *pattern, int argc, char *argv[]
     return found;
 }
 
+//
+// Convert a context string to an integer
+//
+static int context_from_flag(const char *flag)
+{
+    if (streq(flag, "all")) return ALL_CONTEXT;
+    if (streq(flag, "none")) return NO_CONTEXT;
+    return (int)strtol(flag, NULL, 10);
+}
+
 #define FLAG(f) (flag = get_flag(argv, f, &argv))
 #define BOOLFLAG(f) get_boolflag(argv, f, &argv)
 
@@ -567,15 +580,11 @@ int main(int argc, char *argv[])
             }
             options.skip = either_pat(arg_file, options.skip, s);
         } else if (FLAG("-C")     || FLAG("--context")) {
-            if (streq(flag, "all")) {
-                options.context_lines = ALL_CONTEXT;
-            } else if (streq(flag, "none")) {
-                options.context_lines = 0;
-            } else {
-                options.context_lines = (int)strtol(flag, &flag, 10);
-                if (flag && flag[0])
-                    errx(EXIT_FAILURE, "Unsupported flags after --context: %s", flag);
-            }
+            options.context_before = options.context_after = context_from_flag(flag);
+        } else if (FLAG("-B")     || FLAG("--before-context")) {
+            options.context_before = context_from_flag(flag);
+        } else if (FLAG("-A")     || FLAG("--after-context")) {
+            options.context_after = context_from_flag(flag);
         } else if (FLAG("-f")      || FLAG("--format")) {
             options.format = streq(flag, "fancy") ? FORMAT_FANCY : streq(flag, "plain") ? FORMAT_PLAIN : FORMAT_AUTO;
         } else if (argv[0][0] == '-' && argv[0][1] && argv[0][1] != '-') { // single-char flags
@@ -600,8 +609,8 @@ int main(int argc, char *argv[])
 
     for (argc = 0; argv[argc]; ++argc) ; // update argc
 
-    if (options.context_lines == USE_DEFAULT_CONTEXT) options.context_lines = 1;
-    if (options.context_lines < 0 && options.context_lines != ALL_CONTEXT) options.context_lines = 0;
+    if (options.context_before == USE_DEFAULT_CONTEXT) options.context_before = 0;
+    if (options.context_after == USE_DEFAULT_CONTEXT) options.context_after = 0;
 
     if (options.format == FORMAT_AUTO)
         options.format = isatty(STDOUT_FILENO) ? FORMAT_FANCY : FORMAT_PLAIN;

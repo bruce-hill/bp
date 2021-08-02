@@ -22,7 +22,9 @@ It's written in pure C with no dependencies.
 * `-p` `--pattern <pat>` provide a pattern (equivalent to `bp '\(<pat>)'`)
 * `-r` `--replace <replacement>` replace the input pattern with the given replacement
 * `-s` `--skip <skip pattern>` skip over the given pattern when looking for matches
-* `-C` `--context <N>` change how many lines of context are printed (`0`: no context, `all`: the whole file, `<N>` matching lines and `<N-1>` lines before/after)
+* `-B` `--context-before <N>` change how many lines of context are printed before each match
+* `-B` `--context-after <N>` change how many lines of context are printed after each match
+* `-C` `--context <N>` change how many lines of context are printed before and after each match
 * `-g` `--grammar <grammar file>` use the specified file as a grammar
 * `-G` `--git` get filenames from git
 * `-f` `--format` `auto|plain|fancy` set the output format (`fancy` includes colors and line numbers)

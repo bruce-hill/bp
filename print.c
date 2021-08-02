@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include "files.h"
 #include "match.h"
 #include "print.h"
 #include "types.h"
@@ -69,12 +70,12 @@ static void print_between(FILE *out, printer_t *pr, const char *start, const cha
 //
 static const char *context_before(printer_t *pr, const char *pos)
 {
-    if (pr->context_lines == -1) {
+    if (pr->context_before == ALL_CONTEXT) {
         return pr->pos;
-    } else if (pr->context_lines > 0) {
+    } else if (pr->context_before >= 0) {
         size_t n = get_line_number(pr->file, pos);
-        if (n >= (size_t)((pr->context_lines - 1) + 1))
-            n -= (size_t)(pr->context_lines - 1);
+        if (n >= (size_t)(pr->context_before + 1))
+            n -= (size_t)pr->context_before;
         else
             n = 1;
         const char *sol = get_line(pr->file, n);
@@ -91,10 +92,10 @@ static const char *context_before(printer_t *pr, const char *pos)
 //
 static const char *context_after(printer_t *pr, const char *pos)
 {
-    if (pr->context_lines == -1) {
+    if (pr->context_after == ALL_CONTEXT) {
         return pr->file->end;
-    } else if (pr->context_lines > 0) {
-        size_t n = get_line_number(pr->file, pos) + (size_t)(pr->context_lines - 1);
+    } else if (pr->context_after >= 0) {
+        size_t n = get_line_number(pr->file, pos) + (size_t)pr->context_after;
         const char *eol = get_line(pr->file, n+1);
         return eol ? eol : pr->file->end;
     } else {
@@ -221,7 +222,7 @@ void print_match(FILE *out, printer_t *pr, match_t *m)
         if (!first) {
             // When not printing context lines, print each match on its own
             // line instead of jamming them all together:
-            if (pr->context_lines == 0 && (!pr->needs_line_number || !pr->print_line_numbers)) {
+            if (pr->context_before == NO_CONTEXT && pr->context_after == NO_CONTEXT && (!pr->needs_line_number || !pr->print_line_numbers)) {
                 fprintf(out, "\n");
                 pr->needs_line_number = 1;
             }
@@ -233,7 +234,7 @@ void print_match(FILE *out, printer_t *pr, match_t *m)
             } else {
                 // Non-overlapping ranges:
                 print_between(out, pr, pr->pos, after_last, pr->use_color ? color_normal : NULL);
-                if (pr->context_lines > 1)
+                if (pr->context_before > 0 || pr->context_after > 0)
                     fprintf(out, "\n"); // Gap between chunks
             }
         }
@@ -253,19 +254,19 @@ void print_match(FILE *out, printer_t *pr, match_t *m)
 // Print any errors that are present in the given match object to stderr and
 // return the number of errors found.
 //
-int print_errors(printer_t *pr, match_t *m)
+int print_errors(file_t *f, match_t *m)
 {
     int ret = 0;
     if (m->pat->type == BP_ERROR) {
         fprintf(stderr, "\033[31;1m");
-        printer_t tmp = {.file = pr->file}; // No bells and whistles
+        printer_t tmp = {.file = f, .context_before=NO_CONTEXT, .context_after=NO_CONTEXT}; // No bells and whistles
         print_match(stderr, &tmp, m); // Error message
         fprintf(stderr, "\033[0m\n");
-        fprint_line(stderr, pr->file, m->start, m->end, " ");
+        fprint_line(stderr, f, m->start, m->end, " ");
         return 1;
     }
     for (int i = 0; m->children && m->children[i]; i++)
-        ret += print_errors(pr, m->children[i]);
+        ret += print_errors(f, m->children[i]);
     return ret;
 }
 
