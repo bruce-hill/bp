@@ -21,10 +21,10 @@
 #include <unistd.h>
 
 #include "definitions.h"
+#include "explain.h"
 #include "files.h"
 #include "json.h"
 #include "match.h"
-#include "matchviz.h"
 #include "pattern.h"
 #include "print.h"
 #include "utils.h"
@@ -188,12 +188,11 @@ static int explain_matches(def_t *defs, file_t *f, pat_t *pattern)
     int matches = 0;
     match_t *m = NULL;
     while ((m = next_match(defs, f, m, pattern, options.skip, options.ignorecase))) {
-        if (++matches == 1) {
+        if (++matches == 1)
             fprint_filename(stdout, f->filename);
-        } else {
+        else
             printf("\n\n");
-        }
-        visualize_match(m);
+        explain_match(m);
     }
     if (m) recycle_if_unused(&m);
     return matches;

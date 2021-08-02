@@ -1,11 +1,10 @@
 //
-// debugviz.c - Debug visualization of pattern matches.
+// explain.c - Debug visualization of pattern matches.
 //
 
 #include <stdio.h>
 #include <string.h>
 
-#include "matchviz.h"
 #include "types.h"
 #include "utils.h"
 
@@ -17,7 +16,7 @@ typedef struct match_node_s {
 __attribute__((nonnull, pure))
 static int height_of_match(match_t *m);
 __attribute__((nonnull))
-static void _visualize_matches(match_node_t *firstmatch, int depth, const char *text, size_t textlen);
+static void _explain_matches(match_node_t *firstmatch, int depth, const char *text, size_t textlen);
 
 //
 // Return the height of a match object (i.e. the number of descendents of the
@@ -37,7 +36,7 @@ static int height_of_match(match_t *m)
 //
 // Print a visual explanation for the as-yet-unprinted matches provided.
 //
-static void _visualize_matches(match_node_t *firstmatch, int depth, const char *text, size_t textlen)
+static void _explain_matches(match_node_t *firstmatch, int depth, const char *text, size_t textlen)
 {
     const char *V = "│"; // Vertical bar
     const char *H = "─"; // Horizontal bar
@@ -152,7 +151,7 @@ static void _visualize_matches(match_node_t *firstmatch, int depth, const char *
     printf("\n");
 
     if (children)
-        _visualize_matches(children, depth+1, text, textlen);
+        _explain_matches(children, depth+1, text, textlen);
 
     for (match_node_t *c = children, *next = NULL; c; c = next) {
         next = c->next;
@@ -163,10 +162,10 @@ static void _visualize_matches(match_node_t *firstmatch, int depth, const char *
 //
 // Print a visualization of a match object.
 //
-void visualize_match(match_t *m)
+void explain_match(match_t *m)
 {
     printf("\033[?7l"); // Disable line wrapping
     match_node_t first = {.m = m};
-    _visualize_matches(&first, 0, m->start, (size_t)(m->end - m->start));
+    _explain_matches(&first, 0, m->start, (size_t)(m->end - m->start));
     printf("\033[?7h"); // Re-enable line wrapping
 }
