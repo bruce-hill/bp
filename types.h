@@ -114,11 +114,6 @@ typedef struct match_s {
     match_dll_t gc, cache;
     size_t defs_id;
     int refcount;
-    // If skip_replacement is set to 1, that means the user wants to not print
-    // the replaced text when printing this match:
-    // TODO: this is a bit hacky, there is probably a better way to go about
-    // this but it's less hacky that mutating the match objects more drastically
-    bool skip_replacement:1;
     struct match_s **children;
     struct match_s *_children[3];
 } match_t;

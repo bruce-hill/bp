@@ -15,7 +15,6 @@ It's written in pure C with no dependencies.
 * `-v` `--verbose` print verbose debugging info
 * `-i` `--ignore-case` perform a case-insensitive match
 * `-I` `--inplace` perform replacements or filtering in-place on files
-* `-c` `--confirm` during replacement, confirm before each replacement
 * `-e` `--explain` print an explanation of the matches
 * `-j` `--json` print matches as JSON objects
 * `-l` `--list-files` print only filenames containing matches

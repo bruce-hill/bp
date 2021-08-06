@@ -110,10 +110,6 @@ static void _print_match(FILE *out, printer_t *pr, match_t *m)
 {
     pr->pos = m->start;
     if (m->pat->type == BP_REPLACE) {
-        if (m->skip_replacement) {
-            _print_match(out, pr, m->children[0]);
-            return;
-        }
         size_t line = get_line_number(pr->file, m->start);
         size_t line_end = get_line_number(pr->file, m->end);
 

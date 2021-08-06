@@ -45,7 +45,6 @@ static const char *usage = (
     " -j --json                        print matches as a list of JSON objects\n"
     " -i --ignore-case                 preform matching case-insensitively\n"
     " -I --inplace                     modify a file in-place\n"
-    " -c --confirm                     ask for confirmation on each replacement\n"
     " -l --list-files                  list filenames only\n"
     " -p --pattern <pat>               provide a pattern (equivalent to bp '\\(<pat>)')\n"
     " -w --word <string-pat>           find words matching the given string pattern\n"
@@ -61,11 +60,9 @@ static const char *usage = (
 #define CHECK_FIRST_N_BYTES 256
 
 // Flag-configurable options:
-typedef enum { CONFIRM_ASK, CONFIRM_ALL, CONFIRM_NONE } confirm_t;
 static struct {
     int context_before, context_after;
     bool ignorecase, verbose, git_mode;
-    confirm_t confirm;
     enum { MODE_NORMAL, MODE_LISTFILES, MODE_INPLACE, MODE_JSON, MODE_EXPLAIN } mode;
     enum { FORMAT_AUTO, FORMAT_FANCY, FORMAT_PLAIN } format;
     pat_t *skip;
@@ -74,7 +71,6 @@ static struct {
     .context_after = USE_DEFAULT_CONTEXT,
     .ignorecase = false,
     .verbose = false,
-    .confirm = CONFIRM_ALL,
     .mode = MODE_NORMAL,
     .format = FORMAT_AUTO,
     .skip = NULL,
@@ -83,9 +79,6 @@ static struct {
 // If a file is partly through being modified when the program exits, restore it from backup.
 static FILE *modifying_file = NULL;
 static file_t *backup_file;
-
-// Used for user input/output that doesn't interfere with unix pipeline
-static FILE *tty_out = NULL, *tty_in = NULL;
 
 //
 // Helper function to reduce code duplication
@@ -227,63 +220,6 @@ static void sig_handler(int sig)
 }
 
 //
-// Present the user with a prompt to confirm replacements before they happen.
-// If the user rejects a replacement, the match object is set to the underlying
-// non-replacement value.
-//
-static void confirm_replacements(file_t *f, match_t *m, confirm_t *confirm)
-{
-    if (*confirm == CONFIRM_ALL) return;
-    if (m->pat->type == BP_REPLACE) {
-        if (*confirm == CONFIRM_NONE) {
-            m->skip_replacement = true;
-            goto check_children;
-        }
-
-        { // Print the original
-            printer_t pr = {.file = f, .context_before = options.context_before,
-                .context_after = options.context_after,
-                .use_color = true, .print_line_numbers = true};
-            print_match(tty_out, &pr, m->children[0]);
-            // Print trailing context lines:
-            print_match(tty_out, &pr, NULL);
-        }
-        if (options.context_before > 1 || options.context_after > 1) fprintf(tty_out, "\n");
-        { // Print the replacement
-            printer_t pr = {.file = f, .context_before = options.context_before,
-                .context_after = options.context_after,
-                .use_color = true, .print_line_numbers = true};
-            print_match(tty_out, &pr, m);
-            // Print trailing context lines:
-            print_match(tty_out, &pr, NULL);
-        }
-
-      retry:
-        fprintf(tty_out, "\033[1mReplace? (y)es (n)o (r)emaining (d)one\033[0m ");
-        (void)fflush(tty_out);
-
-        char *answer = NULL;
-        size_t len = 0;
-        if (getline(&answer, &len, tty_in) > 0) {
-            if (strlen(answer) > 2) goto retry;
-            switch (answer[0]) {
-                case 'y': case '\n': break;
-                case 'n': m->skip_replacement = 1; break;
-                case 'r': *confirm = CONFIRM_ALL; break;
-                case 'd': m->skip_replacement = 1; *confirm = CONFIRM_NONE; break;
-                default: goto retry;
-            }
-        }
-        if (answer) delete(&answer);
-        fprintf(tty_out, "\n");
-    }
-
-  check_children:
-    for (int i = 0; m->children && m->children[i]; i++)
-        confirm_replacements(f, m->children[i], confirm);
-}
-
-//
 // Replace a file's contents with the text version of a match.
 // (Useful for replacements)
 //
@@ -306,7 +242,6 @@ static int inplace_modify_file(def_t *defs, file_t *f, pat_t *pattern)
 
     FILE *dest = NULL; // Lazy-open this on the first match
     int matches = 0;
-    confirm_t confirm_file = options.confirm;
     match_t *m = NULL;
     while ((m = next_match(defs, f, m, pattern, options.skip, options.ignorecase))) {
         ++matches;
@@ -317,10 +252,7 @@ static int inplace_modify_file(def_t *defs, file_t *f, pat_t *pattern)
             dest = check_nonnull(fopen(f->filename, "w"), "Failed to open %s for modification", f->filename);
             backup_file = f;
             modifying_file = dest;
-            if (options.confirm == CONFIRM_ASK && f->filename)
-                fprint_filename(tty_out, f->filename);
         }
-        confirm_replacements(f, m, &confirm_file);
         print_match(dest, &pr, m);
     }
     if (m) recycle_if_unused(&m);
@@ -328,8 +260,6 @@ static int inplace_modify_file(def_t *defs, file_t *f, pat_t *pattern)
     if (dest) {
         // Print trailing context lines:
         print_match(dest, &pr, NULL);
-        if (options.confirm == CONFIRM_ALL)
-            printf("%s\n", f->filename);
         (void)fclose(dest);
         if (modifying_file == dest) modifying_file = NULL;
         if (backup_file == f) backup_file = NULL;
@@ -528,8 +458,6 @@ int main(int argc, char *argv[])
             options.mode = MODE_JSON;
         } else if (BOOLFLAG("-I") || BOOLFLAG("--inplace")) {
             options.mode = MODE_INPLACE;
-        } else if (BOOLFLAG("-c") || BOOLFLAG("--confirm")) {
-            options.confirm = CONFIRM_ASK;
         } else if (BOOLFLAG("-G") || BOOLFLAG("--git")) {
             options.git_mode = true;
         } else if (BOOLFLAG("-i") || BOOLFLAG("--ignore-case")) {
@@ -560,6 +488,7 @@ int main(int argc, char *argv[])
             file_t *arg_file = spoof_file(&loaded_files, "<pattern argument>", flag, -1);
             pat_t *p = bp_pattern(arg_file, arg_file->start);
             if (!p) file_err(arg_file, arg_file->start, arg_file->end, "Failed to compile this part of the argument");
+            if (after_spaces(p->end, true) < arg_file->end) file_err(arg_file, p->end, arg_file->end, "Failed to compile this part of the argument");
             pattern = chain_together(arg_file, pattern, p);
         } else if (FLAG("-w")     || FLAG("--word")) {
             check_nonnegative(asprintf(&flag, "\\|%s\\|", flag), "Could not allocate memory");
@@ -604,9 +533,6 @@ int main(int argc, char *argv[])
     if (pattern == NULL)
         errx(EXIT_FAILURE, "No pattern provided.\n\n%s", usage);
 
-    if (options.confirm == CONFIRM_ASK && options.mode != MODE_INPLACE)
-        errx(EXIT_FAILURE, "Confirm mode (-C flag) can only be used with inplace mode (-I flag)");
-
     for (argc = 0; argv[argc]; ++argc) ; // update argc
 
     if (options.context_before == USE_DEFAULT_CONTEXT) options.context_before = 0;
@@ -624,13 +550,6 @@ int main(int argc, char *argv[])
 
     // Handle exit() calls gracefully:
     check_nonnegative(atexit(&cleanup), "Failed to set cleanup handler at exit");
-
-    // User input/output is handled through /dev/tty so that normal unix pipes
-    // can work properly while simultaneously asking for user input.
-    if (options.confirm == CONFIRM_ASK) {
-        tty_in = fopen("/dev/tty", "r");
-        tty_out = fopen("/dev/tty", "w");
-    }
 
     // No need for these caches anymore:
     for (file_t *f = loaded_files; f; f = f->next)
@@ -657,9 +576,6 @@ int main(int argc, char *argv[])
         found += process_file(defs, "", pattern);
     }
     if (options.mode == MODE_JSON) printf("]\n");
-
-    if (tty_out) { (void)fclose(tty_out); tty_out = NULL; }
-    if (tty_in) { (void)fclose(tty_in); tty_in = NULL; }
 
     // This code frees up all residual heap-allocated memory. Since the program
     // is about to exit, this step is unnecessary. However, it is useful for

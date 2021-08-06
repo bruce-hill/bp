@@ -42,9 +42,6 @@ themselves.
 : Perform filtering or replacement in-place (i.e. overwrite files with new
 content).
 
-`-c`, `--confirm`
-: During in-place modification of a file, confirm before each modification.
-
 `-r`, `--replace` *replacement*
 : Replace all occurrences of the main pattern with the given string.
 
