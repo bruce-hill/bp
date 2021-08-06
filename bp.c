@@ -62,7 +62,7 @@ static const char *usage = (
 // Flag-configurable options:
 static struct {
     int context_before, context_after;
-    bool ignorecase, verbose, git_mode;
+    bool ignorecase, verbose, git_mode, print_filenames;
     enum { MODE_NORMAL, MODE_LISTFILES, MODE_INPLACE, MODE_JSON, MODE_EXPLAIN } mode;
     enum { FORMAT_AUTO, FORMAT_FANCY, FORMAT_PLAIN } format;
     pat_t *skip;
@@ -70,6 +70,7 @@ static struct {
     .context_before = USE_DEFAULT_CONTEXT,
     .context_after = USE_DEFAULT_CONTEXT,
     .ignorecase = false,
+    .print_filenames = true,
     .verbose = false,
     .mode = MODE_NORMAL,
     .format = FORMAT_AUTO,
@@ -182,9 +183,10 @@ static int explain_matches(def_t *defs, file_t *f, pat_t *pattern)
     int matches = 0;
     match_t *m = NULL;
     while ((m = next_match(defs, f, m, pattern, options.skip, options.ignorecase))) {
-        if (++matches == 1)
-            fprint_filename(stdout, f->filename);
-        else
+        if (++matches == 1) {
+            if (options.print_filenames)
+                fprint_filename(stdout, f->filename);
+        } else
             printf("\n\n");
         explain_match(m);
     }
@@ -220,60 +222,9 @@ static void sig_handler(int sig)
 }
 
 //
-// Replace a file's contents with the text version of a match.
-// (Useful for replacements)
-//
-static int inplace_modify_file(def_t *defs, file_t *f, pat_t *pattern)
-{
-    file_t *inmem_copy = NULL;
-    // Ensure the file is resident in memory:
-    if (f->mmapped) {
-        inmem_copy = spoof_file(NULL, f->filename, f->start, (ssize_t)(f->end - f->start));
-        f = inmem_copy;
-    }
-
-    printer_t pr = {
-        .file = f,
-        .context_before = ALL_CONTEXT,
-        .context_after = ALL_CONTEXT,
-        .use_color = false,
-        .print_line_numbers = false,
-    };
-
-    FILE *dest = NULL; // Lazy-open this on the first match
-    int matches = 0;
-    match_t *m = NULL;
-    while ((m = next_match(defs, f, m, pattern, options.skip, options.ignorecase))) {
-        ++matches;
-        if (print_errors(f, m) > 0)
-            exit(EXIT_FAILURE);
-        // Lazy-open file for writing upon first match:
-        if (dest == NULL) {
-            dest = check_nonnull(fopen(f->filename, "w"), "Failed to open %s for modification", f->filename);
-            backup_file = f;
-            modifying_file = dest;
-        }
-        print_match(dest, &pr, m);
-    }
-    if (m) recycle_if_unused(&m);
-
-    if (dest) {
-        // Print trailing context lines:
-        print_match(dest, &pr, NULL);
-        (void)fclose(dest);
-        if (modifying_file == dest) modifying_file = NULL;
-        if (backup_file == f) backup_file = NULL;
-    }
-
-    if (inmem_copy != NULL) destroy_file(&inmem_copy);
-
-    return matches;
-}
-
-//
 // Print all the matches in a file.
 //
-static int print_matches(def_t *defs, file_t *f, pat_t *pattern)
+static int print_matches(FILE *out, def_t *defs, file_t *f, pat_t *pattern)
 {
     static int printed_filenames = 0;
     int matches = 0;
@@ -290,17 +241,17 @@ static int print_matches(def_t *defs, file_t *f, pat_t *pattern)
         if (print_errors(f, m) > 0)
             exit(EXIT_FAILURE);
 
-        if (++matches == 1) {
+        if (++matches == 1 && options.print_filenames) {
             if (printed_filenames++ > 0) printf("\n");
-            fprint_filename(stdout, f->filename);
+            fprint_filename(out, f->filename);
         }
-        print_match(stdout, &pr, m);
+        print_match(out, &pr, m);
     }
     if (m) recycle_if_unused(&m);
 
     if (matches > 0) {
         // Print trailing context lines:
-        print_match(stdout, &pr, NULL);
+        print_match(out, &pr, NULL);
     }
 
     return matches;
@@ -332,9 +283,17 @@ static int process_file(def_t *defs, const char *filename, pat_t *pattern)
     } else if (options.mode == MODE_JSON) {
         matches += print_matches_as_json(defs, f, pattern);
     } else if (options.mode == MODE_INPLACE) {
-        matches += inplace_modify_file(defs, f, pattern);
+        // Ensure the file is resident in memory:
+        if (f->mmapped) {
+            file_t *copy = spoof_file(NULL, f->filename, f->start, (ssize_t)(f->end - f->start));
+            destroy_file(&f);
+            f = copy;
+        }
+        FILE *out = fopen(filename, "w");
+        matches += print_matches(out, defs, f, pattern);
+        fclose(out);
     } else {
-        matches += print_matches(defs, f, pattern);
+        matches += print_matches(stdout, defs, f, pattern);
     }
     fflush(stdout);
 
@@ -458,6 +417,8 @@ int main(int argc, char *argv[])
             options.mode = MODE_JSON;
         } else if (BOOLFLAG("-I") || BOOLFLAG("--inplace")) {
             options.mode = MODE_INPLACE;
+            options.print_filenames = false;
+            options.format = FORMAT_PLAIN;
         } else if (BOOLFLAG("-G") || BOOLFLAG("--git")) {
             options.git_mode = true;
         } else if (BOOLFLAG("-i") || BOOLFLAG("--ignore-case")) {
