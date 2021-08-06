@@ -345,10 +345,11 @@ static int process_git_files(def_t *defs, pat_t *pattern, int argc, char *argv[]
     check_nonnegative(pipe(fds), "Failed to create pipe");
     pid_t child = check_nonnegative(fork(), "Failed to fork");
     if (child == 0) {
-        const char **git_args = new(char*[2+argc+1]);
+        const char **git_args = new(char*[3+argc+1]);
         int g = 0;
         git_args[g++] = "git";
         git_args[g++] = "ls-files";
+        git_args[g++] = "-z";
         while (*argv) git_args[g++] = *(argv++);
         check_nonnegative(dup2(fds[STDOUT_FILENO], STDOUT_FILENO), "Failed to hook up pipe to stdout");
         check_nonnegative(close(fds[STDIN_FILENO]), "Failed to close read end of pipe");
@@ -358,19 +359,16 @@ static int process_git_files(def_t *defs, pat_t *pattern, int argc, char *argv[]
     check_nonnegative(close(fds[STDOUT_FILENO]), "Failed to close write end of pipe");
     FILE *fp = check_nonnull(fdopen(fds[STDIN_FILENO], "r"), "Could not open pipe file descriptor");
     char *path = NULL;
-    size_t size = 0;
-    ssize_t len = 0;
+    size_t path_size = 0;
     int found = 0;
-    while ((len = getline(&path, &size, fp)) > 0) {
-        if (path[len-1] == '\n') path[len-1] = '\0';
+    while (getdelim(&path, &path_size, '\0', fp) > 0)
         found += process_file(defs, path, pattern);
-    }
     if (path) delete(&path);
     check_nonnegative(fclose(fp), "Failed to close read end of pipe");
     int status;
     while (waitpid(child, &status, 0) != child) continue;
     if (!((WIFEXITED(status) == 1) && (WEXITSTATUS(status) == 0)))
-        errx(EXIT_FAILURE, "`git --ls-files` failed. Do you have git installed?");
+        errx(EXIT_FAILURE, "`git ls-files -z` failed.");
     return found;
 }
 
