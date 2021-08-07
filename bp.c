@@ -290,7 +290,14 @@ static int process_file(def_t *defs, const char *filename, pat_t *pattern)
             f = copy;
         }
         FILE *out = fopen(filename, "w");
-        matches += print_matches(out, defs, f, pattern);
+        // Set these temporary values in case the program crashes while in the
+        // middle of inplace modifying a file. If that happens, these variables
+        // are used to restore the original file contents.
+        modifying_file = out; backup_file = f;
+        {
+            matches += print_matches(out, defs, f, pattern);
+        }
+        modifying_file = NULL; backup_file = NULL;
         fclose(out);
     } else {
         matches += print_matches(stdout, defs, f, pattern);
