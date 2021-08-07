@@ -424,7 +424,6 @@ int main(int argc, char *argv[])
             options.mode = MODE_INPLACE;
             options.print_filenames = false;
             options.format = FORMAT_PLAIN;
-            options.context_before = options.context_after = ALL_CONTEXT;
         } else if (BOOLFLAG("-G") || BOOLFLAG("--git")) {
             options.git_mode = true;
         } else if (BOOLFLAG("-i") || BOOLFLAG("--ignore-case")) {
@@ -440,6 +439,8 @@ int main(int argc, char *argv[])
             pattern = bp_replacement(replace_file, pattern, replace_file->start);
             if (!pattern)
                 errx(EXIT_FAILURE, "Replacement failed to compile: %s", flag);
+            if (options.context_before == USE_DEFAULT_CONTEXT) options.context_before = ALL_CONTEXT;
+            if (options.context_after == USE_DEFAULT_CONTEXT) options.context_after = ALL_CONTEXT;
         } else if (FLAG("-g")     || FLAG("--grammar")) {
             file_t *f = NULL;
             if (strlen(flag) > 3 && strncmp(&flag[strlen(flag)-3], ".bp", 3) == 0)
