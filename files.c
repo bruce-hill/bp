@@ -116,7 +116,7 @@ file_t *load_file(file_t **files, const char *filename)
 
   finished_loading:
     if (fd != STDIN_FILENO)
-        check_nonnegative(close(fd), "Failed to close file");
+        require(close(fd), "Failed to close file");
 
     populate_lines(f);
     if (files != NULL) {
@@ -177,7 +177,7 @@ void destroy_file(file_t **at_f)
         delete(&f->allocated);
 
     if (f->mmapped) {
-        check_nonnegative(munmap(f->mmapped, (size_t)(f->end - f->mmapped)),
+        require(munmap(f->mmapped, (size_t)(f->end - f->mmapped)),
                           "Failure to un-memory-map some memory");
         f->mmapped = NULL;
     }

@@ -342,8 +342,8 @@ __attribute__((nonnull(2)))
 static int process_git_files(def_t *defs, pat_t *pattern, int argc, char *argv[])
 {
     int fds[2];
-    check_nonnegative(pipe(fds), "Failed to create pipe");
-    pid_t child = check_nonnegative(fork(), "Failed to fork");
+    require(pipe(fds), "Failed to create pipe");
+    pid_t child = require(fork(), "Failed to fork");
     if (child == 0) {
         const char **git_args = new(char*[3+argc+1]);
         int g = 0;
@@ -351,20 +351,20 @@ static int process_git_files(def_t *defs, pat_t *pattern, int argc, char *argv[]
         git_args[g++] = "ls-files";
         git_args[g++] = "-z";
         while (*argv) git_args[g++] = *(argv++);
-        check_nonnegative(dup2(fds[STDOUT_FILENO], STDOUT_FILENO), "Failed to hook up pipe to stdout");
-        check_nonnegative(close(fds[STDIN_FILENO]), "Failed to close read end of pipe");
+        require(dup2(fds[STDOUT_FILENO], STDOUT_FILENO), "Failed to hook up pipe to stdout");
+        require(close(fds[STDIN_FILENO]), "Failed to close read end of pipe");
         (void)execvp("git", (char**)git_args);
         _exit(EXIT_FAILURE);
     }
-    check_nonnegative(close(fds[STDOUT_FILENO]), "Failed to close write end of pipe");
-    FILE *fp = check_nonnull(fdopen(fds[STDIN_FILENO], "r"), "Could not open pipe file descriptor");
+    require(close(fds[STDOUT_FILENO]), "Failed to close write end of pipe");
+    FILE *fp = require(fdopen(fds[STDIN_FILENO], "r"), "Could not open pipe file descriptor");
     char *path = NULL;
     size_t path_size = 0;
     int found = 0;
     while (getdelim(&path, &path_size, '\0', fp) > 0)
         found += process_file(defs, path, pattern);
     if (path) delete(&path);
-    check_nonnegative(fclose(fp), "Failed to close read end of pipe");
+    require(fclose(fp), "Failed to close read end of pipe");
     int status;
     while (waitpid(child, &status, 0) != child) continue;
     if (!((WIFEXITED(status) == 1) && (WEXITSTATUS(status) == 0)))
@@ -450,7 +450,7 @@ int main(int argc, char *argv[])
             if (after_spaces(p->end, true) < arg_file->end) file_err(arg_file, p->end, arg_file->end, "Failed to compile this part of the argument");
             pattern = chain_together(arg_file, pattern, p);
         } else if (FLAG("-w")     || FLAG("--word")) {
-            check_nonnegative(asprintf(&flag, "\\|%s\\|", flag), "Could not allocate memory");
+            require(asprintf(&flag, "\\|%s\\|", flag), "Could not allocate memory");
             file_t *arg_file = spoof_file(&loaded_files, "<word pattern>", flag, -1);
             delete(&flag);
             pat_t *p = bp_stringpattern(arg_file, arg_file->start);
@@ -505,10 +505,10 @@ int main(int argc, char *argv[])
     int signals[] = {SIGTERM, SIGINT, SIGXCPU, SIGXFSZ, SIGVTALRM, SIGPROF, SIGSEGV, SIGTSTP};
     struct sigaction sa = {.sa_handler = &sig_handler, .sa_flags = (int)(SA_NODEFER | SA_RESETHAND)};
     for (size_t i = 0; i < sizeof(signals)/sizeof(signals[0]); i++)
-        check_nonnegative(sigaction(signals[i], &sa, NULL), "Failed to set signal handler");
+        require(sigaction(signals[i], &sa, NULL), "Failed to set signal handler");
 
     // Handle exit() calls gracefully:
-    check_nonnegative(atexit(&cleanup), "Failed to set cleanup handler at exit");
+    require(atexit(&cleanup), "Failed to set cleanup handler at exit");
 
     // No need for these caches anymore:
     for (file_t *f = loaded_files; f; f = f->next)
