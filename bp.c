@@ -424,6 +424,7 @@ int main(int argc, char *argv[])
             options.mode = MODE_INPLACE;
             options.print_filenames = false;
             options.format = FORMAT_PLAIN;
+            options.context_before = options.context_after = ALL_CONTEXT;
         } else if (BOOLFLAG("-G") || BOOLFLAG("--git")) {
             options.git_mode = true;
         } else if (BOOLFLAG("-i") || BOOLFLAG("--ignore-case")) {
