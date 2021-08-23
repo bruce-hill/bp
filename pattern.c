@@ -90,10 +90,11 @@ static pat_t *expand_replacements(file_t *f, pat_t *replace_pat, bool allow_nl)
     while (matchstr(&str, "=>", allow_nl)) {
         const char *repstr;
         size_t replen;
-        if (matchchar(&str, '"', allow_nl) || matchchar(&str, '\'', allow_nl)) {
-            char quote = str[-1];
+        if (matchchar(&str, '"', allow_nl) || matchchar(&str, '\'', allow_nl)
+            || matchchar(&str, '{', allow_nl) || matchchar(&str, '\002', allow_nl)) {
+            char closequote = str[-1] == '{' ? '}' : (str[-1] == '\002' ? '\003' : str[-1]);
             repstr = str;
-            for (; *str && *str != quote; str = next_char(f, str)) {
+            for (; *str && *str != closequote; str = next_char(f, str)) {
                 if (*str == '\\') {
                     if (!str[1] || str[1] == '\n')
                         file_err(f, str, str+1,
@@ -102,7 +103,7 @@ static pat_t *expand_replacements(file_t *f, pat_t *replace_pat, bool allow_nl)
                 }
             }
             replen = (size_t)(str-repstr);
-            (void)matchchar(&str, quote, true);
+            (void)matchchar(&str, closequote, true);
         } else {
             repstr = "";
             replen = 0;
@@ -339,8 +340,8 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
             return new_pat(f, start, str, 0, 0, BP_WORD_BOUNDARY);
         }
         // String literal
-        case '"': case '\'': case '\002': {
-            char endquote = c == '\002' ? '\003' : c;
+        case '"': case '\'': case '\002': case '{': {
+            char endquote = c == '\002' ? '\003' : (c == '{' ? '}' : c);
             char *litstart = (char*)str;
             while (str < f->end && *str != endquote)
                 str = next_char(f, str);
