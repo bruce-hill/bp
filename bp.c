@@ -249,7 +249,7 @@ static int print_matches(FILE *out, def_t *defs, file_t *f, pat_t *pattern)
     }
     if (m) recycle_if_unused(&m);
 
-    if (matches > 0 || (options.context_before == ALL_CONTEXT && options.context_after == ALL_CONTEXT)) {
+    if (matches > 0 || f->filename[0] == '\0') {
         // Print trailing context lines:
         print_match(out, &pr, NULL);
     }
