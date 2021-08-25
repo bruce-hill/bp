@@ -530,6 +530,8 @@ int main(int argc, char *argv[])
     } else if (argv[0]) {
         // Files pass in as command line args:
         struct stat statbuf;
+        if (!argv[1]) // Don't print filename for single-file matching
+            options.print_filenames = false;
         for ( ; argv[0]; argv++) {
             if (stat(argv[0], &statbuf) == 0 && S_ISDIR(statbuf.st_mode)) // Symlinks are okay if manually specified
                 found += process_dir(defs, argv[0], pattern);
@@ -541,6 +543,7 @@ int main(int argc, char *argv[])
         found += process_dir(defs, ".", pattern);
     } else {
         // Piped in input:
+        options.print_filenames = false; // Don't print filename on stdin
         found += process_file(defs, "", pattern);
     }
     if (options.mode == MODE_JSON) printf("]\n");
