@@ -228,7 +228,7 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
             return (str == f->end || *str == '\n') ? new_match(defs, pat, str, str, NULL) : NULL;
         }
         case BP_WORD_BOUNDARY: {
-            return (isidcontinue(f, str) != isidcontinue(f, prev_char(f, str))) ? new_match(defs, pat, str, str, NULL) : NULL;
+            return (str == f->start || isidcontinue(f, str) != isidcontinue(f, prev_char(f, str))) ? new_match(defs, pat, str, str, NULL) : NULL;
         }
         case BP_STRING: {
             if (&str[pat->min_matchlen] > f->end) return NULL;
