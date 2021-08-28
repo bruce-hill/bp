@@ -79,6 +79,11 @@ Pattern            | Meaning
 See `man ./bp.1` for more details.
 
 
+## Tutorial
+
+Run `make tutorial` to run through the tutorial. It walks through some basic pattern matching.
+
+
 ## Grammar Files
 
 BP comes packaged with some pattern definitions that can be useful when parsing

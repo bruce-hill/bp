@@ -43,8 +43,15 @@ clean:
 	rm -f $(NAME) $(OBJFILES)
 
 test: $(NAME)
-	./$(NAME) Comment -r '[@0]'
-	./$(NAME) -g ./grammars/bp.bp -p Grammar ./grammars/bp.bp
+	./$(NAME) Comment -r '[@0]' >/dev/null
+	./$(NAME) -g ./grammars/bp.bp -p Grammar ./grammars/bp.bp >/dev/null
+	for test in tests/*.sh; do \
+		sh "$$test" <"$${test/.sh/.in}" | diff -q - "$${test/.sh/.out}" ||\
+			sh "$$test" <"$${test/.sh/.in}" | diff -y --color=always - "$${test/.sh/.out}"; \
+	done
+
+tutorial:
+	./tutorial.sh
 
 leaktest: bp
 	valgrind --leak-check=full ./bp -l -g ./grammars/bp.bp -p Grammar ./grammars/bp.bp
@@ -74,4 +81,4 @@ uninstall:
 	  [ "$$confirm" != n ] && rm -rf ~/.config/$(NAME); \
 	fi
 
-.PHONY: all clean install uninstall leaktest splint test
+.PHONY: all clean install uninstall leaktest splint test tutorial
