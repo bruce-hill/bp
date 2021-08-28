@@ -68,4 +68,4 @@ def_t *free_defs(def_t *defs, def_t *stop)
     return defs;
 }
 
-// vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1
+// vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1,\:0

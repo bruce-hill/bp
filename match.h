@@ -22,4 +22,4 @@ size_t free_all_matches(void);
 size_t recycle_all_matches(void);
 
 #endif
-// vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1
+// vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1,\:0

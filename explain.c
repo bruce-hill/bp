@@ -65,9 +65,9 @@ static void _explain_matches(match_node_t *firstmatch, int depth, const char *te
 
     for (size_t i = 0; i < viz_typelen; i++) {
         switch (viz_type[i]) {
-            case '\n': printf("↵"); break;
-            case '\t': printf("⇥"); break;
-            default: printf("%c", viz_type[i]); break;
+        case '\n': printf("↵"); break;
+        case '\t': printf("⇥"); break;
+        default: printf("%c", viz_type[i]); break;
         }
     }
 
@@ -169,3 +169,5 @@ void explain_match(match_t *m)
     _explain_matches(&first, 0, m->start, (size_t)(m->end - m->start));
     printf("\033[?7h"); // Re-enable line wrapping
 }
+
+// vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1,\:0

@@ -383,4 +383,4 @@ void cache_destroy(file_t *f)
     f->cache.size = 0;
 }
 
-// vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1
+// vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1,\:0

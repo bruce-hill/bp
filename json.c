@@ -29,11 +29,11 @@ static int _json_match(const char *text, match_t *m, int comma, bool verbose)
     printf("{\"rule\":\"");
     for (const char *c = m->pat->start; c < m->pat->end; c++) {
         switch (*c) {
-            case '"': printf("\\\""); break;
-            case '\\': printf("\\\\"); break;
-            case '\t': printf("\\t"); break;
-            case '\n': printf("↵"); break;
-            default: printf("%c", *c); break;
+        case '"': printf("\\\""); break;
+        case '\\': printf("\\\\"); break;
+        case '\t': printf("\\t"); break;
+        case '\n': printf("↵"); break;
+        default: printf("%c", *c); break;
         }
     }
     printf("\",\"start\":%ld,\"end\":%ld,\"children\":[",
@@ -52,4 +52,4 @@ void json_match(const char *text, match_t *m, bool verbose)
     (void)_json_match(text, m, 0, verbose);
 }
 
-// vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1
+// vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1,\:0
