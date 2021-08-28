@@ -4,6 +4,11 @@ BP is a parsing expression grammar (PEG) tool for the command line.
 It's written in pure C with no dependencies.
 
 
+## Tutorial
+
+Run `make tutorial` to run through the tutorial. It walks through some basic pattern matching.
+
+
 ## Usage
 
 `bp [flags] <pattern> [<input files>...]`
@@ -77,11 +82,6 @@ Pattern            | Meaning
 `# line comment`   | A line comment
 
 See `man ./bp.1` for more details.
-
-
-## Tutorial
-
-Run `make tutorial` to run through the tutorial. It walks through some basic pattern matching.
 
 
 ## Grammar Files
