@@ -5,10 +5,10 @@ indent: \N (` /\t)
 dedent: $ !(nodent/indent)
 crlf: \r\n
 cr: \r
-anglebraces: `< ..%(\n/anglebraces/string) `>
-brackets: `[ ..%(\n/brackets/string) `]
-braces: `{ ..%(\n/braces/string) `}
-parens: `( ..%(\n/parens/string) `)
+anglebraces: `< ..%(\n/>`<anglebraces/>`",'string) `>
+brackets: `[ ..%(\n/>`[brackets/>`",'string) `]
+braces: `{ ..%(\n/>`{braces/>`",'string) `}
+parens: `( ..%(\n/>`(parens/>`",'string) `)
 string: `" ..%string-escape `" / `' ..%string-escape `'
 string-escape: `\ (`x 2 Hex / 1-3 `0-7 / `u 1-4 Hex / .)
 id: \I *\i
