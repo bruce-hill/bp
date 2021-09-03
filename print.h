@@ -19,7 +19,7 @@ typedef struct {
     int context_before, context_after;
     bool needs_line_number:1;
     bool use_color:1;
-    bool print_line_numbers:1;
+    const char *lineformat;
 } printer_t;
 
 __attribute__((nonnull(1,2)))

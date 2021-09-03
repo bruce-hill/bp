@@ -53,7 +53,7 @@ static const char *usage = (
     " -B --context-before <n>          set number of lines of context to print before the match\n"
     " -B --context-after <n>           set number of lines of context to print after the match\n"
     " -C --context <context>           set number of lines of context to print before and after the match\n"
-    " -f --format auto|fancy|plain     set the output format\n"
+    " -f --format fancy|plain|bare|file:line    set the output format\n"
     " -g --grammar <grammar-file>      use the specified file as a grammar");
 
 // Used as a heuristic to check if a file is binary or text:
@@ -64,7 +64,7 @@ static struct {
     int context_before, context_after;
     bool ignorecase, verbose, git_mode, print_filenames;
     enum { MODE_NORMAL, MODE_LISTFILES, MODE_INPLACE, MODE_JSON, MODE_EXPLAIN } mode;
-    enum { FORMAT_AUTO, FORMAT_FANCY, FORMAT_PLAIN } format;
+    enum { FORMAT_AUTO, FORMAT_FANCY, FORMAT_PLAIN, FORMAT_BARE, FORMAT_FILE_LINE } format;
     pat_t *skip;
 } options = {
     .context_before = USE_DEFAULT_CONTEXT,
@@ -75,6 +75,13 @@ static struct {
     .mode = MODE_NORMAL,
     .format = FORMAT_AUTO,
     .skip = NULL,
+};
+
+const char *LINE_FORMATS[] = {
+    [FORMAT_FANCY] = "\033[0;2m#\033(0\x78\033(B",
+    [FORMAT_PLAIN] = "#|",
+    [FORMAT_BARE] = "",
+    [FORMAT_FILE_LINE] = "@:#0:",
 };
 
 // If a file is partly through being modified when the program exits, restore it from backup.
@@ -233,7 +240,7 @@ static int print_matches(FILE *out, def_t *defs, file_t *f, pat_t *pattern)
         .context_before = options.context_before,
         .context_after = options.context_after,
         .use_color = options.format == FORMAT_FANCY,
-        .print_line_numbers = options.format == FORMAT_FANCY,
+        .lineformat = LINE_FORMATS[options.format],
     };
 
     match_t *m = NULL;
@@ -483,7 +490,14 @@ int main(int argc, char *argv[])
         } else if (FLAG("-A")     || FLAG("--after-context")) {
             options.context_after = context_from_flag(flag);
         } else if (FLAG("-f")      || FLAG("--format")) {
-            options.format = streq(flag, "fancy") ? FORMAT_FANCY : streq(flag, "plain") ? FORMAT_PLAIN : FORMAT_AUTO;
+            if (streq(flag, "fancy")) options.format = FORMAT_FANCY;
+            else if (streq(flag, "plain")) options.format = FORMAT_PLAIN;
+            else if (streq(flag, "bare")) options.format = FORMAT_BARE;
+            else if (streq(flag, "file:line")) {
+                options.format = FORMAT_FILE_LINE;
+                options.print_filenames = 0;
+            } else if (!streq(flag, "auto"))
+                errx(EXIT_FAILURE, "Unknown --format option: %s", flag);
         } else if (argv[0][0] == '-' && argv[0][1] && argv[0][1] != '-') { // single-char flags
             errx(EXIT_FAILURE, "Unrecognized flag: -%c\n\n%s", argv[0][1], usage);
         } else if (argv[0][0] != '-') {

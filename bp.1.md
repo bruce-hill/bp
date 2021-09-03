@@ -72,10 +72,12 @@ passed to `git --ls-files` instead of treated as literal files.
 is `none`, print only the exact text of the matches. If *N* is **"all"**, print
 all text before and after each match.
 
-`-f`, `--format` *auto*\|*fancy*\|*plain*
+`-f`, `--format` *fancy*\|*plain*\|*bare*\|*file:line*\|*auto*
 : Set the output format. *fancy* includes colors and line numbers, *plain*
-includes neither, and *auto* (the default) uses *fancy* formatting only when
-the output is a TTY.
+prints line numbers with no coloring, *bare* prints only the match text,
+*file:line* prints the filename and line number for each match (grep-style),
+and *auto* (the default) uses *fancy* formatting when the output is a TTY and
+*plain* formatting otherwise.
 
 `-h`, `--help`
 : Print the usage and exit.

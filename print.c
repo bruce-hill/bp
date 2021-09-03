@@ -20,20 +20,30 @@ static const char *current_color = NULL;
 
 //
 // Print a line number, if it needs to be printed.
-// line number of 0 means "just print an empty space for the number"
+// In the lineformat string, replace "@" with the filename, and "#" with the line number.
 //
 __attribute__((nonnull(1,2)))
-static inline void print_line_number(FILE *out, printer_t *pr, size_t line_number, const char *color)
+static inline void print_line_number(FILE *out, printer_t *pr, size_t line_number, const char *color, int is_line_continued)
 {
     if (!pr->needs_line_number) return;
-    if (pr->print_line_numbers) {
-        if (line_number == 0) {
-            if (color) fprintf(out, "\033[0;2m     \033(0\x78\033(B%s", color);
-            else fprintf(out, "     |");
-        } else {
-            if (color) fprintf(out, "\033[0;2m%5lu\033(0\x78\033(B%s", line_number, color);
-            else fprintf(out, "%5lu|", line_number);
-        }
+    for (const char *c = pr->lineformat; c && *c; c++) {
+        if (*c == '@') { // Print filename
+            fprintf(out, "%s", pr->file->filename);
+        } else if (*c == '#') { // Print line number
+            const char *after;
+            int space = (int)strtol(c+1, (char**)&after, 10);
+            if (after > c+1) c = after-1; // Width was specified
+            else // Otherwise default to "wide enough for every line number in this file"
+                for (int i = (int)pr->file->nlines; i > 0; i /= 10) ++space;
+
+            if (is_line_continued) {
+                for (space = abs(space); space > 0; --space)
+                    fputc('.', out);
+            } else fprintf(out, "%*lu", space, line_number);
+        } else fputc(*c, out);
+    }
+    if (color) {
+        fprintf(out, "%s", color);
         current_color = color;
     }
     pr->needs_line_number = 0;
@@ -48,7 +58,7 @@ static void print_between(FILE *out, printer_t *pr, const char *start, const cha
     file_t *f = pr->file;
     while (start < end) {
         size_t line_num = get_line_number(f, start);
-        print_line_number(out, pr, line_num, color);
+        print_line_number(out, pr, line_num, color, 0);
         const char *eol = get_line(pr->file, line_num + 1);
         if (!eol || eol > end) eol = end;
         if (color && color != current_color) {
@@ -122,7 +132,7 @@ static void _print_match(FILE *out, printer_t *pr, match_t *m)
 
         // TODO: clean up the line numbering code
         for (const char *r = text; r < end; ) {
-            print_line_number(out, pr, line > line_end ? 0 : line, pr->use_color ? color_replace : NULL);
+            print_line_number(out, pr, line, pr->use_color ? color_replace : NULL, line > line_end);
 
             // Capture substitution
             if (*r == '@' && r[1] && r[1] != '@') {
@@ -151,9 +161,9 @@ static void _print_match(FILE *out, printer_t *pr, match_t *m)
                         pr->file, get_line_number(pr->file, m->start));
                     char denter = line_start ? *line_start : '\t';
                     fputc('\n', out);
-                    ++line;
                     pr->needs_line_number = 1;
-                    print_line_number(out, pr, 0, pr->use_color ? color_replace : NULL);
+                    print_line_number(out, pr, line, pr->use_color ? color_replace : NULL, 1);
+                    ++line;
                     if (denter == ' ' || denter == '\t') {
                         for (const char *p = line_start; p && *p == denter && p < m->start; ++p)
                             fputc(denter, out);
@@ -182,7 +192,7 @@ static void _print_match(FILE *out, printer_t *pr, match_t *m)
                 continue;
             }
         }
-        print_line_number(out, pr, line > line_end ? 0 : line, pr->use_color ? color_normal : NULL);
+        print_line_number(out, pr, line, pr->use_color ? color_normal : NULL, line > line_end);
     } else {
         const char *prev = m->start;
         for (int i = 0; m->children && m->children[i]; i++) {
@@ -218,7 +228,7 @@ void print_match(FILE *out, printer_t *pr, match_t *m)
         if (!first) {
             // When not printing context lines, print each match on its own
             // line instead of jamming them all together:
-            if (pr->context_before == NO_CONTEXT && pr->context_after == NO_CONTEXT && (!pr->needs_line_number || !pr->print_line_numbers)) {
+            if (pr->context_before == NO_CONTEXT && pr->context_after == NO_CONTEXT && (!pr->needs_line_number || !pr->lineformat)) {
                 fprintf(out, "\n");
                 pr->needs_line_number = 1;
             }
