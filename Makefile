@@ -46,8 +46,8 @@ test: $(NAME)
 	./$(NAME) Comment -r '[@0]' >/dev/null
 	./$(NAME) -g ./grammars/bp.bp -p Grammar ./grammars/bp.bp >/dev/null
 	for test in tests/*.sh; do \
-		sh "$$test" <"$${test/.sh/.in}" | diff -q - "$${test/.sh/.out}" ||\
-			sh "$$test" <"$${test/.sh/.in}" | diff -y --color=always - "$${test/.sh/.out}"; \
+		PATH=".:$$PATH" sh "$$test" <"$${test/.sh/.in}" | diff -q - "$${test/.sh/.out}" ||\
+			PATH=".:$$PATH" sh "$$test" <"$${test/.sh/.in}" | diff -y --color=always - "$${test/.sh/.out}"; \
 	done
 
 tutorial:
