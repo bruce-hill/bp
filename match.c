@@ -447,13 +447,14 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
         slice_file(&slice, f, m1->start, m1->end);
         match_t *m2 = next_match(defs, &slice, NULL, pat->args.multiple.second, NULL, ignorecase);
         if ((!m2 && pat->type == BP_MATCH) || (m2 && pat->type == BP_NOT_MATCH)) {
-            if (m2) recycle_if_unused(&m2);
             cache_destroy(&slice);
+            if (m2) recycle_if_unused(&m2);
             recycle_if_unused(&m1);
             return NULL;
         }
+        match_t *ret = new_match(defs, pat, m1->start, m1->end, (pat->type == BP_MATCH) ? MATCHES(m1, m2) : MATCHES(m1));
         cache_destroy(&slice);
-        return new_match(defs, pat, m1->start, m1->end, (pat->type == BP_MATCH) ? MATCHES(m1, m2) : NULL);
+        return ret;
     }
     case BP_REPLACE: {
         match_t *p = NULL;
