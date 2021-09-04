@@ -77,7 +77,7 @@ all text before and after each match.
 prints line numbers with no coloring, *bare* prints only the match text,
 *file:line* prints the filename and line number for each match (grep-style),
 and *auto* (the default) uses *fancy* formatting when the output is a TTY and
-*plain* formatting otherwise.
+*bare* formatting otherwise.
 
 `-h`, `--help`
 : Print the usage and exit.
