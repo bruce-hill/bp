@@ -74,7 +74,7 @@ static void _explain_matches(match_node_t *firstmatch, int depth, const char *te
     if (viz_type >= text && viz_type <= &text[textlen])
         printf("\033[0;2m\"");
 
-    printf("\033[0m");
+    printf("\033[m");
 
     match_node_t *children = NULL;
     match_node_t **nextchild = &children;
@@ -102,7 +102,7 @@ static void _explain_matches(match_node_t *firstmatch, int depth, const char *te
                 else
                     printf("%c", *c);
             }
-            printf("\033[0;2m%s\033[0m", V);
+            printf("\033[0;2m%s\033[m", V);
         } else {
             *nextchild = new(match_node_t);
             (*nextchild)->m = m->m;
@@ -112,7 +112,7 @@ static void _explain_matches(match_node_t *firstmatch, int depth, const char *te
                 printf(" ");
             if (m->m->end > m->m->start)
                 printf("\033[0;2m%s", V);
-            printf("\033[0m");
+            printf("\033[m");
         }
     }
 
@@ -120,9 +120,9 @@ static void _explain_matches(match_node_t *firstmatch, int depth, const char *te
     for (match_node_t *m = firstmatch; m; m = m->next) {
         if (m->m->end > m->m->start) continue;
         if (RIGHT_TYPE(m)) {
-            printf("\033[%ldG\033[7;%sm▒\033[0m", 1+2*(m->m->start - text), color);
+            printf("\033[%ldG\033[7;%sm▒\033[m", 1+2*(m->m->start - text), color);
         } else {
-            printf("\033[%ldG\033[0;2m%s\033[0m", 1+2*(m->m->start - text), V);
+            printf("\033[%ldG\033[0;2m%s\033[m", 1+2*(m->m->start - text), V);
         }
     }
 
@@ -143,7 +143,7 @@ static void _explain_matches(match_node_t *firstmatch, int depth, const char *te
             const char *h = RIGHT_TYPE(m) ? H : " ";
             for (ssize_t n = (ssize_t)(2*(m->m->end - m->m->start) - 1); n > 0; n--)
                 printf("%s", h);
-            printf("%s\033[0m", r);
+            printf("%s\033[m", r);
         }
     }
 #undef RIGHT_TYPE

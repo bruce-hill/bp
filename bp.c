@@ -94,7 +94,7 @@ static file_t *backup_file;
 static inline void fprint_filename(FILE *out, const char *filename)
 {
     if (!filename[0]) return;
-    if (options.format == FORMAT_FANCY) fprintf(out, "\033[0;1;4;33m%s\033[0m\n", filename);
+    if (options.format == FORMAT_FANCY) fprintf(out, "\033[0;1;4;33m%s\033[m\n", filename);
     else fprintf(out, "%s:\n", filename);
 }
 
@@ -317,7 +317,7 @@ static int process_file(def_t *defs, const char *filename, pat_t *pattern)
 
     cache_destroy(f);
     if (recycle_all_matches() != 0)
-        fprintf(stderr, "\033[33;1mMemory leak: there should no longer be any matches in use at this point.\033[0m\n");
+        fprintf(stderr, "\033[33;1mMemory leak: there should no longer be any matches in use at this point.\033[m\n");
     destroy_file(&f);
     (void)fflush(stdout);
     return matches;

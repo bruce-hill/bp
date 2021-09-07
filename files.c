@@ -233,7 +233,7 @@ void fprint_line(FILE *dest, file_t *f, const char *start, const char *end, cons
     if (end > f->end) end = f->end;
     size_t linenum = get_line_number(f, start);
     const char *line = get_line(f, linenum);
-    fprintf(dest, "\033[1m%s:%lu:\033[0m ", f->filename[0] ? f->filename : "stdin", linenum);
+    fprintf(dest, "\033[1m%s:%lu:\033[m ", f->filename[0] ? f->filename : "stdin", linenum);
 
     va_list args;
     va_start(args, fmt);
@@ -243,7 +243,7 @@ void fprint_line(FILE *dest, file_t *f, const char *start, const char *end, cons
 
     const char *eol = linenum == f->nlines ? strchr(line, '\0') : strchr(line, '\n');
     if (end == NULL || end > eol) end = eol;
-    fprintf(dest, "\033[2m%5lu\033(0\x78\033(B\033[0m%.*s\033[41;30m%.*s\033[0m%.*s\n",
+    fprintf(dest, "\033[2m%5lu\033(0\x78\033(B\033[m%.*s\033[41;30m%.*s\033[m%.*s\n",
             linenum,
             (int)(start - line), line,
             (int)(end - start), start,
@@ -258,7 +258,7 @@ void fprint_line(FILE *dest, file_t *f, const char *start, const char *end, cons
             fprintf(dest, "^^^^^^^^\033[8D\033[I\033[K");
         else
             (void)fputc('^', dest);
-    fprintf(dest, "\033[0m\n");
+    fprintf(dest, "\033[m\n");
 }
 
 //

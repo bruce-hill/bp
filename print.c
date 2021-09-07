@@ -15,7 +15,7 @@
 
 static const char *color_match = "\033[0;31;1m";
 static const char *color_replace = "\033[0;34;1m";
-static const char *color_normal = "\033[0m";
+static const char *color_normal = "\033[m";
 static const char *current_color = NULL;
 
 //
@@ -267,7 +267,7 @@ int print_errors(file_t *f, match_t *m)
         fprintf(stderr, "\033[31;1m");
         printer_t tmp = {.file = f, .context_before=NO_CONTEXT, .context_after=NO_CONTEXT}; // No bells and whistles
         print_match(stderr, &tmp, m); // Error message
-        fprintf(stderr, "\033[0m\n");
+        fprintf(stderr, "\033[m\n");
         fprint_line(stderr, f, m->start, m->end, " ");
         return 1;
     }
