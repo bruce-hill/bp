@@ -290,6 +290,10 @@ static int process_file(def_t *defs, const char *filename, pat_t *pattern)
     } else if (options.mode == MODE_JSON) {
         matches += print_matches_as_json(defs, f, pattern);
     } else if (options.mode == MODE_INPLACE) {
+        match_t *m = next_match(defs, f, NULL, pattern, options.skip, options.ignorecase);
+        if (m) recycle_if_unused(&m);
+        else return 0;
+
         // Ensure the file is resident in memory:
         if (f->mmapped) {
             file_t *copy = spoof_file(NULL, f->filename, f->start, (ssize_t)(f->end - f->start));
@@ -430,7 +434,7 @@ int main(int argc, char *argv[])
         } else if (BOOLFLAG("-I") || BOOLFLAG("--inplace")) {
             options.mode = MODE_INPLACE;
             options.print_filenames = false;
-            options.format = FORMAT_PLAIN;
+            options.format = FORMAT_BARE;
         } else if (BOOLFLAG("-G") || BOOLFLAG("--git")) {
             options.git_mode = true;
         } else if (BOOLFLAG("-i") || BOOLFLAG("--ignore-case")) {
