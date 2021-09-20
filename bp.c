@@ -548,7 +548,7 @@ int main(int argc, char *argv[])
     } else if (argv[0]) {
         // Files pass in as command line args:
         struct stat statbuf;
-        if (!argv[1]) // Don't print filename for single-file matching
+        if (!argv[1] && !(stat(argv[0], &statbuf) == 0 && S_ISDIR(statbuf.st_mode))) // Don't print filename for single-file matching
             options.print_filenames = false;
         for ( ; argv[0]; argv++) {
             if (stat(argv[0], &statbuf) == 0 && S_ISDIR(statbuf.st_mode)) // Symlinks are okay if manually specified
