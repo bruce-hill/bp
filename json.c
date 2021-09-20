@@ -16,14 +16,6 @@ static int _json_match(const char *text, match_t *m, int comma, bool verbose);
 //
 static int _json_match(const char *text, match_t *m, int comma, bool verbose)
 {
-    if (!verbose) {
-        if (m->pat->type != BP_REF && m->pat->type != BP_ERROR) {
-            for (int i = 0; m->children && m->children[i]; i++)
-                comma |= _json_match(text, m->children[i], comma, verbose);
-            return comma;
-        }
-    }
-
     if (comma) printf(",\n");
     comma = 0;
     printf("{\"rule\":\"");
@@ -37,7 +29,8 @@ static int _json_match(const char *text, match_t *m, int comma, bool verbose)
         }
     }
     printf("\",\"range\":[%ld,%ld]", m->start - text, m->end - text);
-    if (m->children) {
+
+    if (m->children && (verbose || (m->pat->type != BP_REF && m->pat->type != BP_ERROR))) {
         printf(",\"children\":[");
         for (int i = 0; m->children && m->children[i]; i++)
             comma |= _json_match(text, m->children[i], comma, verbose);
