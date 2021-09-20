@@ -15,8 +15,6 @@ match_t *new_match(def_t *defs, pat_t *pat, const char *start, const char *end, 
 __attribute__((nonnull(2,4)))
 match_t *next_match(def_t *defs, file_t *f, match_t *prev, pat_t *pat, pat_t *skip, bool ignorecase);
 __attribute__((nonnull))
-match_t *get_capture(match_t *m, const char **id);
-__attribute__((nonnull))
 void recycle_if_unused(match_t **at_m);
 size_t free_all_matches(void);
 size_t recycle_all_matches(void);

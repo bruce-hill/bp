@@ -2,7 +2,6 @@
 // match.c - Code for the BP virtual machine that performs the matching.
 //
 
-#include <ctype.h>
 #include <err.h>
 #include <limits.h>
 #include <stdbool.h>
@@ -30,10 +29,6 @@ static match_t *in_use_matches = NULL;
 
 __attribute__((nonnull(1)))
 static inline pat_t *deref(def_t *defs, pat_t *pat);
-__attribute__((nonnull))
-static match_t *get_capture_by_num(match_t *m, int *n);
-__attribute__((nonnull, pure))
-static match_t *get_capture_by_name(match_t *m, const char *name);
 __attribute__((hot, nonnull(2,3,4)))
 static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool ignorecase);
 
@@ -558,61 +553,6 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
         errx(EXIT_FAILURE, "Unknown pattern type: %u", pat->type);
         return NULL;
     }
-    }
-}
-
-//
-// Get a specific numbered pattern capture.
-//
-static match_t *get_capture_by_num(match_t *m, int *n)
-{
-    if (*n == 0) return m;
-    if (m->pat->type == BP_CAPTURE && *n == 1) return m;
-    if (m->pat->type == BP_CAPTURE) --(*n);
-    if (m->children) {
-        for (int i = 0; m->children[i]; i++) {
-            match_t *cap = get_capture_by_num(m->children[i], n);
-            if (cap) return cap;
-        }
-    }
-    return NULL;
-}
-
-//
-// Get a capture with a specific name.
-//
-static match_t *get_capture_by_name(match_t *m, const char *name)
-{
-    if (m->pat->type == BP_CAPTURE && m->pat->args.capture.name
-        && strncmp(m->pat->args.capture.name, name, m->pat->args.capture.namelen) == 0)
-        return m;
-    if (m->children) {
-        for (int i = 0; m->children[i]; i++) {
-            match_t *cap = get_capture_by_name(m->children[i], name);
-            if (cap) return cap;
-        }
-    }
-    return NULL;
-}
-
-//
-// Get a capture by identifier (name or number).
-// Update *id to point to after the identifier (if found).
-//
-match_t *get_capture(match_t *m, const char **id)
-{
-    if (isdigit(**id)) {
-        int n = (int)strtol(*id, (char**)id, 10);
-        return get_capture_by_num(m, &n);
-    } else {
-        const char *end = after_name(*id);
-        if (end == *id) return NULL;
-        char *name = strndup(*id, (size_t)(end-*id));
-        match_t *cap = get_capture_by_name(m, name);
-        delete(&name);
-        *id = end;
-        if (**id == ';') ++(*id);
-        return cap;
     }
 }
 
