@@ -412,7 +412,7 @@ int main(int argc, char *argv[])
     pat_t *pattern = NULL;
 
     // Load builtins:
-    file_t *builtins_file = load_filef(&loaded_files, "/etc/"BP_NAME"/builtins.bp");
+    file_t *builtins_file = load_file(&loaded_files, "/etc/"BP_NAME"/builtins.bp");
     if (builtins_file) defs = load_grammar(defs, builtins_file);
     file_t *local_file = load_filef(&loaded_files, "%s/.config/"BP_NAME"/builtins.bp", getenv("HOME"));
     if (local_file) defs = load_grammar(defs, local_file);
