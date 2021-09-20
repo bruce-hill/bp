@@ -36,11 +36,14 @@ static int _json_match(const char *text, match_t *m, int comma, bool verbose)
         default: printf("%c", *c); break;
         }
     }
-    printf("\",\"start\":%ld,\"end\":%ld,\"children\":[",
-            m->start - text, m->end - text);
-    for (int i = 0; m->children && m->children[i]; i++)
-        comma |= _json_match(text, m->children[i], comma, verbose);
-    printf("]}");
+    printf("\",\"range\":[%ld,%ld]", m->start - text, m->end - text);
+    if (m->children) {
+        printf(",\"children\":[");
+        for (int i = 0; m->children && m->children[i]; i++)
+            comma |= _json_match(text, m->children[i], comma, verbose);
+        printf("]");
+    }
+    printf("}");
     return 1;
 }
 
