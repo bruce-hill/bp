@@ -16,16 +16,6 @@
 __attribute__((nonnull))
 static pat_t *bp_pattern_nl(file_t *f, const char *str, bool allow_nl);
 __attribute__((nonnull))
-static pat_t *expand_replacements(file_t *f, pat_t *replace_pat, bool allow_nl);
-__attribute__((nonnull))
-static pat_t *expand_chain(file_t *f, pat_t *first, bool allow_nl);
-__attribute__((nonnull))
-static pat_t *expand_choices(file_t *f, pat_t *first, bool allow_nl);
-__attribute__((nonnull))
-static pat_t *_bp_simplepattern(file_t *f, const char *str);
-__attribute__((nonnull(1,2,3,6)))
-static pat_t *new_range(file_t *f, const char *start, const char *end, size_t min, ssize_t max, pat_t *repeating, pat_t *sep);
-__attribute__((nonnull(1,2)))
 static pat_t *bp_simplepattern(file_t *f, const char *str);
 
 //
@@ -52,6 +42,7 @@ pat_t *new_pat(file_t *f, const char *start, const char *end, size_t minlen, ssi
 //
 // Helper function to initialize a range object.
 //
+__attribute__((nonnull(1,2,3,6)))
 static pat_t *new_range(file_t *f, const char *start, const char *end, size_t min, ssize_t max, pat_t *repeating, pat_t *sep)
 {
     size_t minlen = min*repeating->min_matchlen + (min > 0 ? min-1 : 0)*(sep ? sep->min_matchlen : 0);
@@ -69,6 +60,7 @@ static pat_t *new_range(file_t *f, const char *start, const char *end, size_t mi
 // Take a pattern and expand it into a chain of patterns if it's followed by
 // any patterns (e.g. "`x `y"), otherwise return the original input.
 //
+__attribute__((nonnull))
 static pat_t *expand_chain(file_t *f, pat_t *first, bool allow_nl)
 {
     const char *str = after_spaces(first->end, allow_nl);
@@ -84,6 +76,7 @@ static pat_t *expand_chain(file_t *f, pat_t *first, bool allow_nl)
 //
 // Match trailing => replacements (with optional pattern beforehand)
 //
+__attribute__((nonnull))
 static pat_t *expand_replacements(file_t *f, pat_t *replace_pat, bool allow_nl)
 {
     const char *str = replace_pat->end;
@@ -94,12 +87,12 @@ static pat_t *expand_replacements(file_t *f, pat_t *replace_pat, bool allow_nl)
             || matchchar(&str, '{', allow_nl) || matchchar(&str, '\002', allow_nl)) {
             char closequote = str[-1] == '{' ? '}' : (str[-1] == '\002' ? '\003' : str[-1]);
             repstr = str;
-            for (; *str && *str != closequote; str = next_char(f, str)) {
+            for (; str < f->end && *str != closequote; str = next_char(str, f->end)) {
                 if (*str == '\\') {
                     if (!str[1] || str[1] == '\n')
                         file_err(f, str, str+1,
                                  "There should be an escape sequence after this backslash.");
-                    str = next_char(f, str);
+                    str = next_char(str, f->end);
                 }
             }
             replen = (size_t)(str-repstr);
@@ -124,6 +117,7 @@ static pat_t *expand_replacements(file_t *f, pat_t *replace_pat, bool allow_nl)
 // chain of choices if it's followed by any "/"-separated patterns (e.g.
 // "`x/`y"), otherwise return the original input.
 //
+__attribute__((nonnull))
 static pat_t *expand_choices(file_t *f, pat_t *first, bool allow_nl)
 {
     first = expand_chain(f, first, allow_nl);
@@ -192,53 +186,22 @@ pat_t *either_pat(file_t *f, pat_t *first, pat_t *second)
 }
 
 //
-// Wrapper for _bp_simplepattern() that expands any postfix operators (~, !~)
-//
-static pat_t *bp_simplepattern(file_t *f, const char *str)
-{
-    pat_t *pat = _bp_simplepattern(f, str);
-    if (pat == NULL) return pat;
-    str = pat->end;
-
-    // Expand postfix operators (if any)
-    while (str < f->end) {
-        enum pattype_e type;
-        if (matchchar(&str, '~', false))
-            type = BP_MATCH;
-        else if (matchstr(&str, "!~", false))
-            type = BP_NOT_MATCH;
-        else break;
-
-        pat_t *first = pat;
-        pat_t *second = bp_simplepattern(f, str);
-        if (!second)
-            file_err(f, str, str, "The '%s' operator expects a pattern before and after.", type == BP_MATCH ? "~" : "!~");
-
-        pat = new_pat(f, str, second->end, first->min_matchlen, first->max_matchlen, type);
-        pat->args.multiple.first = first;
-        pat->args.multiple.second = second;
-        str = pat->end;
-    }
-
-    return pat;
-}
-
-//
 // Compile a string of BP code into a BP pattern object.
 //
+__attribute__((nonnull))
 static pat_t *_bp_simplepattern(file_t *f, const char *str)
 {
     str = after_spaces(str, false);
     if (!*str) return NULL;
     const char *start = str;
     char c = *str;
-    str = next_char(f, str);
+    str = next_char(str, f->end);
     switch (c) {
     // Any char (dot)
     case '.': {
         if (*str == '.') { // ".."
             pat_t *skip = NULL;
-            str = next_char(f, str);
+            str = next_char(str, f->end);
             char skipper = *str;
             if (matchchar(&str, '%', false) || matchchar(&str, '=', false)) {
                 skip = bp_simplepattern(f, str);
@@ -261,11 +224,11 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
                 file_err(f, str, str, "There should be a character here after the '`'");
 
             const char *c1_loc = str;
-            str = next_char(f, c1_loc);
+            str = next_char(c1_loc, f->end);
             if (*str == '-') { // Range
                 const char *c2_loc = ++str;
-                if (next_char(f, c1_loc) > c1_loc+1 || next_char(f, c2_loc) > c2_loc+1)
-                    file_err(f, start, next_char(f, c2_loc), "Sorry, UTF-8 character ranges are not yet supported.");
+                if (next_char(c1_loc, f->end) > c1_loc+1 || next_char(c2_loc, f->end) > c2_loc+1)
+                    file_err(f, start, next_char(c2_loc, f->end), "Sorry, UTF-8 character ranges are not yet supported.");
                 char c1 = *c1_loc, c2 = *c2_loc;
                 if (!c2 || c2 == '\n')
                     file_err(f, str, str, "There should be a character here to complete the character range.");
@@ -274,7 +237,7 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
                     c1 = c2;
                     c2 = tmp;
                 }
-                str = next_char(f, c2_loc);
+                str = next_char(c2_loc, f->end);
                 pat_t *pat = new_pat(f, start == c1_loc - 1 ? start : c1_loc, str, 1, 1, BP_RANGE);
                 pat->args.range.low = (unsigned char)c1;
                 pat->args.range.high = (unsigned char)c2;
@@ -318,8 +281,8 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
             unsigned char e_high = e_low;
             if (*str == '-') { // Escape range (e.g. \x00-\xFF)
                 ++str;
-                if (next_char(f, str) != str+1)
-                    file_err(f, start, next_char(f, str), "Sorry, UTF8 escape sequences are not supported in ranges.");
+                if (next_char(str, f->end) != str+1)
+                    file_err(f, start, next_char(str, f->end), "Sorry, UTF8 escape sequences are not supported in ranges.");
                 const char *seqstart = str;
                 e_high = (unsigned char)unescapechar(str, &str);
                 if (str == seqstart)
@@ -331,7 +294,7 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
             esc->args.range.low = e_low;
             esc->args.range.high = e_high;
             all = either_pat(f, all, esc);
-        } while (*str++ == ',');
+        } while (*str == ',' && str++ < f->end);
 
         return all;
     }
@@ -344,9 +307,9 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
         char endquote = c == '\002' ? '\003' : (c == '{' ? '}' : c);
         char *litstart = (char*)str;
         while (str < f->end && *str != endquote)
-            str = next_char(f, str);
+            str = next_char(str, f->end);
         size_t len = (size_t)(str - litstart);
-        str = next_char(f, str);
+        str = next_char(str, f->end);
 
         pat_t *pat = new_pat(f, start, str, len, (ssize_t)len, BP_STRING);
         pat->args.string = litstart;
@@ -528,10 +491,10 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
 pat_t *bp_stringpattern(file_t *f, const char *str)
 {
     pat_t *ret = NULL;
-    while (*str) {
+    while (str < f->end) {
         char *start = (char*)str;
         pat_t *interp = NULL;
-        for (; str < f->end; str = next_char(f, str)) {
+        for (; str < f->end; str = next_char(str, f->end)) {
             if (*str == '\\' && str+1 < f->end) {
                 if (str[1] == '\\' || isalnum(str[1]))
                     interp = bp_simplepattern(f, str);
@@ -559,6 +522,38 @@ pat_t *bp_stringpattern(file_t *f, const char *str)
 }
 
 //
+// Wrapper for _bp_simplepattern() that expands any postfix operators (~, !~)
+//
+static pat_t *bp_simplepattern(file_t *f, const char *str)
+{
+    pat_t *pat = _bp_simplepattern(f, str);
+    if (pat == NULL) return pat;
+    str = pat->end;
+
+    // Expand postfix operators (if any)
+    while (str < f->end) {
+        enum pattype_e type;
+        if (matchchar(&str, '~', false))
+            type = BP_MATCH;
+        else if (matchstr(&str, "!~", false))
+            type = BP_NOT_MATCH;
+        else break;
+
+        pat_t *first = pat;
+        pat_t *second = bp_simplepattern(f, str);
+        if (!second)
+            file_err(f, str, str, "The '%s' operator expects a pattern before and after.", type == BP_MATCH ? "~" : "!~");
+
+        pat = new_pat(f, str, second->end, first->min_matchlen, first->max_matchlen, type);
+        pat->args.multiple.first = first;
+        pat->args.multiple.second = second;
+        str = pat->end;
+    }
+
+    return pat;
+}
+
+//
 // Given a pattern and a replacement string, compile the two into a BP
 // replace pattern.
 //
@@ -567,7 +562,7 @@ pat_t *bp_replacement(file_t *f, pat_t *replacepat, const char *replacement)
     pat_t *pat = new_pat(f, replacepat->start, replacepat->end, replacepat->min_matchlen, replacepat->max_matchlen, BP_REPLACE);
     pat->args.replace.pat = replacepat;
     const char *p = replacement;
-    for (; *p; p++) {
+    for (; p < f->end; p++) {
         if (*p == '\\') {
             if (!p[1] || p[1] == '\n')
                 file_err(f, p, p, "There should be an escape sequence or pattern here after this backslash.");

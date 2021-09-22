@@ -9,7 +9,7 @@
 
 __attribute__((returns_nonnull, nonnull(1,2)))
 pat_t *new_pat(file_t *f, const char *start, const char *end, size_t minlen, ssize_t maxlen, enum pattype_e type);
-__attribute__((nonnull(1,2)))
+__attribute__((nonnull))
 pat_t *bp_stringpattern(file_t *f, const char *str);
 __attribute__((nonnull(1,2)))
 pat_t *bp_replacement(file_t *f, pat_t *replacepat, const char *replacement);

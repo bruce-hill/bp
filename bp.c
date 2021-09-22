@@ -169,17 +169,15 @@ static int is_text_file(const char *filename)
 //
 static int print_matches_as_json(def_t *defs, file_t *f, pat_t *pattern)
 {
-    static int matches = 0;
-    match_t *m = NULL;
-    while ((m = next_match(defs, f, m, pattern, options.skip, options.ignorecase))) {
-        if (++matches > 1)
+    int nmatches = 0;
+    for (match_t *m = NULL; next_match(&m, defs, f, pattern, options.skip, options.ignorecase); ) {
+        if (++nmatches > 1)
             printf(",\n");
         printf("{\"filename\":\"%s\",\"match\":", f->filename);
         json_match(f->start, m, options.verbose);
         printf("}");
     }
-    if (m) recycle_if_unused(&m);
-    return matches;
+    return nmatches;
 }
 
 //
@@ -187,18 +185,16 @@ static int print_matches_as_json(def_t *defs, file_t *f, pat_t *pattern)
 //
 static int explain_matches(def_t *defs, file_t *f, pat_t *pattern)
 {
-    int matches = 0;
-    match_t *m = NULL;
-    while ((m = next_match(defs, f, m, pattern, options.skip, options.ignorecase))) {
-        if (++matches == 1) {
+    int nmatches = 0;
+    for (match_t *m = NULL; next_match(&m, defs, f, pattern, options.skip, options.ignorecase); ) {
+        if (++nmatches == 1) {
             if (options.print_filenames)
                 fprint_filename(stdout, f->filename);
         } else
             printf("\n\n");
         explain_match(m);
     }
-    if (m) recycle_if_unused(&m);
-    return matches;
+    return nmatches;
 }
 
 //
@@ -243,8 +239,7 @@ static int print_matches(FILE *out, def_t *defs, file_t *f, pat_t *pattern)
         .lineformat = LINE_FORMATS[options.format],
     };
 
-    match_t *m = NULL;
-    while ((m = next_match(defs, f, m, pattern, options.skip, options.ignorecase))) {
+    for (match_t *m = NULL; next_match(&m, defs, f, pattern, options.skip, options.ignorecase); ) {
         if (print_errors(f, m) > 0)
             exit(EXIT_FAILURE);
 
@@ -254,7 +249,6 @@ static int print_matches(FILE *out, def_t *defs, file_t *f, pat_t *pattern)
         }
         print_match(out, &pr, m);
     }
-    if (m) recycle_if_unused(&m);
 
     if (matches > 0 || (f->filename[0] == '\0' && options.context_before == ALL_CONTEXT)) {
         // Print trailing context lines:
@@ -281,18 +275,19 @@ static int process_file(def_t *defs, const char *filename, pat_t *pattern)
     if (options.mode == MODE_EXPLAIN) {
         matches += explain_matches(defs, f, pattern);
     } else if (options.mode == MODE_LISTFILES) {
-        match_t *m = next_match(defs, f, NULL, pattern, options.skip, options.ignorecase);
-        if (m) {
-            recycle_if_unused(&m);
+        match_t *m = NULL;
+        if (next_match(&m, defs, f, pattern, options.skip, options.ignorecase)) {
             printf("%s\n", f->filename);
             matches += 1;
         }
+        stop_matching(&m);
     } else if (options.mode == MODE_JSON) {
         matches += print_matches_as_json(defs, f, pattern);
     } else if (options.mode == MODE_INPLACE) {
-        match_t *m = next_match(defs, f, NULL, pattern, options.skip, options.ignorecase);
-        if (m) recycle_if_unused(&m);
-        else return 0;
+        match_t *m = NULL;
+        bool found = next_match(&m, defs, f, pattern, options.skip, options.ignorecase);
+        stop_matching(&m);
+        if (!found) return 0;
 
         // Ensure the file is resident in memory:
         if (f->mmapped) {
@@ -315,7 +310,6 @@ static int process_file(def_t *defs, const char *filename, pat_t *pattern)
     }
     fflush(stdout);
 
-    cache_destroy(f);
     if (recycle_all_matches() != 0)
         fprintf(stderr, "\033[33;1mMemory leak: there should no longer be any matches in use at this point.\033[m\n");
     destroy_file(&f);
@@ -480,10 +474,10 @@ int main(int argc, char *argv[])
             file_t *arg_file = spoof_file(&loaded_files, "<skip argument>", flag, -1);
             pat_t *s = bp_pattern(arg_file, arg_file->start);
             if (!s) {
-                fprint_line(stdout, arg_file, arg_file->start, arg_file->end,
+                file_err(arg_file, arg_file->start, arg_file->end,
                             "Failed to compile the skip argument");
             } else if (after_spaces(s->end, true) < arg_file->end) {
-                fprint_line(stdout, arg_file, s->end, arg_file->end,
+                file_err(arg_file, s->end, arg_file->end,
                             "Failed to compile part of the skip argument");
             }
             options.skip = either_pat(arg_file, options.skip, s);
@@ -536,10 +530,6 @@ int main(int argc, char *argv[])
 
     // Handle exit() calls gracefully:
     require(atexit(&cleanup), "Failed to set cleanup handler at exit");
-
-    // No need for these caches anymore:
-    for (file_t *f = loaded_files; f; f = f->next)
-        cache_destroy(f);
 
     int found = 0;
     if (options.mode == MODE_JSON) printf("[");

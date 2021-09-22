@@ -16,6 +16,13 @@
 #include "utils.h"
 #include "utf8.h"
 
+#define MAX_CACHE_SIZE (1<<14)
+
+typedef struct {
+    size_t size, occupancy;
+    match_t **matches;
+} cache_t;
+
 // New match objects are either recycled from unused match objects or allocated
 // from the heap. While it is in use, the match object is stored in the
 // `in_use_matches` linked list. Once it is no longer needed, it is moved to
@@ -27,10 +34,8 @@ static match_t *in_use_matches = NULL;
 
 #define MATCHES(...) (match_t*[]){__VA_ARGS__, NULL}
 
-__attribute__((nonnull(1)))
-static inline pat_t *deref(def_t *defs, pat_t *pat);
-__attribute__((hot, nonnull(2,3,4)))
-static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool ignorecase);
+__attribute__((hot, nonnull(2,3,4,5)))
+static match_t *match(def_t *defs, cache_t *cache, file_t *f, const char *str, pat_t *pat, bool ignorecase);
 
 // Store a value and update its refcount
 static inline void add_owner(match_t** owner, match_t* owned)
@@ -81,9 +86,116 @@ static inline void list_remove(match_t *m, match_dll_t *node)
 }
 
 //
+// Hash a string position/pattern.
+//
+static inline size_t hash(const char *str, pat_t *pat)
+{
+    return (size_t)str + 2*pat->id;
+}
+
+//
+// Check if we have memoized a pattern match at the given position for the
+// given definitions. If a result has been memoized, set *result to the
+// memoized value and return true, otherwise return false.
+//
+static bool cache_get(cache_t *cache, def_t *defs, const char *str, pat_t *pat, match_t **result)
+{
+    if (!cache->matches) return NULL;
+    size_t h = hash(str, pat) & (cache->size-1);
+    for (match_t *c = cache->matches[h]; c; c = c->cache.next) {
+        if (c->pat == pat && c->defs_id == (defs?defs->id:0) && c->start == str) {
+            // If c->end == NULL, that means no match occurs here
+            *result = c->end == NULL ? NULL : c;
+            return true;
+        }
+    }
+    return false;
+}
+
+//
+// Remove an item from the cache.
+//
+static void cache_remove(cache_t *cache, match_t *m)
+{
+    if (!m->cache.home) return;
+    *m->cache.home = m->cache.next;
+    if (m->cache.next) m->cache.next->cache.home = m->cache.home;
+    m->cache.next = NULL;
+    m->cache.home = NULL;
+    if (--m->refcount == 0) recycle_if_unused(&m);
+    --cache->occupancy;
+}
+
+//
+// Save a match in the cache.
+//
+static void cache_save(cache_t *cache, def_t *defs, const char *str, pat_t *pat, match_t *m)
+{
+    // As a convention, a match with {.pat=pat, .start=str, .end==NULL} is used
+    // to memoize the fact that `pat` will *not* match at `str`.
+    if (m == NULL) m = new_match(defs, pat, str, NULL, NULL);
+
+    if (cache->occupancy+1 > 3*cache->size) {
+        if (cache->size == MAX_CACHE_SIZE) {
+            size_t h = hash(m->start, m->pat) & (cache->size-1);
+            for (int quota = 2; cache->matches[h] && quota > 0; quota--) {
+                match_t *last = cache->matches[h];
+                while (last->cache.next) last = last->cache.next;
+                cache_remove(cache, last);
+            }
+        } else {
+            match_t **old_matches = cache->matches;
+            size_t old_size = cache->size;
+            cache->size = old_size == 0 ? 16 : 2*old_size;
+            cache->matches = new(match_t*[cache->size]);
+
+            // Rehash:
+            if (old_matches) {
+                for (size_t i = 0; i < old_size; i++) {
+                    for (match_t *o; (o = old_matches[i]); ) {
+                        *o->cache.home = o->cache.next;
+                        if (o->cache.next) o->cache.next->cache.home = o->cache.home;
+                        size_t h = hash(o->start, o->pat) & (cache->size-1);
+                        o->cache.home = &(cache->matches[h]);
+                        o->cache.next = cache->matches[h];
+                        if (cache->matches[h]) cache->matches[h]->cache.home = &o->cache.next;
+                        cache->matches[h] = o;
+                    }
+                }
+                free(old_matches);
+            }
+        }
+    }
+
+    size_t h = hash(m->start, m->pat) & (cache->size-1);
+    m->cache.home = &(cache->matches[h]);
+    m->cache.next = cache->matches[h];
+    if (cache->matches[h]) cache->matches[h]->cache.home = &m->cache.next;
+    cache->matches[h] = m;
+    ++m->refcount;
+    ++cache->occupancy;
+}
+
+//
+// Clear and deallocate the cache.
+//
+void cache_destroy(cache_t *cache)
+{
+    if (!cache->matches) return;
+    for (size_t i = 0; i < cache->size; i++) {
+        while (cache->matches[i])
+            cache_remove(cache, cache->matches[i]);
+    }
+    cache->occupancy = 0;
+    delete(&cache->matches);
+    cache->size = 0;
+}
+
+//
 // If the given pattern is a reference, look it up and return the referenced
 // pattern. This is used for an optimization to avoid repeated lookups.
 //
+__attribute__((nonnull(1)))
 static inline pat_t *deref(def_t *defs, pat_t *pat)
 {
     if (pat && pat->type == BP_REF) {
@@ -128,15 +240,18 @@ static pat_t *first_pat(def_t *defs, pat_t *pat)
 //
 // Find the next match after prev (or the first match if prev is NULL)
 //
-match_t *next_match(def_t *defs, file_t *f, match_t *prev, pat_t *pat, pat_t *skip, bool ignorecase)
+__attribute__((nonnull(3,5)))
+static match_t *_next_match(def_t *defs, cache_t *cache, file_t *f, const char *str, pat_t *pat, pat_t *skip, bool ignorecase)
 {
-    const char *str;
-    if (prev) {
-        str = prev->end > prev->start ? prev->end : prev->end + 1;
-        if (prev->refcount == 0) recycle_if_unused(&prev);
-        cache_prune(f, str, f->end);
-    } else {
-        str = f->start;
+    // Prune the unnecessary entries from the cache (those not between start/end)
+    if (cache->matches) {
+        for (size_t i = 0; i < cache->size; i++) {
+            for (match_t *m = cache->matches[i], *next = NULL; m; m = next) {
+                next = m->cache.next;
+                if (m->start < f->start || (m->end ? m->end : m->start) > f->end)
+                    cache_remove(cache, m);
+            }
+        }
     }
 
     pat = deref(defs, pat);
@@ -162,14 +277,14 @@ match_t *next_match(def_t *defs, file_t *f, match_t *prev, pat_t *pat, pat_t *sk
     if (str > f->end) return NULL;
 
     do {
-        match_t *m = match(defs, f, str, pat, ignorecase);
+        match_t *m = match(defs, cache, f, str, pat, ignorecase);
         if (m) return m;
         if (first->type == BP_START_OF_FILE) return NULL;
         match_t *s;
-        if (skip && (s = match(defs, f, str, skip, ignorecase))) {
+        if (skip && (s = match(defs, cache, f, str, skip, ignorecase))) {
             str = s->end > str ? s->end : str + 1;
             recycle_if_unused(&s);
-        } else str = next_char(f, str);
+        } else str = next_char(str, f->end);
     } while (str < f->end);
     return NULL;
 }
@@ -179,12 +294,12 @@ match_t *next_match(def_t *defs, file_t *f, match_t *prev, pat_t *pat, pat_t *sk
 // match object, or NULL if no match is found.
 // The returned value should be free()'d to avoid memory leaking.
 //
-static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool ignorecase)
+static match_t *match(def_t *defs, cache_t *cache, file_t *f, const char *str, pat_t *pat, bool ignorecase)
 {
     switch (pat->type) {
     case BP_DEFINITION: {
         def_t *defs2 = with_def(defs, pat->args.def.namelen, pat->args.def.name, pat->args.def.def);
-        match_t *m = match(defs2, f, str, pat->args.def.pat ? pat->args.def.pat : pat->args.def.def, ignorecase);
+        match_t *m = match(defs2, cache, f, str, pat->args.def.pat ? pat->args.def.pat : pat->args.def.def, ignorecase);
         defs = free_defs(defs2, defs);
         return m;
     }
@@ -198,17 +313,17 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
             ++pat->args.leftrec.visits;
             return pat->args.leftrec.match;
         } else {
-            return match(defs, f, str, pat->args.leftrec.fallback, ignorecase);
+            return match(defs, cache, f, str, pat->args.leftrec.fallback, ignorecase);
         }
     }
     case BP_ANYCHAR: {
-        return (str < f->end && *str != '\n') ? new_match(defs, pat, str, next_char(f, str), NULL) : NULL;
+        return (str < f->end && *str != '\n') ? new_match(defs, pat, str, next_char(str, f->end), NULL) : NULL;
     }
     case BP_ID_START: {
-        return (str < f->end && isidstart(f, str)) ? new_match(defs, pat, str, next_char(f, str), NULL) : NULL;
+        return (str < f->end && isidstart(str, f->end)) ? new_match(defs, pat, str, next_char(str, f->end), NULL) : NULL;
     }
     case BP_ID_CONTINUE: {
-        return (str < f->end && isidcontinue(f, str)) ? new_match(defs, pat, str, next_char(f, str), NULL) : NULL;
+        return (str < f->end && isidcontinue(str, f->end)) ? new_match(defs, pat, str, next_char(str, f->end), NULL) : NULL;
     }
     case BP_START_OF_FILE: {
         return (str == f->start) ? new_match(defs, pat, str, str, NULL) : NULL;
@@ -223,7 +338,7 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
         return (str == f->end || *str == '\n') ? new_match(defs, pat, str, str, NULL) : NULL;
     }
     case BP_WORD_BOUNDARY: {
-        return (str == f->start || isidcontinue(f, str) != isidcontinue(f, prev_char(f, str))) ? new_match(defs, pat, str, str, NULL) : NULL;
+        return (str == f->start || isidcontinue(str, f->end) != isidcontinue(prev_char(f->start, str), f->end)) ? new_match(defs, pat, str, str, NULL) : NULL;
     }
     case BP_STRING: {
         if (&str[pat->min_matchlen] > f->end) return NULL;
@@ -238,7 +353,7 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
         return new_match(defs, pat, str, str+1, NULL);
     }
     case BP_NOT: {
-        match_t *m = match(defs, f, str, pat->args.pat, ignorecase);
+        match_t *m = match(defs, cache, f, str, pat->args.pat, ignorecase);
         if (m != NULL) {
             recycle_if_unused(&m);
             return NULL;
@@ -259,7 +374,7 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
         for (const char *prev = NULL; prev < str; ) {
             prev = str;
             if (target) {
-                match_t *p = match(defs, f, str, target, ignorecase);
+                match_t *p = match(defs, cache, f, str, target, ignorecase);
                 if (p != NULL) {
                     recycle_if_unused(&p);
                     m->end = str;
@@ -270,7 +385,7 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
                 return m;
             }
             if (skip) {
-                match_t *s = match(defs, f, str, skip, ignorecase);
+                match_t *s = match(defs, cache, f, str, skip, ignorecase);
                 if (s != NULL) {
                     str = s->end;
                     if (nchildren+2 >= child_cap) {
@@ -285,7 +400,7 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
             // be at least once chance to match the pattern, even if
             // we're at the end of the string already (e.g. "..$").
             if (str < f->end && *str != '\n' && pat->type != BP_UPTO_STRICT)
-                str = next_char(f, str);
+                str = next_char(str, f->end);
         }
         recycle_if_unused(&m);
         return NULL;
@@ -302,11 +417,11 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
             // Separator
             match_t *msep = NULL;
             if (sep != NULL && reps > 0) {
-                msep = match(defs, f, str, sep, ignorecase);
+                msep = match(defs, cache, f, str, sep, ignorecase);
                 if (msep == NULL) break;
                 str = msep->end;
             }
-            match_t *mp = match(defs, f, str, repeating, ignorecase);
+            match_t *mp = match(defs, cache, f, str, repeating, ignorecase);
             if (mp == NULL) {
                 str = start;
                 if (msep) recycle_if_unused(&msep);
@@ -358,19 +473,20 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
         // current pos, so mock it out as a file slice.
         // TODO: this breaks ^/^^/$/$$, but that can probably be ignored
         // because you rarely need to check those in a backtrack.
+        cache_t slice_cache = {0};
         file_t slice;
         slice_file(&slice, f, f->start, str);
         for (const char *pos = &str[-(long)back->min_matchlen];
              pos >= f->start && (back->max_matchlen == -1 || pos >= &str[-(int)back->max_matchlen]);
-             pos = prev_char(f, pos)) {
-            cache_destroy(&slice);
+             pos = prev_char(f->start, pos)) {
+            cache_destroy(&slice_cache);
             slice.start = (char*)pos;
-            match_t *m = match(defs, &slice, pos, back, ignorecase);
+            match_t *m = match(defs, &slice_cache, &slice, pos, back, ignorecase);
             // Match should not go past str (i.e. (<"AB" "B") should match "ABB", but not "AB")
             if (m && m->end != str)
                 recycle_if_unused(&m);
             else if (m) {
-                cache_destroy(&slice);
+                cache_destroy(&slice_cache);
                 return new_match(defs, pat, str, str, MATCHES(m));
             }
             if (pos == f->start) break;
@@ -378,23 +494,23 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
             // walking backwards endlessly over newlines.
             if (back->max_matchlen == -1 && *pos == '\n') break;
         }
-        cache_destroy(&slice);
+        cache_destroy(&slice_cache);
         return NULL;
     }
     case BP_BEFORE: {
-        match_t *after = match(defs, f, str, pat->args.pat, ignorecase);
+        match_t *after = match(defs, cache, f, str, pat->args.pat, ignorecase);
         return after ? new_match(defs, pat, str, str, MATCHES(after)) : NULL;
     }
     case BP_CAPTURE: {
-        match_t *p = match(defs, f, str, pat->args.pat, ignorecase);
+        match_t *p = match(defs, cache, f, str, pat->args.pat, ignorecase);
         return p ? new_match(defs, pat, str, p->end, MATCHES(p)) : NULL;
     }
     case BP_OTHERWISE: {
-        match_t *m = match(defs, f, str, pat->args.multiple.first, ignorecase);
-        return m ? m : match(defs, f, str, pat->args.multiple.second, ignorecase);
+        match_t *m = match(defs, cache, f, str, pat->args.multiple.first, ignorecase);
+        return m ? m : match(defs, cache, f, str, pat->args.multiple.second, ignorecase);
     }
     case BP_CHAIN: {
-        match_t *m1 = match(defs, f, str, pat->args.multiple.first, ignorecase);
+        match_t *m1 = match(defs, cache, f, str, pat->args.multiple.first, ignorecase);
         if (m1 == NULL) return NULL;
 
         match_t *m2;
@@ -408,7 +524,7 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
 
             def_t *defs2 = with_def(defs, m1->pat->args.capture.namelen, m1->pat->args.capture.name, backref);
             ++m1->refcount; {
-                m2 = match(defs2, f, m1->end, pat->args.multiple.second, ignorecase);
+                m2 = match(defs2, cache, f, m1->end, pat->args.multiple.second, ignorecase);
                 if (!m2) { // No need to keep the backref in memory if it didn't match
                     for (pat_t **rem = &f->pats; *rem; rem = &(*rem)->next) {
                         if ((*rem) == backref) {
@@ -422,7 +538,7 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
                 defs = free_defs(defs2, defs);
             } --m1->refcount;
         } else {
-            m2 = match(defs, f, m1->end, pat->args.multiple.second, ignorecase);
+            m2 = match(defs, cache, f, m1->end, pat->args.multiple.second, ignorecase);
         }
 
         if (m2 == NULL) {
@@ -433,35 +549,36 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
         return new_match(defs, pat, str, m2->end, MATCHES(m1, m2));
     }
     case BP_MATCH: case BP_NOT_MATCH: {
-        match_t *m1 = match(defs, f, str, pat->args.multiple.first, ignorecase);
+        match_t *m1 = match(defs, cache, f, str, pat->args.multiple.first, ignorecase);
         if (m1 == NULL) return NULL;
 
         // <p1>~<p2> matches iff the text of <p1> matches <p2>
         // <p1>!~<p2> matches iff the text of <p1> does not match <p2>
+        cache_t slice_cache = {0};
         file_t slice;
         slice_file(&slice, f, m1->start, m1->end);
-        match_t *m2 = next_match(defs, &slice, NULL, pat->args.multiple.second, NULL, ignorecase);
+        match_t *m2 = _next_match(defs, &slice_cache, &slice, slice.start, pat->args.multiple.second, NULL, ignorecase);
         if ((!m2 && pat->type == BP_MATCH) || (m2 && pat->type == BP_NOT_MATCH)) {
-            cache_destroy(&slice);
+            cache_destroy(&slice_cache);
             if (m2) recycle_if_unused(&m2);
             recycle_if_unused(&m1);
             return NULL;
         }
         match_t *ret = new_match(defs, pat, m1->start, m1->end, (pat->type == BP_MATCH) ? MATCHES(m1, m2) : MATCHES(m1));
-        cache_destroy(&slice);
+        cache_destroy(&slice_cache);
         return ret;
     }
     case BP_REPLACE: {
         match_t *p = NULL;
         if (pat->args.replace.pat) {
-            p = match(defs, f, str, pat->args.replace.pat, ignorecase);
+            p = match(defs, cache, f, str, pat->args.replace.pat, ignorecase);
             if (p == NULL) return NULL;
         }
         return new_match(defs, pat, str, p ? p->end : str, MATCHES(p));
     }
     case BP_REF: {
         match_t *cached;
-        if (cache_get(f, defs, str, pat, &cached))
+        if (cache_get(cache, defs, str, pat, &cached))
             return cached;
 
         def_t *def = lookup(defs, pat->args.ref.len, pat->args.ref.name);
@@ -490,9 +607,9 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
         };
 
         const char *prev = str;
-        match_t *m = match(&defs2, f, str, ref, ignorecase);
+        match_t *m = match(&defs2, cache, f, str, ref, ignorecase);
         if (m == NULL) {
-            cache_save(f, defs, str, pat, NULL);
+            cache_save(cache, defs, str, pat, NULL);
             return NULL;
         }
 
@@ -501,7 +618,7 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
             remove_ownership(&rec_op.args.leftrec.match);
             add_owner(&rec_op.args.leftrec.match, m);
             prev = m->end;
-            match_t *m2 = match(&defs2, f, str, ref, ignorecase);
+            match_t *m2 = match(&defs2, cache, f, str, ref, ignorecase);
             if (m2 == NULL) break;
             if (m2->end <= prev) {
                 recycle_if_unused(&m2);
@@ -516,7 +633,7 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
         // results.
         // OPTIMIZE: remove this if necessary
         match_t *wrap = new_match(defs, pat, m->start, m->end, MATCHES(m));
-        cache_save(f, defs, str, pat, wrap);
+        cache_save(cache, defs, str, pat, wrap);
 
         if (rec_op.args.leftrec.match)
             remove_ownership(&rec_op.args.leftrec.match);
@@ -527,9 +644,8 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
         if (*str != '\n') return NULL;
         const char *start = str;
 
-        size_t linenum = get_line_number(f, str);
-        const char *p = get_line(f, linenum);
-        if (p < f->start) p = f->start; // Can happen with recursive matching
+        const char *p = str;
+        while (p > f->start && p[-1] != '\n') --p;
 
         // Current indentation:
         char denter = *p;
@@ -546,7 +662,7 @@ static match_t *match(def_t *defs, file_t *f, const char *str, pat_t *pat, bool 
         return new_match(defs, pat, start, &str[dents], NULL);
     }
     case BP_ERROR: {
-        match_t *p = pat->args.pat ? match(defs, f, str, pat->args.pat, ignorecase) : NULL;
+        match_t *p = pat->args.pat ? match(defs, cache, f, str, pat->args.pat, ignorecase) : NULL;
         return p ? new_match(defs, pat, str, p->end, MATCHES(p)) : NULL;
     }
     default: {
@@ -642,6 +758,34 @@ size_t free_all_matches(void)
         ++count;
     }
     return count;
+}
+
+//
+// Iterate over matches.
+// Usage: for (match_t *m = NULL; next_match(&m, ...); ) {...}
+//
+bool next_match(match_t **m, def_t *defs, file_t *f, pat_t *pat, pat_t *skip, bool ignorecase)
+{
+    static cache_t cache = {0};
+    if (!f || !pat) { // Cleanup for stop_matching()
+        recycle_if_unused(m);
+        cache_destroy(&cache);
+        return false;
+    }
+
+    const char *start;
+    if (*m) {
+        // Make sure forward progress is occurring, even after zero-width matches:
+        start = ((*m)->end > (*m)->start) ? (*m)->end : (*m)->end+1;
+        recycle_if_unused(m);
+    } else {
+        start = f->start;
+        cache_destroy(&cache);
+    }
+
+    *m = (start <= f->end) ? _next_match(defs, &cache, f, start, pat, skip, ignorecase) : NULL;
+    if (!*m) cache_destroy(&cache);
+    return *m != NULL;
 }
 
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1,\:0

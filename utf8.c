@@ -3,8 +3,9 @@
 //
 #include <ctype.h>
 #include <stdint.h>
+#include <stdbool.h>
+#include <unistd.h>
 
-#include "files.h"
 #include "utf8.h"
 
 #define ARRAY_LEN(a) (sizeof(a)/sizeof((a)[0]))
@@ -181,39 +182,39 @@ static const uint32_t XID_Continue_only[][2] = {
 // Return the location of the next character or UTF8 codepoint.
 // (i.e. skip forward one codepoint at a time, not one byte at a time)
 //
-const char *next_char(file_t *f, const char *str)
+const char *next_char(const char *str, const char *end)
 {
-    if (likely(str+1 <= f->end) && likely((str[0] & 0x80) == 0x0))
+    if (likely(str+1 <= end) && likely((str[0] & 0x80) == 0x0))
         return str+1;
-    if (likely(str+2 <= f->end) && (str[0] & 0xe0) == 0xc0)
+    if (likely(str+2 <= end) && (str[0] & 0xe0) == 0xc0)
         return str+2;
-    if (likely(str+3 <= f->end) && (str[0] & 0xf0) == 0xe0)
+    if (likely(str+3 <= end) && (str[0] & 0xf0) == 0xe0)
         return str+3;
-    if (likely(str+4 <= f->end) && (str[0] & 0xf8) == 0xf0)
+    if (likely(str+4 <= end) && (str[0] & 0xf8) == 0xf0)
         return str+4;
-    return likely(str+1 <= f->end) ? str+1 : f->end;
+    return likely(str+1 <= end) ? str+1 : end;
 }
 
 //
 // Return the location of the previous character or UTF8 codepoint.
 // (i.e. skip backwards one codepoint at a time, not one byte at a time)
 //
-const char *prev_char(file_t *f, const char *str)
+const char *prev_char(const char *start, const char *str)
 {
-    if (likely(str-1 >= f->start) && likely((str[-1] & 0x80) == 0x0))
+    if (likely(str-1 >= start) && likely((str[-1] & 0x80) == 0x0))
         return str-1;
-    if (likely(str-2 >= f->start) && (str[-2] & 0xe0) == 0xc0)
+    if (likely(str-2 >= start) && (str[-2] & 0xe0) == 0xc0)
         return str-2;
-    if (likely(str-3 >= f->start) && (str[-3] & 0xf0) == 0xe0)
+    if (likely(str-3 >= start) && (str[-3] & 0xf0) == 0xe0)
         return str-3;
-    if (likely(str-4 >= f->start) && (str[-4] & 0xf8) == 0xf0)
+    if (likely(str-4 >= start) && (str[-4] & 0xf8) == 0xf0)
         return str-4;
-    return likely(str-1 >= f->start) ? str-1 : f->start;
+    return likely(str-1 >= start) ? str-1 : start;
 }
 
-static uint32_t get_codepoint(file_t *f, const char *str)
+static uint32_t get_codepoint(const char *str, const char *end)
 {
-    if (str >= f->end)
+    if (unlikely(str >= end))
         return (uint32_t)-1;
 
     unsigned char c1 = (unsigned char)str[0];
@@ -235,7 +236,7 @@ static uint32_t get_codepoint(file_t *f, const char *str)
     }
 
     for (int i = 1; i < seqlen; ++i) {
-        if (unlikely(&str[i] >= f->end || (str[i] & 0xC0) != 0x80))
+        if (unlikely((&str[i] >= end) || (str[i] & 0xC0) != 0x80))
             return (uint32_t)-1;
         codepoint = ((codepoint << 6) | (uint32_t)(str[i] & 0x3F));
     }
@@ -259,22 +260,22 @@ static bool find_in_ranges(uint32_t codepoint, const uint32_t ranges[][2], size_
     return false;
 }
 
-bool isidstart(file_t *f, const char *str)
+bool isidstart(const char *str, const char *end)
 {
-    if (unlikely(str >= f->end)) return false;
+    if (unlikely(str >= end)) return false;
     else if (isalpha(*str) || *str == '_') return true;
     else if (likely((*str & 0x80) == 0)) return false;
-    uint32_t codepoint = get_codepoint(f, str);
+    uint32_t codepoint = get_codepoint(str, end);
     return codepoint != (uint32_t)-1
         && find_in_ranges(codepoint, XID_Start, ARRAY_LEN(XID_Start));
 }
 
-bool isidcontinue(file_t *f, const char *str)
+bool isidcontinue(const char *str, const char *end)
 {
-    if (unlikely(str >= f->end)) return false;
+    if (unlikely(str >= end)) return false;
     else if (isalnum(*str) || *str == '_') return true;
     else if (likely((*str & 0x80) == 0)) return false;
-    uint32_t codepoint = get_codepoint(f, str);
+    uint32_t codepoint = get_codepoint(str, end);
     return codepoint != (uint32_t)-1
         && (find_in_ranges(codepoint, XID_Start, ARRAY_LEN(XID_Start))
             || find_in_ranges(codepoint, XID_Continue_only, ARRAY_LEN(XID_Continue_only)));

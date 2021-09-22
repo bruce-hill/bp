@@ -6,13 +6,10 @@
 
 #include "types.h"
 
-#include <stdbool.h>
 #include <stdio.h>
 #include <unistd.h>
 
 #define file_err(f, ...) do { fprint_line(stderr, f, __VA_ARGS__); exit(EXIT_FAILURE); } while(false)
-
-#define MAX_CACHE_SIZE (1<<14)
 
 typedef struct file_s {
     struct file_s *next;
@@ -43,14 +40,6 @@ __attribute__((pure, nonnull))
 const char *get_line(file_t *f, size_t line_number);
 __attribute__((nonnull(1,2,3), format(printf,5,6)))
 void fprint_line(FILE *dest, file_t *f, const char *start, const char *end, const char *fmt, ...);
-__attribute__((nonnull(1,3,4,5)))
-bool cache_get(file_t *f, def_t *defs, const char *str, pat_t *pat, match_t **result);
-__attribute__((nonnull(1,3,4)))
-void cache_save(file_t *f, def_t *defs, const char *str, pat_t *pat, match_t *m);
-__attribute__((nonnull))
-void cache_prune(file_t *f, const char *start, const char *end);
-__attribute__((nonnull))
-void cache_destroy(file_t *f);
 
 #endif
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1,\:0
