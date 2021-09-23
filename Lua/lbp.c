@@ -5,6 +5,7 @@
 *   bp.replace(str, pat, replacement, start_index) -> str with replacements
 */
 
+#include <stdlib.h>
 #include <string.h>
 
 #include "lua.h"
@@ -22,6 +23,15 @@
 #endif
 
 static int MATCH_METATABLE = 0;
+
+static inline void push_parse_error(lua_State *L, maybe_pat_t m)
+{
+    size_t err_len = (size_t)(m.value.error.end - m.value.error.start);
+    char *buf = calloc(err_len+1, sizeof(char));
+    memcpy(buf, m.value.error.start, err_len);
+    luaL_error(L, "%s: \"%s\"", m.value.error.msg, buf);
+    free(buf);
+}
 
 static void push_matchstring(lua_State *L, file_t *f, match_t *m)
 {
@@ -124,17 +134,17 @@ static int Lmatch(lua_State *L)
         return 0;
 
     file_t *pat_file = spoof_file(NULL, "<pattern argument>", pat_text, patlen);
-    pat_t *pat = bp_pattern(pat_file, pat_file->start);
-    if (!pat) {
-        // destroy_file(&pat_file);
-        luaL_error(L, "Pattern failed to compile: %s", pat_text);
+    maybe_pat_t maybe_pat = bp_pattern(pat_file, pat_file->start);
+    if (!maybe_pat.success) {
+        push_parse_error(L, maybe_pat);
+        destroy_file(&pat_file);
         return 0;
     }
 
     file_t *text_file = spoof_file(NULL, "<text argument>", text+(index-1), textlen);
     match_t *m = NULL;
     int ret = 0;
-    if (next_match(&m, NULL, text_file, pat, NULL, false)) {
+    if (next_match(&m, NULL, text_file, maybe_pat.value.pat, NULL, false)) {
 
         // lua_createtable(L, 0, 1);
 
@@ -173,18 +183,18 @@ static int Lreplace(lua_State *L)
         index = (lua_Integer)strlen(text)+1;
 
     file_t *pat_file = spoof_file(NULL, "<pattern argument>", pat_text, patlen);
-    pat_t *pat = bp_pattern(pat_file, pat_file->start);
-    if (!pat) {
-        // destroy_file(&pat_file);
-        luaL_error(L, "Pattern failed to compile: %s", pat_text);
+    maybe_pat_t maybe_pat = bp_pattern(pat_file, pat_file->start);
+    if (!maybe_pat.success) {
+        push_parse_error(L, maybe_pat);
+        destroy_file(&pat_file);
         return 0;
     }
     file_t *rep_file = spoof_file(NULL, "<replacement argument>", rep_text, replen);
-    pat = bp_replacement(rep_file, pat, rep_file->start);
-    if (!pat) {
-        // destroy_file(&pat_file);
-        // destroy_file(&rep_file);
-        luaL_error(L, "Replacement failed to compile: %s", rep_text);
+    maybe_pat = bp_replacement(rep_file, maybe_pat.value.pat, rep_file->start);
+    if (!maybe_pat.success) {
+        push_parse_error(L, maybe_pat);
+        destroy_file(&pat_file);
+        destroy_file(&rep_file);
         return 0;
     }
 
@@ -200,7 +210,7 @@ static int Lreplace(lua_State *L)
         .lineformat = "",
     };
     int replacements = 0;
-    for (match_t *m = NULL; next_match(&m, NULL, text_file, pat, NULL, false); ) {
+    for (match_t *m = NULL; next_match(&m, NULL, text_file, maybe_pat.value.pat, NULL, false); ) {
         print_match(out, &pr, m);
         ++replacements;
     }

@@ -37,7 +37,6 @@ enum pattype_e {
     BP_WORD_BOUNDARY = 24,
     BP_DEFINITION    = 25,
     BP_LEFTRECURSION = 26,
-    BP_ERROR         = 27,
 };
 
 struct match_s; // forward declared to resolve circular struct defs

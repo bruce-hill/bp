@@ -99,6 +99,16 @@ static inline void fprint_filename(FILE *out, const char *filename)
 }
 
 //
+// If there was a parse error while building a pattern, print an error message and exit.
+//
+static inline pat_t *assert_pat(file_t *f, maybe_pat_t maybe_pat)
+{
+    if (!maybe_pat.success)
+        file_err(f, maybe_pat.value.error.start, maybe_pat.value.error.end, maybe_pat.value.error.msg);
+    return maybe_pat.value.pat;
+}
+
+//
 // Look for a key/value flag at the first position in the given argument list.
 // If the flag is found, update `next` to point to the next place to check for a flag.
 // The contents of argv[0] may be modified for single-char flags.
@@ -440,9 +450,7 @@ int main(int argc, char *argv[])
             // TODO: spoof file as sprintf("pattern => '%s'", flag)
             // except that would require handling edge cases like quotation marks etc.
             file_t *replace_file = spoof_file(&loaded_files, "<replace argument>", flag, -1);
-            pattern = bp_replacement(replace_file, pattern, replace_file->start);
-            if (!pattern)
-                errx(EXIT_FAILURE, "Replacement failed to compile: %s", flag);
+            pattern = assert_pat(replace_file, bp_replacement(replace_file, pattern, replace_file->start));
             if (options.context_before == USE_DEFAULT_CONTEXT) options.context_before = ALL_CONTEXT;
             if (options.context_after == USE_DEFAULT_CONTEXT) options.context_after = ALL_CONTEXT;
         } else if (FLAG("-g")     || FLAG("--grammar")) {
@@ -458,29 +466,17 @@ int main(int argc, char *argv[])
             defs = load_grammar(defs, f); // Keep in memory for debug output
         } else if (FLAG("-p")     || FLAG("--pattern")) {
             file_t *arg_file = spoof_file(&loaded_files, "<pattern argument>", flag, -1);
-            pat_t *p = bp_pattern(arg_file, arg_file->start);
-            if (!p) file_err(arg_file, arg_file->start, arg_file->end, "Failed to compile this part of the argument");
-            if (p->type == BP_ERROR)
-                file_err(arg_file, p->args.error.start, p->args.error.end, p->args.error.msg);
-            if (after_spaces(p->end, true) < arg_file->end) file_err(arg_file, p->end, arg_file->end, "Failed to compile this part of the argument");
+            pat_t *p = assert_pat(arg_file, bp_pattern(arg_file, arg_file->start));
             pattern = chain_together(arg_file, pattern, p);
         } else if (FLAG("-w")     || FLAG("--word")) {
             require(asprintf(&flag, "\\|%s\\|", flag), "Could not allocate memory");
             file_t *arg_file = spoof_file(&loaded_files, "<word pattern>", flag, -1);
             delete(&flag);
-            pat_t *p = bp_stringpattern(arg_file, arg_file->start);
-            if (!p) errx(EXIT_FAILURE, "Pattern failed to compile: %s", flag);
+            pat_t *p = assert_pat(arg_file, bp_stringpattern(arg_file, arg_file->start));
             pattern = chain_together(arg_file, pattern, p);
         } else if (FLAG("-s")     || FLAG("--skip")) {
             file_t *arg_file = spoof_file(&loaded_files, "<skip argument>", flag, -1);
-            pat_t *s = bp_pattern(arg_file, arg_file->start);
-            if (!s) {
-                file_err(arg_file, arg_file->start, arg_file->end,
-                            "Failed to compile the skip argument");
-            } else if (after_spaces(s->end, true) < arg_file->end) {
-                file_err(arg_file, s->end, arg_file->end,
-                            "Failed to compile part of the skip argument");
-            }
+            pat_t *s = assert_pat(arg_file, bp_pattern(arg_file, arg_file->start));
             options.skip = either_pat(arg_file, options.skip, s);
         } else if (FLAG("-C")     || FLAG("--context")) {
             options.context_before = options.context_after = context_from_flag(flag);
@@ -502,8 +498,7 @@ int main(int argc, char *argv[])
         } else if (argv[0][0] != '-') {
             if (pattern != NULL) break;
             file_t *arg_file = spoof_file(&loaded_files, "<pattern argument>", argv[0], -1);
-            pat_t *p = bp_stringpattern(arg_file, arg_file->start);
-            if (!p) errx(EXIT_FAILURE, "Pattern failed to compile: %s", argv[0]);
+            pat_t *p = assert_pat(arg_file, bp_stringpattern(arg_file, arg_file->start));
             pattern = chain_together(arg_file, pattern, p);
             ++argv;
         } else {
