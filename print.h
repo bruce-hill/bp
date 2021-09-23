@@ -6,8 +6,8 @@
 
 #include <stdbool.h>
 
-#include "types.h"
 #include "files.h"
+#include "match.h"
 
 #define USE_DEFAULT_CONTEXT -3
 #define ALL_CONTEXT -2

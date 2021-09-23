@@ -5,7 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "types.h"
+#include "match.h"
 #include "utils.h"
 
 typedef struct match_node_s {

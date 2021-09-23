@@ -6,7 +6,7 @@
 
 #include <stdbool.h>
 
-#include "types.h"
+#include "match.h"
 
 __attribute__((nonnull))
 void json_match(const char *text, match_t *m, bool verbose);

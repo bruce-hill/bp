@@ -4,7 +4,7 @@
 #ifndef EXPLAIN__H
 #define EXPLAIN__H
 
-#include "types.h"
+#include "match.h"
 
 __attribute__((nonnull))
 void explain_match(match_t *m);

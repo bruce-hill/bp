@@ -5,7 +5,18 @@
 #define DEFINITIONS__H
 
 #include "files.h"
-#include "types.h"
+#include "pattern.h"
+
+//
+// Pattern matching rule definition(s)
+//
+typedef struct def_s {
+    size_t id;
+    size_t namelen;
+    const char *name;
+    pat_t *pat;
+    struct def_s *next;
+} def_t;
 
 __attribute__((nonnull(3,4), returns_nonnull))
 def_t *with_def(def_t *defs, size_t namelen, const char *name, pat_t *pat);

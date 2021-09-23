@@ -182,11 +182,6 @@ void destroy_file(file_t **at_f)
         f->mmapped = NULL;
     }
 
-    for (pat_t *next; f->pats; f->pats = next) {
-        next = f->pats->next;
-        delete(&f->pats);
-    }
-
     delete(at_f);
 }
 

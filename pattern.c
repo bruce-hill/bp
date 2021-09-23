@@ -14,6 +14,8 @@
 #include "utils.h"
 #include "utf8.h"
 
+static pat_t *allocated_pats = NULL;
+
 __attribute__((nonnull))
 static pat_t *bp_pattern_nl(file_t *f, const char *str, bool allow_nl);
 __attribute__((nonnull))
@@ -48,10 +50,11 @@ static inline void parse_err(const char *start, const char *end, const char *msg
 __attribute__((returns_nonnull, nonnull(1,2)))
 static pat_t *new_pat(file_t *f, const char *start, const char *end, size_t minlen, ssize_t maxlen, enum pattype_e type)
 {
+    (void)f;
     static size_t next_pat_id = 1;
     pat_t *pat = new(pat_t);
     *pat = (pat_t){
-        .next = f->pats,
+        .next = allocated_pats,
         .type = type,
         .start = start,
         .end = end,
@@ -59,7 +62,7 @@ static pat_t *new_pat(file_t *f, const char *start, const char *end, size_t minl
         .max_matchlen = maxlen,
         .id = next_pat_id++,
     };
-    f->pats = pat;
+    allocated_pats = pat;
     return pat;
 }
 
@@ -610,12 +613,11 @@ static pat_t *bp_pattern_nl(file_t *f, const char *str, bool allow_nl)
 //
 // Return a new back reference to an existing match.
 //
-pat_t *bp_backref(file_t *f, match_t *m)
+pat_t *bp_raw_literal(file_t *f, const char *str, size_t len)
 {
-    size_t len = (size_t)(m->end - m->start);
-    pat_t *backref = new_pat(f, m->start, m->end, len, (ssize_t)len, BP_STRING);
-    backref->args.string = m->start;
-    return backref;
+    pat_t *lit = new_pat(f, str, &str[len], len, (ssize_t)len, BP_STRING);
+    lit->args.string = str;
+    return lit;
 }
 
 //
@@ -632,6 +634,26 @@ maybe_pat_t bp_pattern(file_t *f, const char *str)
         return (maybe_pat_t){.success = true, .value.pat = ret};
     else
         return (maybe_pat_t){.success = false, .value.error.start = str, .value.error.end = f->end, .value.error.msg = "Failed to parse this pattern"};
+}
+
+void free_pat(pat_t *target)
+{
+    if (target) {
+        for (pat_t **rem = &allocated_pats; *rem; rem = &(*rem)->next) {
+            if ((*rem) == target) {
+                pat_t *tmp = *rem;
+                *rem = (*rem)->next;
+                free(tmp);
+                break;
+            }
+        }
+    } else {
+        while (allocated_pats) {
+            pat_t *tofree = allocated_pats;
+            allocated_pats = tofree->next;
+            free(tofree);
+        }
+    }
 }
 
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1,\:0

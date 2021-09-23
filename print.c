@@ -11,7 +11,6 @@
 #include "files.h"
 #include "match.h"
 #include "print.h"
-#include "types.h"
 #include "utils.h"
 
 static const char *color_match = "\033[0;31;1m";

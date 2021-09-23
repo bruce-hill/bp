@@ -4,8 +4,6 @@
 #ifndef FILES__H
 #define FILES__H
 
-#include "types.h"
-
 #include <stdio.h>
 #include <unistd.h>
 
@@ -17,7 +15,6 @@ typedef struct file_s {
     char *mmapped, *allocated;
     char **lines, *start, *end;
     size_t nlines;
-    struct pat_s *pats;
 } file_t;
 
 __attribute__((nonnull(2)))
