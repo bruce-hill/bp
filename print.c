@@ -115,64 +115,6 @@ static const char *context_after(printer_t *pr, const char *pos)
 }
 
 //
-// Get a specific numbered pattern capture.
-//
-__attribute__((nonnull))
-static match_t *get_capture_by_num(match_t *m, int *n)
-{
-    if (*n == 0) return m;
-    if (m->pat->type == BP_CAPTURE && *n == 1) return m;
-    if (m->pat->type == BP_CAPTURE) --(*n);
-    if (m->children) {
-        for (int i = 0; m->children[i]; i++) {
-            match_t *cap = get_capture_by_num(m->children[i], n);
-            if (cap) return cap;
-        }
-    }
-    return NULL;
-}
-
-//
-// Get a capture with a specific name.
-//
-__attribute__((nonnull, pure))
-static match_t *get_capture_by_name(match_t *m, const char *name)
-{
-    if (m->pat->type == BP_CAPTURE && m->pat->args.capture.name
-        && strncmp(m->pat->args.capture.name, name, m->pat->args.capture.namelen) == 0)
-        return m;
-    if (m->children) {
-        for (int i = 0; m->children[i]; i++) {
-            match_t *cap = get_capture_by_name(m->children[i], name);
-            if (cap) return cap;
-        }
-    }
-    return NULL;
-}
-
-//
-// Get a capture by identifier (name or number).
-// Update *id to point to after the identifier (if found).
-//
-__attribute__((nonnull))
-static match_t *get_capture(match_t *m, const char **id)
-{
-    if (isdigit(**id)) {
-        int n = (int)strtol(*id, (char**)id, 10);
-        return get_capture_by_num(m, &n);
-    } else {
-        const char *end = after_name(*id);
-        if (end == *id) return NULL;
-        char *name = strndup(*id, (size_t)(end-*id));
-        match_t *cap = get_capture_by_name(m, name);
-        delete(&name);
-        *id = end;
-        if (**id == ';') ++(*id);
-        return cap;
-    }
-}
-
-//
 // Print the text of a match (no context).
 //
 static void _print_match(FILE *out, printer_t *pr, match_t *m)
@@ -194,9 +136,23 @@ static void _print_match(FILE *out, printer_t *pr, match_t *m)
             print_line_number(out, pr, line, pr->use_color ? color_replace : NULL, line > line_end);
 
             // Capture substitution
-            if (*r == '@' && r[1] && r[1] != '@') {
+            if (*r == '@' && r+1 < m->end && r[1] != '@') {
                 ++r;
-                match_t *cap = get_capture(m->children[0], &r);
+
+                // Retrieve the capture value:
+                match_t *cap = NULL;
+                if (isdigit(*r)) {
+                    int n = (int)strtol(r, (char**)&r, 10);
+                    cap = get_numbered_capture(m->children[0], n);
+                } else {
+                    const char *name = r, *end = after_name(r);
+                    if (end > name) {
+                        cap = get_named_capture(m->children[0], name, (size_t)(end - name));
+                        r = end;
+                        if (r < m->end && *r == ';') ++r;
+                    }
+                }
+
                 if (cap != NULL) {
                     _print_match(out, pr, cap);
                     if (pr->use_color && current_color != color_replace) {

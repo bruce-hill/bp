@@ -788,4 +788,50 @@ bool next_match(match_t **m, def_t *defs, file_t *f, pat_t *pat, pat_t *skip, bo
     return *m != NULL;
 }
 
+//
+// Helper function to track state while doing a depth-first search.
+//
+__attribute__((nonnull))
+static match_t *_get_numbered_capture(match_t *m, int *n)
+{
+    if (*n == 0) return m;
+    if (m->pat->type == BP_CAPTURE && m->pat->args.capture.namelen == 0) {
+        if (*n == 1) return m;
+        --(*n);
+    }
+    if (m->children) {
+        for (int i = 0; m->children[i]; i++) {
+            match_t *cap = _get_numbered_capture(m->children[i], n);
+            if (cap) return cap;
+        }
+    }
+    return NULL;
+}
+
+//
+// Get a specific numbered pattern capture.
+//
+match_t *get_numbered_capture(match_t *m, int n)
+{
+    return _get_numbered_capture(m, &n);
+}
+
+//
+// Get a capture with a specific name.
+//
+match_t *get_named_capture(match_t *m, const char *name, size_t namelen)
+{
+    if (m->pat->type == BP_CAPTURE && m->pat->args.capture.name
+        && m->pat->args.capture.namelen == namelen
+        && strncmp(m->pat->args.capture.name, name, m->pat->args.capture.namelen) == 0)
+        return m;
+    if (m->children) {
+        for (int i = 0; m->children[i]; i++) {
+            match_t *cap = get_named_capture(m->children[i], name, namelen);
+            if (cap) return cap;
+        }
+    }
+    return NULL;
+}
+
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1,\:0
