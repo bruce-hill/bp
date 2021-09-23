@@ -9,7 +9,6 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "files.h"
 #include "pattern.h"
 #include "utils.h"
 #include "utf8.h"
