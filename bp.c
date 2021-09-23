@@ -253,6 +253,8 @@ static int print_matches(FILE *out, def_t *defs, file_t *f, pat_t *pattern)
     if (matches > 0 || (f->filename[0] == '\0' && options.context_before == ALL_CONTEXT)) {
         // Print trailing context lines:
         print_match(out, &pr, NULL);
+        // Guarantee trailing newline:
+        if (!pr.needs_line_number) fprintf(out, "\n");
     }
 
     return matches;

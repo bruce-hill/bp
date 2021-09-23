@@ -262,8 +262,6 @@ void print_match(FILE *out, printer_t *pr, match_t *m)
         // After the last match is printed, print the trailing context:
         const char *after_last = context_after(pr, pr->pos);
         print_between(out, pr, pr->pos, after_last, pr->use_color ? color_normal : NULL);
-        // Guarantee trailing newline
-        if (!pr->needs_line_number) fprintf(out, "\n");
     }
     if (pr->use_color) fprintf(out, "%s", color_normal);
 }
