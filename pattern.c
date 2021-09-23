@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <setjmp.h>
 
 #include "files.h"
 #include "pattern.h"
@@ -17,6 +18,29 @@ __attribute__((nonnull))
 static pat_t *bp_pattern_nl(file_t *f, const char *str, bool allow_nl);
 __attribute__((nonnull))
 static pat_t *bp_simplepattern(file_t *f, const char *str);
+
+// For error-handling purposes, use setjmp/longjmp to break out of deeply
+// recursive function calls when a parse error occurs.
+bool is_in_try_catch = false;
+static jmp_buf err_jmp;
+pat_t *err_pat = NULL;
+
+#define __TRY_PATTERN__ bool was_in_try_catch = is_in_try_catch; \
+    if (!is_in_try_catch) { is_in_try_catch = true; if (setjmp(err_jmp)) return err_pat; }
+#define __END_TRY_PATTERN__ if (!was_in_try_catch) is_in_try_catch = false;
+
+static inline void parse_err(file_t *f, const char *start, const char *end, const char *msg)
+{
+    if (!is_in_try_catch) {
+        fprintf(stderr, "Parse error: %s\n%.*s\n", msg, (int)(end-start), start);
+        exit(1);
+    }
+    err_pat = new_pat(f, start, end, 0, 0, BP_ERROR);
+    err_pat->args.error.start = start;
+    err_pat->args.error.end = end;
+    err_pat->args.error.msg = msg;
+    longjmp(err_jmp, 1);
+}
 
 //
 // Allocate a new pattern for this file (ensuring it will be automatically
@@ -67,9 +91,6 @@ static pat_t *expand_chain(file_t *f, pat_t *first, bool allow_nl)
     pat_t *second = bp_simplepattern(f, str);
     if (second == NULL) return first;
     second = expand_chain(f, second, allow_nl);
-    if (second->end <= first->end)
-        file_err(f, second->end, second->end,
-                 "This chain is not parsing properly");
     return chain_together(f, first, second);
 }
 
@@ -90,7 +111,7 @@ static pat_t *expand_replacements(file_t *f, pat_t *replace_pat, bool allow_nl)
             for (; str < f->end && *str != closequote; str = next_char(str, f->end)) {
                 if (*str == '\\') {
                     if (!str[1] || str[1] == '\n')
-                        file_err(f, str, str+1,
+                        parse_err(f, str, str+1,
                                  "There should be an escape sequence after this backslash.");
                     str = next_char(str, f->end);
                 }
@@ -130,7 +151,7 @@ static pat_t *expand_choices(file_t *f, pat_t *first, bool allow_nl)
     if (matchstr(&str, "=>", allow_nl))
         second = expand_replacements(f, second ? second : new_pat(f, str-2, str-2, 0, 0, BP_STRING), allow_nl);
     if (!second)
-        file_err(f, str, str, "There should be a pattern here after a '/'");
+        parse_err(f, str, str, "There should be a pattern here after a '/'");
     second = expand_choices(f, second, allow_nl);
     return either_pat(f, first, second);
 }
@@ -221,7 +242,7 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
         pat_t *all = NULL;
         do { // Comma-separated items:
             if (str >= f->end || !*str || *str == '\n')
-                file_err(f, str, str, "There should be a character here after the '`'");
+                parse_err(f, str, str, "There should be a character here after the '`'");
 
             const char *c1_loc = str;
             str = next_char(c1_loc, f->end);
@@ -490,6 +511,7 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
 //
 pat_t *bp_stringpattern(file_t *f, const char *str)
 {
+    __TRY_PATTERN__
     pat_t *ret = NULL;
     while (str < f->end) {
         char *start = (char*)str;
@@ -518,6 +540,7 @@ pat_t *bp_stringpattern(file_t *f, const char *str)
             (void)matchchar(&str, ';', false);
         }
     }
+    __END_TRY_PATTERN__
     return ret;
 }
 
@@ -562,6 +585,7 @@ pat_t *bp_replacement(file_t *f, pat_t *replacepat, const char *replacement)
     pat_t *pat = new_pat(f, replacepat->start, replacepat->end, replacepat->min_matchlen, replacepat->max_matchlen, BP_REPLACE);
     pat->args.replace.pat = replacepat;
     const char *p = replacement;
+    __TRY_PATTERN__
     for (; p < f->end; p++) {
         if (*p == '\\') {
             if (!p[1] || p[1] == '\n')
@@ -569,6 +593,7 @@ pat_t *bp_replacement(file_t *f, pat_t *replacepat, const char *replacement)
             ++p;
         }
     }
+    __END_TRY_PATTERN__
     size_t rlen = (size_t)(p-replacement);
     char *rcpy = new(char[rlen + 1]);
     memcpy(rcpy, replacement, rlen);
@@ -592,7 +617,10 @@ static pat_t *bp_pattern_nl(file_t *f, const char *str, bool allow_nl)
 //
 pat_t *bp_pattern(file_t *f, const char *str)
 {
-    return bp_pattern_nl(f, str, false);
+    __TRY_PATTERN__
+    pat_t *ret = bp_pattern_nl(f, str, false);
+    __END_TRY_PATTERN__
+    return ret;
 }
 
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1,\:0

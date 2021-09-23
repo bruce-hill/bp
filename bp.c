@@ -463,6 +463,8 @@ int main(int argc, char *argv[])
             file_t *arg_file = spoof_file(&loaded_files, "<pattern argument>", flag, -1);
             pat_t *p = bp_pattern(arg_file, arg_file->start);
             if (!p) file_err(arg_file, arg_file->start, arg_file->end, "Failed to compile this part of the argument");
+            if (p->type == BP_ERROR)
+                file_err(arg_file, p->args.error.start, p->args.error.end, p->args.error.msg);
             if (after_spaces(p->end, true) < arg_file->end) file_err(arg_file, p->end, arg_file->end, "Failed to compile this part of the argument");
             pattern = chain_together(arg_file, pattern, p);
         } else if (FLAG("-w")     || FLAG("--word")) {

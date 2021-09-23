@@ -56,9 +56,9 @@ static void print_between(FILE *out, printer_t *pr, const char *start, const cha
 {
     file_t *f = pr->file;
     while (start < end) {
-        size_t line_num = get_line_number(f, start);
+        size_t line_num = f ? get_line_number(f, start) : 0;
         print_line_number(out, pr, line_num, color, 0);
-        const char *eol = get_line(pr->file, line_num + 1);
+        const char *eol = f ? get_line(f, line_num + 1) : end;
         if (!eol || eol > end) eol = end;
         if (color && color != current_color) {
             fprintf(out, "%s", color);
@@ -118,8 +118,8 @@ static void _print_match(FILE *out, printer_t *pr, match_t *m)
 {
     pr->pos = m->start;
     if (m->pat->type == BP_REPLACE) {
-        size_t line = get_line_number(pr->file, m->start);
-        size_t line_end = get_line_number(pr->file, m->end);
+        size_t line = pr->file ? get_line_number(pr->file, m->start) : 0;
+        size_t line_end = pr->file ? get_line_number(pr->file, m->end) : 0;
 
         if (pr->use_color && current_color != color_replace) {
             fprintf(out, "%s", color_replace);
@@ -232,7 +232,7 @@ void print_match(FILE *out, printer_t *pr, match_t *m)
     current_color = color_normal;
     bool first = (pr->pos == NULL);
     if (first) { // First match printed:
-        pr->pos = pr->file->start;
+        pr->pos = pr->file ? pr->file->start : m->start;
         pr->needs_line_number = 1;
     }
     if (m) {

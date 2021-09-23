@@ -92,6 +92,9 @@ typedef struct pat_s {
             const char *at;
             struct pat_s *fallback;
         } leftrec;
+        struct {
+            const char *start, *end, *msg;
+        } error;
         struct pat_s *pat;
     } args;
     size_t id;
