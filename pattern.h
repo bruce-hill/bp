@@ -17,8 +17,8 @@ typedef struct {
     } value;
 } maybe_pat_t;
 
-__attribute__((returns_nonnull, nonnull(1,2)))
-pat_t *new_pat(file_t *f, const char *start, const char *end, size_t minlen, ssize_t maxlen, enum pattype_e type);
+__attribute__((nonnull, returns_nonnull))
+pat_t *bp_backref(file_t *f, match_t *m);
 __attribute__((nonnull))
 maybe_pat_t bp_stringpattern(file_t *f, const char *str);
 __attribute__((nonnull(1,2)))

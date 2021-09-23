@@ -518,10 +518,7 @@ static match_t *match(def_t *defs, cache_t *cache, file_t *f, const char *str, p
         if (m1->pat->type == BP_CAPTURE && m1->pat->args.capture.name) {
             // Temporarily add a rule that the backref name matches the
             // exact string of the original match (no replacements)
-            size_t len = (size_t)(m1->end - m1->start);
-            pat_t *backref = new_pat(f, m1->start, m1->end, len, (ssize_t)len, BP_STRING);
-            backref->args.string = m1->start;
-
+            pat_t *backref = bp_backref(f, m1);
             def_t *defs2 = with_def(defs, m1->pat->args.capture.namelen, m1->pat->args.capture.name, backref);
             ++m1->refcount; {
                 m2 = match(defs2, cache, f, m1->end, pat->args.multiple.second, ignorecase);
