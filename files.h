@@ -18,10 +18,6 @@ typedef struct file_s {
     char **lines, *start, *end;
     size_t nlines;
     struct pat_s *pats;
-    struct {
-        size_t size, occupancy;
-        match_t **matches;
-    } cache;
 } file_t;
 
 __attribute__((nonnull(2)))
