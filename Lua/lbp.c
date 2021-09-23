@@ -134,7 +134,7 @@ static int Lmatch(lua_State *L)
         return 0;
 
     file_t *pat_file = spoof_file(NULL, "<pattern argument>", pat_text, patlen);
-    maybe_pat_t maybe_pat = bp_pattern(pat_file, pat_file->start);
+    maybe_pat_t maybe_pat = bp_pattern(pat_file->start, pat_file->end);
     if (!maybe_pat.success) {
         push_parse_error(L, maybe_pat);
         destroy_file(&pat_file);
@@ -183,14 +183,14 @@ static int Lreplace(lua_State *L)
         index = (lua_Integer)strlen(text)+1;
 
     file_t *pat_file = spoof_file(NULL, "<pattern argument>", pat_text, patlen);
-    maybe_pat_t maybe_pat = bp_pattern(pat_file, pat_file->start);
+    maybe_pat_t maybe_pat = bp_pattern(pat_file->start, pat_file->end);
     if (!maybe_pat.success) {
         push_parse_error(L, maybe_pat);
         destroy_file(&pat_file);
         return 0;
     }
     file_t *rep_file = spoof_file(NULL, "<replacement argument>", rep_text, replen);
-    maybe_pat = bp_replacement(rep_file, maybe_pat.value.pat, rep_file->start);
+    maybe_pat = bp_replacement(maybe_pat.value.pat, rep_file->start, rep_file->end);
     if (!maybe_pat.success) {
         push_parse_error(L, maybe_pat);
         destroy_file(&pat_file);
