@@ -133,7 +133,7 @@ static void _print_match(FILE *out, printer_t *pr, match_t *m)
             print_line_number(out, pr, line, pr->use_color ? color_replace : NULL, line > line_end);
 
             // Capture substitution
-            if (*r == '@' && r+1 < m->end && r[1] != '@') {
+            if (*r == '@' && r+1 < end && r[1] != '@') {
                 ++r;
 
                 // Retrieve the capture value:
