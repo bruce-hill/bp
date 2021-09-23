@@ -33,8 +33,7 @@ def_t *with_def(def_t *defs, size_t namelen, const char *name, pat_t *pat)
 //
 def_t *load_grammar(def_t *defs, file_t *f)
 {
-    const char *str = after_spaces(f->start, true);
-    maybe_pat_t maybe_pat = bp_pattern(f, str);
+    maybe_pat_t maybe_pat = bp_pattern(f->start, f->end);
     if (!maybe_pat.success)
         file_err(f, maybe_pat.value.error.start, maybe_pat.value.error.end, maybe_pat.value.error.msg);
     for (pat_t *p = maybe_pat.value.pat; p && p->type == BP_DEFINITION; p = p->args.def.pat)

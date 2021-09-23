@@ -450,7 +450,7 @@ int main(int argc, char *argv[])
             // TODO: spoof file as sprintf("pattern => '%s'", flag)
             // except that would require handling edge cases like quotation marks etc.
             file_t *replace_file = spoof_file(&loaded_files, "<replace argument>", flag, -1);
-            pattern = assert_pat(replace_file, bp_replacement(replace_file, pattern, replace_file->start));
+            pattern = assert_pat(replace_file, bp_replacement(pattern, replace_file->start, replace_file->end));
             if (options.context_before == USE_DEFAULT_CONTEXT) options.context_before = ALL_CONTEXT;
             if (options.context_after == USE_DEFAULT_CONTEXT) options.context_after = ALL_CONTEXT;
         } else if (FLAG("-g")     || FLAG("--grammar")) {
@@ -466,17 +466,17 @@ int main(int argc, char *argv[])
             defs = load_grammar(defs, f); // Keep in memory for debug output
         } else if (FLAG("-p")     || FLAG("--pattern")) {
             file_t *arg_file = spoof_file(&loaded_files, "<pattern argument>", flag, -1);
-            pat_t *p = assert_pat(arg_file, bp_pattern(arg_file, arg_file->start));
+            pat_t *p = assert_pat(arg_file, bp_pattern(arg_file->start, arg_file->end));
             pattern = chain_together(pattern, p);
         } else if (FLAG("-w")     || FLAG("--word")) {
             require(asprintf(&flag, "\\|%s\\|", flag), "Could not allocate memory");
             file_t *arg_file = spoof_file(&loaded_files, "<word pattern>", flag, -1);
             delete(&flag);
-            pat_t *p = assert_pat(arg_file, bp_stringpattern(arg_file, arg_file->start));
+            pat_t *p = assert_pat(arg_file, bp_stringpattern(arg_file->start, arg_file->end));
             pattern = chain_together(pattern, p);
         } else if (FLAG("-s")     || FLAG("--skip")) {
             file_t *arg_file = spoof_file(&loaded_files, "<skip argument>", flag, -1);
-            pat_t *s = assert_pat(arg_file, bp_pattern(arg_file, arg_file->start));
+            pat_t *s = assert_pat(arg_file, bp_pattern(arg_file->start, arg_file->end));
             options.skip = either_pat(options.skip, s);
         } else if (FLAG("-C")     || FLAG("--context")) {
             options.context_before = options.context_after = context_from_flag(flag);
@@ -498,7 +498,7 @@ int main(int argc, char *argv[])
         } else if (argv[0][0] != '-') {
             if (pattern != NULL) break;
             file_t *arg_file = spoof_file(&loaded_files, "<pattern argument>", argv[0], -1);
-            pat_t *p = assert_pat(arg_file, bp_stringpattern(arg_file, arg_file->start));
+            pat_t *p = assert_pat(arg_file, bp_stringpattern(arg_file->start, arg_file->end));
             pattern = chain_together(pattern, p);
             ++argv;
         } else {
