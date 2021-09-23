@@ -37,10 +37,8 @@ static inline void print_line_number(FILE *out, printer_t *pr, size_t line_numbe
             else // Otherwise default to "wide enough for every line number in this file"
                 for (int i = (int)pr->file->nlines; i > 0; i /= 10) ++space;
 
-            if (is_line_continued) {
-                for (space = abs(space); space > 0; --space)
-                    fputc('.', out);
-            } else fprintf(out, "%*lu", space, line_number);
+            if (is_line_continued) fprintf(out, "%*s", abs(space), "");
+            else fprintf(out, "%*lu", space, line_number);
         } else fputc(*c, out);
     }
     if (color) {
@@ -66,8 +64,7 @@ static void print_between(FILE *out, printer_t *pr, const char *start, const cha
             fprintf(out, "%s", color);
             current_color = color;
         }
-        for (const char *c = start; c < eol; c++)
-            fputc(*c, out);
+        fwrite(start, sizeof(char), (size_t)(eol-start), out);
         if (eol[-1] == '\n')
             pr->needs_line_number = 1;
         start = eol;
