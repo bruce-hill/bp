@@ -108,15 +108,13 @@ typedef struct {
 } maybe_pat_t;
 
 __attribute__((nonnull, returns_nonnull))
-pat_t *bp_raw_literal(file_t *f, const char *str, size_t len);
+pat_t *bp_raw_literal(const char *str, size_t len);
 __attribute__((nonnull))
 maybe_pat_t bp_stringpattern(file_t *f, const char *str);
 __attribute__((nonnull(1,2)))
 maybe_pat_t bp_replacement(file_t *f, pat_t *replacepat, const char *replacement);
-__attribute__((nonnull(1)))
-pat_t *chain_together(file_t *f, pat_t *first, pat_t *second);
-__attribute__((nonnull(1)))
-pat_t *either_pat(file_t *f, pat_t *first, pat_t *second);
+pat_t *chain_together(pat_t *first, pat_t *second);
+pat_t *either_pat(pat_t *first, pat_t *second);
 __attribute__((nonnull))
 maybe_pat_t bp_pattern(file_t *f, const char *str);
 

@@ -467,17 +467,17 @@ int main(int argc, char *argv[])
         } else if (FLAG("-p")     || FLAG("--pattern")) {
             file_t *arg_file = spoof_file(&loaded_files, "<pattern argument>", flag, -1);
             pat_t *p = assert_pat(arg_file, bp_pattern(arg_file, arg_file->start));
-            pattern = chain_together(arg_file, pattern, p);
+            pattern = chain_together(pattern, p);
         } else if (FLAG("-w")     || FLAG("--word")) {
             require(asprintf(&flag, "\\|%s\\|", flag), "Could not allocate memory");
             file_t *arg_file = spoof_file(&loaded_files, "<word pattern>", flag, -1);
             delete(&flag);
             pat_t *p = assert_pat(arg_file, bp_stringpattern(arg_file, arg_file->start));
-            pattern = chain_together(arg_file, pattern, p);
+            pattern = chain_together(pattern, p);
         } else if (FLAG("-s")     || FLAG("--skip")) {
             file_t *arg_file = spoof_file(&loaded_files, "<skip argument>", flag, -1);
             pat_t *s = assert_pat(arg_file, bp_pattern(arg_file, arg_file->start));
-            options.skip = either_pat(arg_file, options.skip, s);
+            options.skip = either_pat(options.skip, s);
         } else if (FLAG("-C")     || FLAG("--context")) {
             options.context_before = options.context_after = context_from_flag(flag);
         } else if (FLAG("-B")     || FLAG("--before-context")) {
@@ -499,7 +499,7 @@ int main(int argc, char *argv[])
             if (pattern != NULL) break;
             file_t *arg_file = spoof_file(&loaded_files, "<pattern argument>", argv[0], -1);
             pat_t *p = assert_pat(arg_file, bp_stringpattern(arg_file, arg_file->start));
-            pattern = chain_together(arg_file, pattern, p);
+            pattern = chain_together(pattern, p);
             ++argv;
         } else {
             errx(EXIT_FAILURE, "Unrecognized flag: %s\n\n%s", argv[0], usage);
