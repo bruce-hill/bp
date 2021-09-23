@@ -266,24 +266,4 @@ void print_match(FILE *out, printer_t *pr, match_t *m)
     if (pr->use_color) fprintf(out, "%s", color_normal);
 }
 
-//
-// Print any errors that are present in the given match object to stderr and
-// return the number of errors found.
-//
-int print_errors(file_t *f, match_t *m)
-{
-    int ret = 0;
-    if (m->pat->type == BP_ERROR) {
-        fprintf(stderr, "\033[31;1m");
-        printer_t tmp = {.file = f, .context_before=NO_CONTEXT, .context_after=NO_CONTEXT}; // No bells and whistles
-        print_match(stderr, &tmp, m); // Error message
-        fprintf(stderr, "\033[m\n");
-        fprint_line(stderr, f, m->start, m->end, " ");
-        return 1;
-    }
-    for (int i = 0; m->children && m->children[i]; i++)
-        ret += print_errors(f, m->children[i]);
-    return ret;
-}
-
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1,\:0

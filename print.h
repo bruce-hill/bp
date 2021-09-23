@@ -24,8 +24,6 @@ typedef struct {
 
 __attribute__((nonnull(1,2)))
 void print_match(FILE *out, printer_t *pr, match_t *m);
-__attribute__((nonnull))
-int print_errors(file_t *f, match_t *m);
 
 #endif
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1,\:0

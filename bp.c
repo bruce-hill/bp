@@ -240,9 +240,6 @@ static int print_matches(FILE *out, def_t *defs, file_t *f, pat_t *pattern)
     };
 
     for (match_t *m = NULL; next_match(&m, defs, f, pattern, options.skip, options.ignorecase); ) {
-        if (print_errors(f, m) > 0)
-            exit(EXIT_FAILURE);
-
         if (++matches == 1 && options.print_filenames) {
             if (printed_filenames++ > 0) printf("\n");
             fprint_filename(out, f->filename);

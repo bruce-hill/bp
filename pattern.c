@@ -400,16 +400,6 @@ static pat_t *_bp_simplepattern(file_t *f, const char *str)
     }
     // Parentheses
     case '(': {
-        if (start + 2 < f->end && strncmp(start, "(!)", 3) == 0) { // (!) errors
-            str = start + 3;
-            pat_t *pat = bp_simplepattern(f, str);
-            if (!pat) pat = new_pat(f, str, str, 0, 0, BP_STRING);
-            pat = expand_replacements(f, pat, false);
-            pat_t *error = new_pat(f, start, pat->end, pat->min_matchlen, pat->max_matchlen, BP_ERROR);
-            error->args.pat = pat;
-            return error;
-        }
-
         pat_t *pat = bp_pattern_nl(f, str, true);
         if (!pat)
             file_err(f, str, str, "There should be a valid pattern after this parenthesis.");
