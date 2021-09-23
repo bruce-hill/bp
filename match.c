@@ -661,10 +661,6 @@ static match_t *match(def_t *defs, cache_t *cache, file_t *f, const char *str, p
 
         return new_match(defs, pat, start, &str[dents], NULL);
     }
-    case BP_ERROR: {
-        match_t *p = pat->args.pat ? match(defs, cache, f, str, pat->args.pat, ignorecase) : NULL;
-        return p ? new_match(defs, pat, str, p->end, MATCHES(p)) : NULL;
-    }
     default: {
         errx(EXIT_FAILURE, "Unknown pattern type: %u", pat->type);
         return NULL;
