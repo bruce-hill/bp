@@ -36,11 +36,14 @@ all: bp.so
 clean:
 	rm -f lbp.o bp.so
 
-lbp.o: lbp.c
+lbp.o: lbp.c builtins.h
 	$(CC) -c $(ALL_FLAGS) -o $@ $<
 
 bp.so: lbp.o ../pattern.o ../utils.o ../utf8.o ../match.o ../definitions.o
 	$(MAKESO) -o $@ $^
+
+builtins.h: ../grammars/builtins.bp
+	sed 's/\\/\\\\/g;s/"/\\"/g;s/  /\\t/g;s/^/"/;s/$$/\\n"/' $< >$@
 
 test: bp.so
 	$(LUA) test.lua

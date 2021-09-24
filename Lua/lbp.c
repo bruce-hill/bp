@@ -5,8 +5,11 @@
 *   bp.replace(str, pat, replacement, start_index) -> str with replacements
 */
 
+#include <fcntl.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/mman.h>
+#include <sys/stat.h>
 
 #include "lua.h"
 #include "lauxlib.h"
@@ -20,9 +23,15 @@
 #define luaL_register(L, _, R) luaL_setfuncs(L, R, 0)
 #endif
 
+static const char *builtins_source =
+#include "builtins.h"
+;
+
 static int MATCH_METATABLE = 0;
 
-static inline void push_parse_error(lua_State *L, maybe_pat_t m)
+static def_t *builtins;
+
+static inline void raise_parse_error(lua_State *L, maybe_pat_t m)
 {
     size_t err_len = (size_t)(m.value.error.end - m.value.error.start);
     char *buf = calloc(err_len+1, sizeof(char));
@@ -126,13 +135,13 @@ static int Lmatch(lua_State *L)
 
     maybe_pat_t maybe_pat = bp_pattern(pat_text, pat_text + patlen);
     if (!maybe_pat.success) {
-        push_parse_error(L, maybe_pat);
+        raise_parse_error(L, maybe_pat);
         return 0;
     }
 
     match_t *m = NULL;
     int ret = 0;
-    if (next_match(&m, NULL, text, &text[textlen], maybe_pat.value.pat, NULL, false)) {
+    if (next_match(&m, builtins, text, &text[textlen], maybe_pat.value.pat, NULL, false)) {
 
         // lua_createtable(L, 0, 1);
 
@@ -168,12 +177,12 @@ static int Lreplace(lua_State *L)
 
     maybe_pat_t maybe_pat = bp_pattern(pat_text, pat_text + patlen);
     if (!maybe_pat.success) {
-        push_parse_error(L, maybe_pat);
+        raise_parse_error(L, maybe_pat);
         return 0;
     }
     maybe_pat = bp_replacement(maybe_pat.value.pat, rep_text, rep_text + replen);
     if (!maybe_pat.success) {
-        push_parse_error(L, maybe_pat);
+        raise_parse_error(L, maybe_pat);
         return 0;
     }
 
@@ -182,7 +191,7 @@ static int Lreplace(lua_State *L)
     FILE *out = open_memstream(&buf, &size);
     int replacements = 0;
     const char *prev = text;
-    for (match_t *m = NULL; next_match(&m, NULL, text, &text[textlen], maybe_pat.value.pat, NULL, false); ) {
+    for (match_t *m = NULL; next_match(&m, builtins, text, &text[textlen], maybe_pat.value.pat, NULL, false); ) {
         fwrite(prev, sizeof(char), (size_t)(m->start - prev), out);
         fprint_match(out, text, m, NULL);
         prev = m->end;
@@ -199,6 +208,14 @@ static int Lreplace(lua_State *L)
 
 LUALIB_API int luaopen_bp(lua_State *L)
 {
+    maybe_pat_t maybe_pat = bp_pattern(builtins_source, builtins_source+strlen(builtins_source));
+    if (!maybe_pat.success) {
+        raise_parse_error(L, maybe_pat);
+        return 0;
+    }
+    for (pat_t *p = maybe_pat.value.pat; p && p->type == BP_DEFINITION; p = p->args.def.pat)
+        builtins = with_def(builtins, p->args.def.namelen, p->args.def.name, p->args.def.def);
+
     lua_pushlightuserdata(L, (void*)&MATCH_METATABLE);
     lua_createtable(L, 0, 4);
     luaL_register(L, NULL, Rinstance_metamethods);

@@ -35,3 +35,6 @@ local ok, msg = pcall(function()
     bp.match("xxx", ".;//;;; wtf")
 end)
 if not ok then print(("\x1B[41;30mParse error:\x1B[0;1;31m %s\x1B[m\n"):format(msg)) end
+
+print("Testing builtins:")
+print(bp.match("...(foo())...", "parens"))
