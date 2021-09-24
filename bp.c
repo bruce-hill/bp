@@ -26,7 +26,6 @@
 #include "json.h"
 #include "match.h"
 #include "pattern.h"
-#include "print.h"
 #include "utils.h"
 
 #ifndef BP_NAME
