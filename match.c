@@ -267,22 +267,23 @@ static match_t *_next_match(match_context_t *ctx, const char *str, pat_t *pat, p
     pat_t *first = first_pat(ctx->defs, pat);
 
     // Performance optimization: if the pattern starts with a string literal,
-    // we can just rely on the highly optimized strstr()/strcasestr()
-    // implementations to skip past areas where we know we won't find a match.
-    if (!skip && first->type == BP_STRING) {
-        for (size_t i = 0; i < first->min_matchlen; i++)
-            if (first->args.string[i] == '\0')
-                goto pattern_search;
-        char *tmp = strndup(first->args.string, first->min_matchlen);
-        char *found = (ctx->ignorecase ? strcasestr : strstr)(str, tmp);
-        if (found)
-            str = found;
-        else
-            str += strlen(str); // Use += strlen here instead of ctx->end to handle files with NULL bytes
-        free(tmp);
+    // we can just rely on the highly optimized memmem() implementation to skip
+    // past areas where we know we won't find a match.
+    if (!skip && first->type == BP_STRING && first->min_matchlen > 0) {
+        if (ctx->ignorecase) {
+            char c1 = first->args.string[0];
+            char *upper = memchr(str, toupper(c1), (size_t)(str - ctx->end));
+            char *lower = isalpha(c1) ? memchr(str, tolower(c1), (size_t)(str - ctx->end)) : NULL;
+            if (upper && lower)
+                str = upper < lower ? upper : lower;
+            else if (upper) str = upper;
+            else if (lower) str = lower;
+        } else {
+            char *found = memmem(str, (size_t)(ctx->end - str), first->args.string, first->min_matchlen);
+            str = found ? found : ctx->end;
+        }
     }
 
-  pattern_search:
     if (str > ctx->end) return NULL;
 
     do {
@@ -353,7 +354,7 @@ static match_t *match(match_context_t *ctx, const char *str, pat_t *pat)
     }
     case BP_STRING: {
         if (&str[pat->min_matchlen] > ctx->end) return NULL;
-        if (pat->min_matchlen > 0 && (ctx->ignorecase ? memicmp : memcmp)(str, pat->args.string, pat->min_matchlen) != 0)
+        if (pat->min_matchlen > 0 && (ctx->ignorecase ? strncasecmp : strncmp)(str, pat->args.string, pat->min_matchlen) != 0)
             return NULL;
         return new_match(ctx->defs, pat, str, str + pat->min_matchlen, NULL);
     }

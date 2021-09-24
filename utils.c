@@ -128,18 +128,6 @@ char unescapechar(const char *escaped, const char **end)
 }
 
 //
-// Case-insensitive memory comparison
-//
-int memicmp(const void *v1, const void *v2, size_t n)
-{
-    int result = 0;
-    const char *s1 = (const char*)v1, *s2 = (const char*)v2;
-    while (n-- > 0 && (result = tolower(*(s1++)) - tolower(*(s2++))) == 0)
-        ;
-    return result;
-}
-
-//
 // Free memory, but also set the pointer to NULL for safety
 //
 void delete(void *p)
