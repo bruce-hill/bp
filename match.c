@@ -2,6 +2,7 @@
 // match.c - Code for the BP virtual machine that performs the matching.
 //
 
+#include <ctype.h>
 #include <err.h>
 #include <limits.h>
 #include <stdbool.h>
@@ -257,22 +258,23 @@ static match_t *_next_match(def_t *defs, cache_t *cache, file_t *f, const char *
     pat_t *first = first_pat(defs, pat);
 
     // Performance optimization: if the pattern starts with a string literal,
-    // we can just rely on the highly optimized strstr()/strcasestr()
-    // implementations to skip past areas where we know we won't find a match.
-    if (!skip && first->type == BP_STRING) {
-        for (size_t i = 0; i < first->min_matchlen; i++)
-            if (first->args.string[i] == '\0')
-                goto pattern_search;
-        char *tmp = strndup(first->args.string, first->min_matchlen);
-        char *found = (ignorecase ? strcasestr : strstr)(str, tmp);
-        if (found)
-            str = found;
-        else
-            str += strlen(str); // Use += strlen here instead of f->end to handle files with NULL bytes
-        free(tmp);
+    // we can just rely on the highly optimized memmem() implementation to skip
+    // past areas where we know we won't find a match.
+    if (!skip && first->type == BP_STRING && first->min_matchlen > 0) {
+        if (ignorecase) {
+            char c1 = first->args.string[0];
+            char *upper = memchr(str, toupper(c1), (size_t)(str - f->end));
+            char *lower = isalpha(c1) ? memchr(str, tolower(c1), (size_t)(str - f->end)) : NULL;
+            if (upper && lower)
+                str = upper < lower ? upper : lower;
+            else if (upper) str = upper;
+            else if (lower) str = lower;
+        } else {
+            char *found = memmem(str, (size_t)(str - f->end), first->args.string, first->min_matchlen);
+            str = found ? found : f->end;
+        }
     }
 
-  pattern_search:
     if (str > f->end) return NULL;
 
     do {
@@ -341,7 +343,7 @@ static match_t *match(def_t *defs, cache_t *cache, file_t *f, const char *str, p
     }
     case BP_STRING: {
         if (&str[pat->min_matchlen] > f->end) return NULL;
-        if (pat->min_matchlen > 0 && (ignorecase ? memicmp : memcmp)(str, pat->args.string, pat->min_matchlen) != 0)
+        if (pat->min_matchlen > 0 && (ignorecase ? strncasecmp : strncmp)(str, pat->args.string, pat->min_matchlen) != 0)
             return NULL;
         return new_match(defs, pat, str, str + pat->min_matchlen, NULL);
     }

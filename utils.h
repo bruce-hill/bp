@@ -58,8 +58,6 @@ bool matchchar(const char **str, char c, bool skip_nl);
 __attribute__((nonnull))
 bool matchstr(const char **str, const char *target, bool skip_nl);
 __attribute__((nonnull))
-int memicmp(const void *s1, const void *s2, size_t n);
-__attribute__((nonnull))
 void delete(void *p);
 
 #endif
