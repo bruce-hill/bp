@@ -270,7 +270,7 @@ static match_t *_next_match(def_t *defs, cache_t *cache, file_t *f, const char *
             else if (upper) str = upper;
             else if (lower) str = lower;
         } else {
-            char *found = memmem(str, (size_t)(str - f->end), first->args.string, first->min_matchlen);
+            char *found = memmem(str, (size_t)(f->end - str), first->args.string, first->min_matchlen);
             str = found ? found : f->end;
         }
     }
