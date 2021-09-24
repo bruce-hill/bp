@@ -7,7 +7,6 @@
 #include <string.h>
 
 #include "definitions.h"
-#include "files.h"
 #include "pattern.h"
 #include "utils.h"
 
