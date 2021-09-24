@@ -121,7 +121,7 @@ char unescapechar(const char *escaped, const char **end)
     }
     default:
         if (end) *end = escaped;
-        return (char)0;
+        return '\\';
     }
     if (end) *end = &escaped[len];
     return (char)ret;

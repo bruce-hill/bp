@@ -59,6 +59,10 @@ static const char *usage = (
 // Used as a heuristic to check if a file is binary or text:
 #define CHECK_FIRST_N_BYTES 256
 
+#define USE_DEFAULT_CONTEXT -3
+#define ALL_CONTEXT -2
+#define NO_CONTEXT -1
+
 // Flag-configurable options:
 static struct {
     int context_before, context_after;
@@ -234,33 +238,85 @@ static void sig_handler(int sig)
     if (kill(0, sig)) _exit(EXIT_FAILURE);
 }
 
-void fprint_between(FILE *out, file_t *f, const char *prev, const char *next)
+void fprint_linenum(FILE *out, file_t *f, int linenum, const char *normal_color)
 {
+    switch (options.format) {
+    case FORMAT_FANCY: case FORMAT_PLAIN: {
+        int space = 0;
+        for (int i = (int)f->nlines; i > 0; i /= 10) ++space;
+        if (options.format == FORMAT_FANCY)
+            fprintf(out, "\033[0;2m%*d\033(0\x78\033(B%s", space, linenum, normal_color ? normal_color : "");
+        else fprintf(out, "%*d|", space, linenum);
+        break;
+    }
+    case FORMAT_FILE_LINE: {
+        fprintf(out, "%s:%d:", f->filename, linenum);
+        break;
+    }
+    default: break;
+    }
+}
+
+static file_t *printing_file = NULL;
+static void _fprint_between(FILE *out, const char *start, const char *end, const char *normal_color)
+{
+    if (!end) end = printing_file->end;
+    while (start < end) {
+        if (!start) start = printing_file->start;
+        if (start == printing_file->start || start[-1] == '\n') {
+            int linenum = (int)get_line_number(printing_file, start);
+            fprint_linenum(out, printing_file, linenum, normal_color);
+        }
+        const char *line_end = memchr(start, '\n', (size_t)(end - start));
+        if (line_end && line_end != end) {
+            fwrite(start, sizeof(char), (size_t)(line_end - start + 1), out);
+            start = line_end + 1;
+        } else {
+            fwrite(start, sizeof(char), (size_t)(end - start), out);
+            break;
+        }
+    }
+}
+
+static void on_nl(FILE *out)
+{
+    switch (options.format) {
+    case FORMAT_FANCY: case FORMAT_PLAIN:
+        for (int i = (int)printing_file->nlines; i > 0; i /= 10) fputc('.', out);
+        fprintf(out, "%s", options.format == FORMAT_FANCY ? "\033[0;2m\033(0\x78\033(B\033[m" : "|");
+        break;
+    default: break;
+    }
+}
+
+static void fprint_context_between(FILE *out, const char *prev, const char *next)
+{
+    if (!prev && !next) return;
     // if (options.context_before == NO_CONTEXT && options.context_after == NO_CONTEXT)
     //     return;
     if (options.context_before == ALL_CONTEXT || options.context_after == ALL_CONTEXT) {
-        fwrite(prev ? prev : f->start, sizeof(char), (size_t)((next ? next : f->end) - (prev ? prev : f->start)), out);
+        _fprint_between(out, prev, next, "\033[m");
         return;
     }
     const char *after_prev = prev, *before_next = next;
     if (prev && options.context_after >= 0) {
-        size_t after_prev_line = get_line_number(f, prev) + (size_t)options.context_after + 1;
-        after_prev = get_line(f, after_prev_line > f->nlines ? f->nlines : after_prev_line);
+        size_t after_prev_line = get_line_number(printing_file, prev) + (size_t)options.context_after + 1;
+        after_prev = after_prev_line > printing_file->nlines ? printing_file->end : get_line(printing_file, after_prev_line > printing_file->nlines ? printing_file->nlines : after_prev_line);
     }
     if (next && options.context_before >= 0) {
-        size_t before_next_line = get_line_number(f, next);
+        size_t before_next_line = get_line_number(printing_file, next);
         before_next_line = options.context_before >= (int)before_next_line ? 1 : before_next_line - (size_t)options.context_before;
-        before_next = get_line(f, before_next_line);
+        before_next = get_line(printing_file, before_next_line);
     }
     if (!prev) {
-        fwrite(before_next, sizeof(char), (size_t)(next - before_next), out);
+        _fprint_between(out, before_next, next, "\033[m");
     } else if (!next) {
-        fwrite(prev, sizeof(char), (size_t)(after_prev - prev), out);
+        _fprint_between(out, prev, after_prev, "\033[m");
     } else if (after_prev >= before_next) {
-        fwrite(prev, sizeof(char), (size_t)(next - prev), out);
+        _fprint_between(out, prev, next, "\033[m");
     } else {
-        fwrite(prev, sizeof(char), (size_t)(after_prev - prev), out);
-        fwrite(before_next, sizeof(char), (size_t)(next - before_next), out);
+        _fprint_between(out, prev, after_prev, "\033[m");
+        _fprint_between(out, before_next, next, "\033[m");
     }
 }
 
@@ -272,17 +328,32 @@ static int print_matches(FILE *out, def_t *defs, file_t *f, pat_t *pattern)
     static int printed_filenames = 0;
     int matches = 0;
     const char *prev = NULL;
+
+    printing_file = f;
+
+    print_options_t print_opts = {.fprint_between = _fprint_between, .on_nl = on_nl};
+    if (options.format == FORMAT_FANCY) {
+        print_opts.match_color = "\033[0;31;1m";
+        print_opts.replace_color = "\033[0;34;1m";
+        print_opts.normal_color = "\033[m";
+    }
     for (match_t *m = NULL; next_match(&m, defs, f->start, f->end, pattern, options.skip, options.ignorecase); ) {
         if (++matches == 1 && options.print_filenames) {
             if (printed_filenames++ > 0) printf("\n");
             fprint_filename(out, f->filename);
         }
-        fprint_between(out, f, prev, m->start);
-        fprint_match(out, f->start, m);
+        fprint_context_between(out, prev, m->start);
+        if (print_opts.normal_color) fprintf(out, "%s", print_opts.normal_color);
+        if (m->start == f->start || m->start[-1] == '\n')
+            fprint_linenum(out, f, (int)get_line_number(f, m->start), print_opts.normal_color);
+        fprint_match(out, f->start, m, &print_opts);
+        if (print_opts.normal_color) fprintf(out, "%s", print_opts.normal_color);
         prev = m->end;
     }
     if (matches > 0)
-        fprint_between(out, f, prev, NULL);
+        fprint_context_between(out, prev, NULL);
+
+    printing_file = NULL;
     return matches;
 }
 

@@ -36,7 +36,7 @@ static void push_matchstring(lua_State *L, match_t *m)
     char *buf = NULL;
     size_t size = 0;
     FILE *out = open_memstream(&buf, &size);
-    fprint_match(out, m->start, m);
+    fprint_match(out, m->start, m, NULL);
     fflush(out);
     lua_pushlstring(L, buf, size);
     fclose(out);
@@ -184,7 +184,7 @@ static int Lreplace(lua_State *L)
     const char *prev = text;
     for (match_t *m = NULL; next_match(&m, NULL, text, &text[textlen], maybe_pat.value.pat, NULL, false); ) {
         fwrite(prev, sizeof(char), (size_t)(m->start - prev), out);
-        fprint_match(out, text, m);
+        fprint_match(out, text, m, NULL);
         prev = m->end;
         ++replacements;
     }
