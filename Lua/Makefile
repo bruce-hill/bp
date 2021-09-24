@@ -39,7 +39,7 @@ clean:
 lbp.o: lbp.c
 	$(CC) -c $(ALL_FLAGS) -o $@ $<
 
-bp.so: lbp.o ../print.o ../files.o ../pattern.o ../utils.o ../utf8.o ../match.o ../definitions.o
+bp.so: lbp.o ../pattern.o ../utils.o ../utf8.o ../match.o ../definitions.o
 	$(MAKESO) -o $@ $^
 
 test: bp.so

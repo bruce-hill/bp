@@ -4,7 +4,6 @@
 #ifndef DEFINITIONS__H
 #define DEFINITIONS__H
 
-#include "files.h"
 #include "pattern.h"
 
 //
@@ -20,8 +19,6 @@ typedef struct def_s {
 
 __attribute__((nonnull(3,4), returns_nonnull))
 def_t *with_def(def_t *defs, size_t namelen, const char *name, pat_t *pat);
-__attribute__((nonnull(2)))
-def_t *load_grammar(def_t *defs, file_t *f);
 __attribute__((pure, nonnull(3)))
 def_t *lookup(def_t *defs, size_t namelen, const char *name);
 __attribute__((nonnull(1)))

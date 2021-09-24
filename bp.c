@@ -180,7 +180,7 @@ static int is_text_file(const char *filename)
 static int print_matches_as_json(def_t *defs, file_t *f, pat_t *pattern)
 {
     int nmatches = 0;
-    for (match_t *m = NULL; next_match(&m, defs, f, pattern, options.skip, options.ignorecase); ) {
+    for (match_t *m = NULL; next_match(&m, defs, f->start, f->end, pattern, options.skip, options.ignorecase); ) {
         if (++nmatches > 1)
             printf(",\n");
         printf("{\"filename\":\"%s\",\"match\":", f->filename);
@@ -196,7 +196,7 @@ static int print_matches_as_json(def_t *defs, file_t *f, pat_t *pattern)
 static int explain_matches(def_t *defs, file_t *f, pat_t *pattern)
 {
     int nmatches = 0;
-    for (match_t *m = NULL; next_match(&m, defs, f, pattern, options.skip, options.ignorecase); ) {
+    for (match_t *m = NULL; next_match(&m, defs, f->start, f->end, pattern, options.skip, options.ignorecase); ) {
         if (++nmatches == 1) {
             if (options.print_filenames)
                 fprint_filename(stdout, f->filename);
@@ -234,6 +234,36 @@ static void sig_handler(int sig)
     if (kill(0, sig)) _exit(EXIT_FAILURE);
 }
 
+void fprint_between(FILE *out, file_t *f, const char *prev, const char *next)
+{
+    // if (options.context_before == NO_CONTEXT && options.context_after == NO_CONTEXT)
+    //     return;
+    if (options.context_before == ALL_CONTEXT || options.context_after == ALL_CONTEXT) {
+        fwrite(prev ? prev : f->start, sizeof(char), (size_t)((next ? next : f->end) - (prev ? prev : f->start)), out);
+        return;
+    }
+    const char *after_prev = prev, *before_next = next;
+    if (prev && options.context_after >= 0) {
+        size_t after_prev_line = get_line_number(f, prev) + (size_t)options.context_after + 1;
+        after_prev = get_line(f, after_prev_line > f->nlines ? f->nlines : after_prev_line);
+    }
+    if (next && options.context_before >= 0) {
+        size_t before_next_line = get_line_number(f, next);
+        before_next_line = options.context_before >= (int)before_next_line ? 1 : before_next_line - (size_t)options.context_before;
+        before_next = get_line(f, before_next_line);
+    }
+    if (!prev) {
+        fwrite(before_next, sizeof(char), (size_t)(next - before_next), out);
+    } else if (!next) {
+        fwrite(prev, sizeof(char), (size_t)(after_prev - prev), out);
+    } else if (after_prev >= before_next) {
+        fwrite(prev, sizeof(char), (size_t)(next - prev), out);
+    } else {
+        fwrite(prev, sizeof(char), (size_t)(after_prev - prev), out);
+        fwrite(before_next, sizeof(char), (size_t)(next - before_next), out);
+    }
+}
+
 //
 // Print all the matches in a file.
 //
@@ -241,29 +271,18 @@ static int print_matches(FILE *out, def_t *defs, file_t *f, pat_t *pattern)
 {
     static int printed_filenames = 0;
     int matches = 0;
-    printer_t pr = {
-        .file = f,
-        .context_before = options.context_before,
-        .context_after = options.context_after,
-        .use_color = options.format == FORMAT_FANCY,
-        .lineformat = LINE_FORMATS[options.format],
-    };
-
-    for (match_t *m = NULL; next_match(&m, defs, f, pattern, options.skip, options.ignorecase); ) {
+    const char *prev = NULL;
+    for (match_t *m = NULL; next_match(&m, defs, f->start, f->end, pattern, options.skip, options.ignorecase); ) {
         if (++matches == 1 && options.print_filenames) {
             if (printed_filenames++ > 0) printf("\n");
             fprint_filename(out, f->filename);
         }
-        print_match(out, &pr, m);
+        fprint_between(out, f, prev, m->start);
+        fprint_match(out, f->start, m);
+        prev = m->end;
     }
-
-    if (matches > 0 || (f->filename[0] == '\0' && options.context_before == ALL_CONTEXT)) {
-        // Print trailing context lines:
-        print_match(out, &pr, NULL);
-        // Guarantee trailing newline:
-        if (!pr.needs_line_number) fprintf(out, "\n");
-    }
-
+    if (matches > 0)
+        fprint_between(out, f, prev, NULL);
     return matches;
 }
 
@@ -285,7 +304,7 @@ static int process_file(def_t *defs, const char *filename, pat_t *pattern)
         matches += explain_matches(defs, f, pattern);
     } else if (options.mode == MODE_LISTFILES) {
         match_t *m = NULL;
-        if (next_match(&m, defs, f, pattern, options.skip, options.ignorecase)) {
+        if (next_match(&m, defs, f->start, f->end, pattern, options.skip, options.ignorecase)) {
             printf("%s\n", f->filename);
             matches += 1;
         }
@@ -294,7 +313,7 @@ static int process_file(def_t *defs, const char *filename, pat_t *pattern)
         matches += print_matches_as_json(defs, f, pattern);
     } else if (options.mode == MODE_INPLACE) {
         match_t *m = NULL;
-        bool found = next_match(&m, defs, f, pattern, options.skip, options.ignorecase);
+        bool found = next_match(&m, defs, f->start, f->end, pattern, options.skip, options.ignorecase);
         stop_matching(&m);
         if (!found) return 0;
 
@@ -391,6 +410,20 @@ static int process_git_files(def_t *defs, pat_t *pattern, int argc, char *argv[]
     if (!((WIFEXITED(status) == 1) && (WEXITSTATUS(status) == 0)))
         errx(EXIT_FAILURE, "`git ls-files -z` failed.");
     return found;
+}
+
+//
+// Load the given grammar (semicolon-separated definitions)
+// and return the first rule defined.
+//
+static def_t *load_grammar(def_t *defs, file_t *f)
+{
+    maybe_pat_t maybe_pat = bp_pattern(f->start, f->end);
+    if (!maybe_pat.success)
+        file_err(f, maybe_pat.value.error.start, maybe_pat.value.error.end, maybe_pat.value.error.msg);
+    for (pat_t *p = maybe_pat.value.pat; p && p->type == BP_DEFINITION; p = p->args.def.pat)
+        defs = with_def(defs, p->args.def.namelen, p->args.def.name, p->args.def.def);
+    return defs;
 }
 
 //

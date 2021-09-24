@@ -36,7 +36,7 @@ static void populate_lines(file_t *f)
             f->lines = grow(f->lines, linecap *= 2);
         f->lines[n] = p;
         do {
-            char *nl = strchr(p, '\n');
+            char *nl = memchr(p, '\n', (size_t)(f->end - p));
             if (nl) {
                 p = nl+1;
                 break;
@@ -234,7 +234,7 @@ void fprint_line(FILE *dest, file_t *f, const char *start, const char *end, cons
     va_end(args);
     (void)fputc('\n', dest);
 
-    const char *eol = linenum == f->nlines ? strchr(line, '\0') : strchr(line, '\n');
+    const char *eol = linenum == f->nlines ? f->end : strchr(line, '\n');
     if (end == NULL || end > eol) end = eol;
     fprintf(dest, "\033[2m%5lu\033(0\x78\033(B\033[m%.*s\033[41;30m%.*s\033[m%.*s\n",
             linenum,

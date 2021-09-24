@@ -2,6 +2,7 @@
 // match.c - Code for the BP virtual machine that performs the matching.
 //
 
+#include <ctype.h>
 #include <err.h>
 #include <limits.h>
 #include <stdbool.h>
@@ -17,10 +18,19 @@
 
 #define MAX_CACHE_SIZE (1<<14)
 
+// Cache datastructure
 typedef struct {
     size_t size, occupancy;
     match_t **matches;
 } cache_t;
+
+// Data structure for various ambient state for matching
+typedef struct {
+    def_t *defs;
+    cache_t *cache;
+    const char *start, *end;
+    bool ignorecase;
+} match_context_t;
 
 // New match objects are either recycled from unused match objects or allocated
 // from the heap. While it is in use, the match object is stored in the
@@ -33,8 +43,8 @@ static match_t *in_use_matches = NULL;
 
 #define MATCHES(...) (match_t*[]){__VA_ARGS__, NULL}
 
-__attribute__((hot, nonnull(2,3,4,5)))
-static match_t *match(def_t *defs, cache_t *cache, file_t *f, const char *str, pat_t *pat, bool ignorecase);
+__attribute__((hot, nonnull(1,2,3)))
+static match_t *match(match_context_t *ctx, const char *str, pat_t *pat);
 
 // Store a value and update its refcount
 static inline void add_owner(match_t** owner, match_t* owned)
@@ -239,22 +249,22 @@ static pat_t *first_pat(def_t *defs, pat_t *pat)
 //
 // Find the next match after prev (or the first match if prev is NULL)
 //
-__attribute__((nonnull(3,5)))
-static match_t *_next_match(def_t *defs, cache_t *cache, file_t *f, const char *str, pat_t *pat, pat_t *skip, bool ignorecase)
+__attribute__((nonnull(1,2,3)))
+static match_t *_next_match(match_context_t *ctx, const char *str, pat_t *pat, pat_t *skip)
 {
     // Prune the unnecessary entries from the cache (those not between start/end)
-    if (cache->matches) {
-        for (size_t i = 0; i < cache->size; i++) {
-            for (match_t *m = cache->matches[i], *next = NULL; m; m = next) {
+    if (ctx->cache->matches) {
+        for (size_t i = 0; i < ctx->cache->size; i++) {
+            for (match_t *m = ctx->cache->matches[i], *next = NULL; m; m = next) {
                 next = m->cache.next;
-                if (m->start < f->start || (m->end ? m->end : m->start) > f->end)
-                    cache_remove(cache, m);
+                if (m->start < ctx->start || (m->end ? m->end : m->start) > ctx->end)
+                    cache_remove(ctx->cache, m);
             }
         }
     }
 
-    pat = deref(defs, pat);
-    pat_t *first = first_pat(defs, pat);
+    pat = deref(ctx->defs, pat);
+    pat_t *first = first_pat(ctx->defs, pat);
 
     // Performance optimization: if the pattern starts with a string literal,
     // we can just rely on the highly optimized strstr()/strcasestr()
@@ -264,27 +274,27 @@ static match_t *_next_match(def_t *defs, cache_t *cache, file_t *f, const char *
             if (first->args.string[i] == '\0')
                 goto pattern_search;
         char *tmp = strndup(first->args.string, first->min_matchlen);
-        char *found = (ignorecase ? strcasestr : strstr)(str, tmp);
+        char *found = (ctx->ignorecase ? strcasestr : strstr)(str, tmp);
         if (found)
             str = found;
         else
-            str += strlen(str); // Use += strlen here instead of f->end to handle files with NULL bytes
+            str += strlen(str); // Use += strlen here instead of ctx->end to handle files with NULL bytes
         free(tmp);
     }
 
   pattern_search:
-    if (str > f->end) return NULL;
+    if (str > ctx->end) return NULL;
 
     do {
-        match_t *m = match(defs, cache, f, str, pat, ignorecase);
+        match_t *m = match(ctx, str, pat);
         if (m) return m;
         if (first->type == BP_START_OF_FILE) return NULL;
         match_t *s;
-        if (skip && (s = match(defs, cache, f, str, skip, ignorecase))) {
+        if (skip && (s = match(ctx, str, skip))) {
             str = s->end > str ? s->end : str + 1;
             recycle_if_unused(&s);
-        } else str = next_char(str, f->end);
-    } while (str < f->end);
+        } else str = next_char(str, ctx->end);
+    } while (str < ctx->end);
     return NULL;
 }
 
@@ -293,13 +303,14 @@ static match_t *_next_match(def_t *defs, cache_t *cache, file_t *f, const char *
 // match object, or NULL if no match is found.
 // The returned value should be free()'d to avoid memory leaking.
 //
-static match_t *match(def_t *defs, cache_t *cache, file_t *f, const char *str, pat_t *pat, bool ignorecase)
+static match_t *match(match_context_t *ctx, const char *str, pat_t *pat)
 {
     switch (pat->type) {
     case BP_DEFINITION: {
-        def_t *defs2 = with_def(defs, pat->args.def.namelen, pat->args.def.name, pat->args.def.def);
-        match_t *m = match(defs2, cache, f, str, pat->args.def.pat ? pat->args.def.pat : pat->args.def.def, ignorecase);
-        defs = free_defs(defs2, defs);
+        match_context_t ctx2 = *ctx;
+        ctx2.defs = with_def(ctx->defs, pat->args.def.namelen, pat->args.def.name, pat->args.def.def);
+        match_t *m = match(&ctx2, str, pat->args.def.pat ? pat->args.def.pat : pat->args.def.def);
+        free_defs(ctx2.defs, ctx->defs);
         return m;
     }
     case BP_LEFTRECURSION: {
@@ -312,59 +323,60 @@ static match_t *match(def_t *defs, cache_t *cache, file_t *f, const char *str, p
             ++pat->args.leftrec.visits;
             return pat->args.leftrec.match;
         } else {
-            return match(defs, cache, f, str, pat->args.leftrec.fallback, ignorecase);
+            return match(ctx, str, pat->args.leftrec.fallback);
         }
     }
     case BP_ANYCHAR: {
-        return (str < f->end && *str != '\n') ? new_match(defs, pat, str, next_char(str, f->end), NULL) : NULL;
+        return (str < ctx->end && *str != '\n') ? new_match(ctx->defs, pat, str, next_char(str, ctx->end), NULL) : NULL;
     }
     case BP_ID_START: {
-        return (str < f->end && isidstart(str, f->end)) ? new_match(defs, pat, str, next_char(str, f->end), NULL) : NULL;
+        return (str < ctx->end && isidstart(str, ctx->end)) ? new_match(ctx->defs, pat, str, next_char(str, ctx->end), NULL) : NULL;
     }
     case BP_ID_CONTINUE: {
-        return (str < f->end && isidcontinue(str, f->end)) ? new_match(defs, pat, str, next_char(str, f->end), NULL) : NULL;
+        return (str < ctx->end && isidcontinue(str, ctx->end)) ? new_match(ctx->defs, pat, str, next_char(str, ctx->end), NULL) : NULL;
     }
     case BP_START_OF_FILE: {
-        return (str == f->start) ? new_match(defs, pat, str, str, NULL) : NULL;
+        return (str == ctx->start) ? new_match(ctx->defs, pat, str, str, NULL) : NULL;
     }
     case BP_START_OF_LINE: {
-        return (str == f->start || str[-1] == '\n') ? new_match(defs, pat, str, str, NULL) : NULL;
+        return (str == ctx->start || str[-1] == '\n') ? new_match(ctx->defs, pat, str, str, NULL) : NULL;
     }
     case BP_END_OF_FILE: {
-        return (str == f->end || (str == f->end-1 && *str == '\n')) ? new_match(defs, pat, str, str, NULL) : NULL;
+        return (str == ctx->end || (str == ctx->end-1 && *str == '\n')) ? new_match(ctx->defs, pat, str, str, NULL) : NULL;
     }
     case BP_END_OF_LINE: {
-        return (str == f->end || *str == '\n') ? new_match(defs, pat, str, str, NULL) : NULL;
+        return (str == ctx->end || *str == '\n') ? new_match(ctx->defs, pat, str, str, NULL) : NULL;
     }
     case BP_WORD_BOUNDARY: {
-        return (str == f->start || isidcontinue(str, f->end) != isidcontinue(prev_char(f->start, str), f->end)) ? new_match(defs, pat, str, str, NULL) : NULL;
+        return (str == ctx->start || isidcontinue(str, ctx->end) != isidcontinue(prev_char(ctx->start, str), ctx->end)) ?
+            new_match(ctx->defs, pat, str, str, NULL) : NULL;
     }
     case BP_STRING: {
-        if (&str[pat->min_matchlen] > f->end) return NULL;
-        if (pat->min_matchlen > 0 && (ignorecase ? memicmp : memcmp)(str, pat->args.string, pat->min_matchlen) != 0)
+        if (&str[pat->min_matchlen] > ctx->end) return NULL;
+        if (pat->min_matchlen > 0 && (ctx->ignorecase ? memicmp : memcmp)(str, pat->args.string, pat->min_matchlen) != 0)
             return NULL;
-        return new_match(defs, pat, str, str + pat->min_matchlen, NULL);
+        return new_match(ctx->defs, pat, str, str + pat->min_matchlen, NULL);
     }
     case BP_RANGE: {
-        if (str >= f->end) return NULL;
+        if (str >= ctx->end) return NULL;
         if ((unsigned char)*str < pat->args.range.low || (unsigned char)*str > pat->args.range.high)
             return NULL;
-        return new_match(defs, pat, str, str+1, NULL);
+        return new_match(ctx->defs, pat, str, str+1, NULL);
     }
     case BP_NOT: {
-        match_t *m = match(defs, cache, f, str, pat->args.pat, ignorecase);
+        match_t *m = match(ctx, str, pat->args.pat);
         if (m != NULL) {
             recycle_if_unused(&m);
             return NULL;
         }
-        return new_match(defs, pat, str, str, NULL);
+        return new_match(ctx->defs, pat, str, str, NULL);
     }
     case BP_UPTO: case BP_UPTO_STRICT: {
-        match_t *m = new_match(defs, pat, str, str, NULL);
-        pat_t *target = deref(defs, pat->args.multiple.first),
-              *skip = deref(defs, pat->args.multiple.second);
+        match_t *m = new_match(ctx->defs, pat, str, str, NULL);
+        pat_t *target = deref(ctx->defs, pat->args.multiple.first),
+              *skip = deref(ctx->defs, pat->args.multiple.second);
         if (!target && !skip) {
-            while (str < f->end && *str != '\n') ++str;
+            while (str < ctx->end && *str != '\n') ++str;
             m->end = str;
             return m;
         }
@@ -373,18 +385,18 @@ static match_t *match(def_t *defs, cache_t *cache, file_t *f, const char *str, p
         for (const char *prev = NULL; prev < str; ) {
             prev = str;
             if (target) {
-                match_t *p = match(defs, cache, f, str, target, ignorecase);
+                match_t *p = match(ctx, str, target);
                 if (p != NULL) {
                     recycle_if_unused(&p);
                     m->end = str;
                     return m;
                 }
-            } else if (str == f->end) {
+            } else if (str == ctx->end) {
                 m->end = str;
                 return m;
             }
             if (skip) {
-                match_t *s = match(defs, cache, f, str, skip, ignorecase);
+                match_t *s = match(ctx, str, skip);
                 if (s != NULL) {
                     str = s->end;
                     if (nchildren+2 >= child_cap) {
@@ -398,29 +410,29 @@ static match_t *match(def_t *defs, cache_t *cache, file_t *f, const char *str, p
             // This isn't in the for() structure because there needs to
             // be at least once chance to match the pattern, even if
             // we're at the end of the string already (e.g. "..$").
-            if (str < f->end && *str != '\n' && pat->type != BP_UPTO_STRICT)
-                str = next_char(str, f->end);
+            if (str < ctx->end && *str != '\n' && pat->type != BP_UPTO_STRICT)
+                str = next_char(str, ctx->end);
         }
         recycle_if_unused(&m);
         return NULL;
     }
     case BP_REPEAT: {
-        match_t *m = new_match(defs, pat, str, str, NULL);
+        match_t *m = new_match(ctx->defs, pat, str, str, NULL);
         size_t reps = 0;
         ssize_t max = pat->args.repetitions.max;
-        pat_t *repeating = deref(defs, pat->args.repetitions.repeat_pat);
-        pat_t *sep = deref(defs, pat->args.repetitions.sep);
+        pat_t *repeating = deref(ctx->defs, pat->args.repetitions.repeat_pat);
+        pat_t *sep = deref(ctx->defs, pat->args.repetitions.sep);
         size_t child_cap = 0, nchildren = 0;
         for (reps = 0; max == -1 || reps < (size_t)max; ++reps) {
             const char *start = str;
             // Separator
             match_t *msep = NULL;
             if (sep != NULL && reps > 0) {
-                msep = match(defs, cache, f, str, sep, ignorecase);
+                msep = match(ctx, str, sep);
                 if (msep == NULL) break;
                 str = msep->end;
             }
-            match_t *mp = match(defs, cache, f, str, repeating, ignorecase);
+            match_t *mp = match(ctx, str, repeating);
             if (mp == NULL) {
                 str = start;
                 if (msep) recycle_if_unused(&msep);
@@ -465,51 +477,52 @@ static match_t *match(def_t *defs, cache_t *cache, file_t *f, const char *str, p
         return m;
     }
     case BP_AFTER: {
-        pat_t *back = deref(defs, pat->args.pat);
+        pat_t *back = deref(ctx->defs, pat->args.pat);
         if (!back) return NULL;
 
         // We only care about the region from the backtrack pos up to the
         // current pos, so mock it out as a file slice.
         // TODO: this breaks ^/^^/$/$$, but that can probably be ignored
         // because you rarely need to check those in a backtrack.
-        cache_t slice_cache = {0};
-        file_t slice;
-        slice_file(&slice, f, f->start, str);
+        match_context_t slice_ctx = *ctx;
+        slice_ctx.cache = &(cache_t){0};
+        slice_ctx.start = ctx->start;
+        slice_ctx.end = str;
         for (const char *pos = &str[-(long)back->min_matchlen];
-             pos >= f->start && (back->max_matchlen == -1 || pos >= &str[-(int)back->max_matchlen]);
-             pos = prev_char(f->start, pos)) {
-            cache_destroy(&slice_cache);
-            slice.start = (char*)pos;
-            match_t *m = match(defs, &slice_cache, &slice, pos, back, ignorecase);
+             pos >= ctx->start && (back->max_matchlen == -1 || pos >= &str[-(int)back->max_matchlen]);
+             pos = prev_char(ctx->start, pos)) {
+            cache_destroy(slice_ctx.cache);
+            slice_ctx.start = (char*)pos;
+            match_t *m = match(&slice_ctx, pos, back);
             // Match should not go past str (i.e. (<"AB" "B") should match "ABB", but not "AB")
             if (m && m->end != str)
                 recycle_if_unused(&m);
             else if (m) {
-                cache_destroy(&slice_cache);
-                return new_match(defs, pat, str, str, MATCHES(m));
+                cache_destroy(slice_ctx.cache);
+                return new_match(ctx->defs, pat, str, str, MATCHES(m));
             }
-            if (pos == f->start) break;
+            if (pos == ctx->start) break;
             // To prevent extreme performance degradation, don't keep
             // walking backwards endlessly over newlines.
             if (back->max_matchlen == -1 && *pos == '\n') break;
         }
-        cache_destroy(&slice_cache);
+        cache_destroy(slice_ctx.cache);
         return NULL;
     }
     case BP_BEFORE: {
-        match_t *after = match(defs, cache, f, str, pat->args.pat, ignorecase);
-        return after ? new_match(defs, pat, str, str, MATCHES(after)) : NULL;
+        match_t *after = match(ctx, str, pat->args.pat);
+        return after ? new_match(ctx->defs, pat, str, str, MATCHES(after)) : NULL;
     }
     case BP_CAPTURE: {
-        match_t *p = match(defs, cache, f, str, pat->args.pat, ignorecase);
-        return p ? new_match(defs, pat, str, p->end, MATCHES(p)) : NULL;
+        match_t *p = match(ctx, str, pat->args.pat);
+        return p ? new_match(ctx->defs, pat, str, p->end, MATCHES(p)) : NULL;
     }
     case BP_OTHERWISE: {
-        match_t *m = match(defs, cache, f, str, pat->args.multiple.first, ignorecase);
-        return m ? m : match(defs, cache, f, str, pat->args.multiple.second, ignorecase);
+        match_t *m = match(ctx, str, pat->args.multiple.first);
+        return m ? m : match(ctx, str, pat->args.multiple.second);
     }
     case BP_CHAIN: {
-        match_t *m1 = match(defs, cache, f, str, pat->args.multiple.first, ignorecase);
+        match_t *m1 = match(ctx, str, pat->args.multiple.first);
         if (m1 == NULL) return NULL;
 
         match_t *m2;
@@ -518,17 +531,18 @@ static match_t *match(def_t *defs, cache_t *cache, file_t *f, const char *str, p
             // Temporarily add a rule that the backref name matches the
             // exact string of the original match (no replacements)
             pat_t *backref = bp_raw_literal(m1->start, (size_t)(m1->end - m1->start));
-            def_t *defs2 = with_def(defs, m1->pat->args.capture.namelen, m1->pat->args.capture.name, backref);
+            match_context_t ctx2 = *ctx;
+            ctx2.defs = with_def(ctx->defs, m1->pat->args.capture.namelen, m1->pat->args.capture.name, backref);
             ++m1->refcount; {
-                m2 = match(defs2, cache, f, m1->end, pat->args.multiple.second, ignorecase);
+                m2 = match(&ctx2, m1->end, pat->args.multiple.second);
                 if (!m2) { // No need to keep the backref in memory if it didn't match
                     free_pat(backref);
                     backref = NULL;
                 }
-                defs = free_defs(defs2, defs);
+                free_defs(ctx2.defs, ctx->defs);
             } --m1->refcount;
         } else {
-            m2 = match(defs, cache, f, m1->end, pat->args.multiple.second, ignorecase);
+            m2 = match(ctx, m1->end, pat->args.multiple.second);
         }
 
         if (m2 == NULL) {
@@ -536,42 +550,43 @@ static match_t *match(def_t *defs, cache_t *cache, file_t *f, const char *str, p
             return NULL;
         }
 
-        return new_match(defs, pat, str, m2->end, MATCHES(m1, m2));
+        return new_match(ctx->defs, pat, str, m2->end, MATCHES(m1, m2));
     }
     case BP_MATCH: case BP_NOT_MATCH: {
-        match_t *m1 = match(defs, cache, f, str, pat->args.multiple.first, ignorecase);
+        match_t *m1 = match(ctx, str, pat->args.multiple.first);
         if (m1 == NULL) return NULL;
 
         // <p1>~<p2> matches iff the text of <p1> matches <p2>
         // <p1>!~<p2> matches iff the text of <p1> does not match <p2>
-        cache_t slice_cache = {0};
-        file_t slice;
-        slice_file(&slice, f, m1->start, m1->end);
-        match_t *m2 = _next_match(defs, &slice_cache, &slice, slice.start, pat->args.multiple.second, NULL, ignorecase);
+        match_context_t slice_ctx = *ctx;
+        slice_ctx.cache = &(cache_t){0};
+        slice_ctx.start = m1->start;
+        slice_ctx.end = m1->end;
+        match_t *m2 = _next_match(&slice_ctx, slice_ctx.start, pat->args.multiple.second, NULL);
         if ((!m2 && pat->type == BP_MATCH) || (m2 && pat->type == BP_NOT_MATCH)) {
-            cache_destroy(&slice_cache);
+            cache_destroy(slice_ctx.cache);
             if (m2) recycle_if_unused(&m2);
             recycle_if_unused(&m1);
             return NULL;
         }
-        match_t *ret = new_match(defs, pat, m1->start, m1->end, (pat->type == BP_MATCH) ? MATCHES(m1, m2) : MATCHES(m1));
-        cache_destroy(&slice_cache);
+        match_t *ret = new_match(ctx->defs, pat, m1->start, m1->end, (pat->type == BP_MATCH) ? MATCHES(m1, m2) : MATCHES(m1));
+        cache_destroy(slice_ctx.cache);
         return ret;
     }
     case BP_REPLACE: {
         match_t *p = NULL;
         if (pat->args.replace.pat) {
-            p = match(defs, cache, f, str, pat->args.replace.pat, ignorecase);
+            p = match(ctx, str, pat->args.replace.pat);
             if (p == NULL) return NULL;
         }
-        return new_match(defs, pat, str, p ? p->end : str, MATCHES(p));
+        return new_match(ctx->defs, pat, str, p ? p->end : str, MATCHES(p));
     }
     case BP_REF: {
         match_t *cached;
-        if (cache_get(cache, defs, str, pat, &cached))
+        if (cache_get(ctx->cache, ctx->defs, str, pat, &cached))
             return cached;
 
-        def_t *def = lookup(defs, pat->args.ref.len, pat->args.ref.name);
+        def_t *def = lookup(ctx->defs, pat->args.ref.len, pat->args.ref.name);
         if (def == NULL)
             errx(EXIT_FAILURE, "Unknown identifier: '%.*s'", (int)pat->args.ref.len, pat->args.ref.name);
         pat_t *ref = def->pat;
@@ -589,17 +604,18 @@ static match_t *match(def_t *defs, cache_t *cache, file_t *f, const char *str, p
                 .fallback = ref,
             },
         };
-        def_t defs2 = {
+        match_context_t ctx2 = *ctx;
+        ctx2.defs = &(def_t){
             .namelen = def->namelen,
             .name = def->name,
             .pat = &rec_op,
-            .next = defs,
+            .next = ctx->defs,
         };
 
         const char *prev = str;
-        match_t *m = match(&defs2, cache, f, str, ref, ignorecase);
+        match_t *m = match(&ctx2, str, ref);
         if (m == NULL) {
-            cache_save(cache, defs, str, pat, NULL);
+            cache_save(ctx->cache, ctx->defs, str, pat, NULL);
             return NULL;
         }
 
@@ -608,7 +624,7 @@ static match_t *match(def_t *defs, cache_t *cache, file_t *f, const char *str, p
             remove_ownership(&rec_op.args.leftrec.match);
             add_owner(&rec_op.args.leftrec.match, m);
             prev = m->end;
-            match_t *m2 = match(&defs2, cache, f, str, ref, ignorecase);
+            match_t *m2 = match(&ctx2, str, ref);
             if (m2 == NULL) break;
             if (m2->end <= prev) {
                 recycle_if_unused(&m2);
@@ -622,8 +638,8 @@ static match_t *match(def_t *defs, cache_t *cache, file_t *f, const char *str, p
         // leftrec.match is GC'd. It also helps with visualization of match
         // results.
         // OPTIMIZE: remove this if necessary
-        match_t *wrap = new_match(defs, pat, m->start, m->end, MATCHES(m));
-        cache_save(cache, defs, str, pat, wrap);
+        match_t *wrap = new_match(ctx->defs, pat, m->start, m->end, MATCHES(m));
+        cache_save(ctx->cache, ctx->defs, str, pat, wrap);
 
         if (rec_op.args.leftrec.match)
             remove_ownership(&rec_op.args.leftrec.match);
@@ -635,21 +651,21 @@ static match_t *match(def_t *defs, cache_t *cache, file_t *f, const char *str, p
         const char *start = str;
 
         const char *p = str;
-        while (p > f->start && p[-1] != '\n') --p;
+        while (p > ctx->start && p[-1] != '\n') --p;
 
         // Current indentation:
         char denter = *p;
         int dents = 0;
         if (denter == ' ' || denter == '\t') {
-            for (; *p == denter && p < f->end; ++p) ++dents;
+            for (; *p == denter && p < ctx->end; ++p) ++dents;
         }
 
         // Subsequent indentation:
         while (*str == '\n' || *str == '\n') ++str;
         for (int i = 0; i < dents; i++)
-            if (&str[i] >= f->end || str[i] != denter) return NULL;
+            if (&str[i] >= ctx->end || str[i] != denter) return NULL;
 
-        return new_match(defs, pat, start, &str[dents], NULL);
+        return new_match(ctx->defs, pat, start, &str[dents], NULL);
     }
     default: {
         errx(EXIT_FAILURE, "Unknown pattern type: %u", pat->type);
@@ -750,26 +766,33 @@ size_t free_all_matches(void)
 // Iterate over matches.
 // Usage: for (match_t *m = NULL; next_match(&m, ...); ) {...}
 //
-bool next_match(match_t **m, def_t *defs, file_t *f, pat_t *pat, pat_t *skip, bool ignorecase)
+bool next_match(match_t **m, def_t *defs, const char *start, const char *end, pat_t *pat, pat_t *skip, bool ignorecase)
 {
     static cache_t cache = {0};
-    if (!f || !pat) { // Cleanup for stop_matching()
+    if (!pat) { // Cleanup for stop_matching()
         recycle_if_unused(m);
         cache_destroy(&cache);
         return false;
     }
 
-    const char *start;
+    const char *pos;
     if (*m) {
         // Make sure forward progress is occurring, even after zero-width matches:
-        start = ((*m)->end > (*m)->start) ? (*m)->end : (*m)->end+1;
+        pos = ((*m)->end > (*m)->start) ? (*m)->end : (*m)->end+1;
         recycle_if_unused(m);
     } else {
-        start = f->start;
+        pos = start;
         cache_destroy(&cache);
     }
 
-    *m = (start <= f->end) ? _next_match(defs, &cache, f, start, pat, skip, ignorecase) : NULL;
+    match_context_t ctx = {
+        .defs = defs,
+        .cache = &cache,
+        .start = start,
+        .end = end,
+        .ignorecase = ignorecase,
+    };
+    *m = (pos <= end) ? _next_match(&ctx, pos, pat, skip) : NULL;
     if (!*m) cache_destroy(&cache);
     return *m != NULL;
 }
@@ -818,6 +841,90 @@ match_t *get_named_capture(match_t *m, const char *name, size_t namelen)
         }
     }
     return NULL;
+}
+
+void fprint_match(FILE *out, const char *file_start, match_t *m)
+{
+    if (m->pat->type == BP_REPLACE) {
+        const char *text = m->pat->args.replace.text;
+        const char *end = &text[m->pat->args.replace.len];
+
+        // TODO: clean up the line numbering code
+        for (const char *r = text; r < end; ) {
+            // Capture substitution
+            if (*r == '@' && r+1 < end && r[1] != '@') {
+                ++r;
+
+                // Retrieve the capture value:
+                match_t *cap = NULL;
+                if (isdigit(*r)) {
+                    int n = (int)strtol(r, (char**)&r, 10);
+                    cap = get_numbered_capture(m->children[0], n);
+                } else {
+                    const char *name = r, *end = after_name(r);
+                    if (end > name) {
+                        cap = get_named_capture(m->children[0], name, (size_t)(end - name));
+                        r = end;
+                        if (r < m->end && *r == ';') ++r;
+                    }
+                }
+
+                if (cap != NULL) {
+                    fprint_match(out, file_start, cap);
+                    continue;
+                } else {
+                    --r;
+                }
+            }
+
+            if (*r == '\\') {
+                ++r;
+                if (*r == 'N') { // \N (nodent)
+                    ++r;
+                    // Mildly hacky: nodents here are based on the *first line*
+                    // of the match. If the match spans multiple lines, or if
+                    // the replacement text contains newlines, this may get weird.
+                    const char *line_start = m->start;
+                    while (line_start > file_start && line_start[-1] != '\n') --line_start;
+                    char denter = *line_start == '\t' ? '\t' : ' ';
+                    fputc('\n', out);
+                    if (denter == ' ' || denter == '\t') {
+                        for (const char *p = line_start; p && *p == denter && p < m->start; ++p)
+                            fputc(denter, out);
+                    }
+                    continue;
+                }
+                const char *start = r;
+                char c = unescapechar(r, &r);
+                if (r > start) (void)fputc(c, out);
+                else (void)fputc('\\', out);
+                continue;
+            } else if (*r == '\n') {
+                (void)fputc('\n', out);
+                ++r;
+                continue;
+            } else {
+                (void)fputc(*r, out);
+                ++r;
+                continue;
+            }
+        }
+    } else {
+        const char *prev = m->start;
+        for (int i = 0; m->children && m->children[i]; i++) {
+            match_t *child = m->children[i];
+            // Skip children from e.g. zero-width matches like >@foo
+            if (!(prev <= child->start && child->start <= m->end &&
+                  prev <= child->end && child->end <= m->end))
+                continue;
+            if (child->start > prev)
+                fwrite(prev, sizeof(char), (size_t)(child->start - prev), out);
+            fprint_match(out, file_start, child);
+            prev = child->end;
+        }
+        if (m->end > prev)
+            fwrite(prev, sizeof(char), (size_t)(m->end - prev), out);
+    }
 }
 
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1,\:0

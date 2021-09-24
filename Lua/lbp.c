@@ -11,8 +11,6 @@
 #include "lua.h"
 #include "lauxlib.h"
 
-#include "../print.h"
-#include "../files.h"
 #include "../pattern.h"
 #include "../match.h"
 
@@ -33,19 +31,12 @@ static inline void push_parse_error(lua_State *L, maybe_pat_t m)
     free(buf);
 }
 
-static void push_matchstring(lua_State *L, file_t *f, match_t *m)
+static void push_matchstring(lua_State *L, match_t *m)
 {
     char *buf = NULL;
     size_t size = 0;
     FILE *out = open_memstream(&buf, &size);
-    printer_t pr = {
-        .file = f,
-        .context_before = NO_CONTEXT,
-        .context_after = NO_CONTEXT,
-        .use_color = 0,
-        .lineformat = "",
-    };
-    print_match(out, &pr, m);
+    fprint_match(out, m->start, m);
     fflush(out);
     lua_pushlstring(L, buf, size);
     fclose(out);
@@ -54,7 +45,7 @@ static void push_matchstring(lua_State *L, file_t *f, match_t *m)
 static int Ltostring(lua_State *L)
 {
     match_t **m = (match_t**)lua_touserdata(L, 1);
-    push_matchstring(L, NULL, *m);
+    push_matchstring(L, *m);
     return 1;
 }
 
@@ -80,7 +71,7 @@ static int Lindex(lua_State *L)
     if (type == LUA_TNUMBER) {
         int n = luaL_checkinteger(L, 2);
         if (n == 0) {
-            push_matchstring(L, NULL, *m);
+            push_matchstring(L, *m);
             return 1;
         } else if (n > 0) {
             ret = get_numbered_capture(*m, n);
@@ -133,18 +124,15 @@ static int Lmatch(lua_State *L)
     if (index > (lua_Integer)strlen(text)+1)
         return 0;
 
-    file_t *pat_file = spoof_file(NULL, "<pattern argument>", pat_text, patlen);
-    maybe_pat_t maybe_pat = bp_pattern(pat_file->start, pat_file->end);
+    maybe_pat_t maybe_pat = bp_pattern(pat_text, pat_text + patlen);
     if (!maybe_pat.success) {
         push_parse_error(L, maybe_pat);
-        destroy_file(&pat_file);
         return 0;
     }
 
-    file_t *text_file = spoof_file(NULL, "<text argument>", text+(index-1), textlen);
     match_t *m = NULL;
     int ret = 0;
-    if (next_match(&m, NULL, text_file, maybe_pat.value.pat, NULL, false)) {
+    if (next_match(&m, NULL, text, &text[textlen], maybe_pat.value.pat, NULL, false)) {
 
         // lua_createtable(L, 0, 1);
 
@@ -158,16 +146,12 @@ static int Lmatch(lua_State *L)
         // int n = 1;
         // assign_captures(L, text_file, m, &n);
 
-        lua_pushinteger(L, (int)(m->start - text_file->start) + index);
+        lua_pushinteger(L, (int)(m->start - text) + index);
         lua_pushinteger(L, (int)(m->end - m->start));
 
         // stop_matching(&m);
         ret = 3;
     }
-
-    // destroy_file(&pat_file);
-    // destroy_file(&text_file);
-    
 
     return ret;
 }
@@ -182,48 +166,34 @@ static int Lreplace(lua_State *L)
     if (index > (lua_Integer)strlen(text)+1)
         index = (lua_Integer)strlen(text)+1;
 
-    file_t *pat_file = spoof_file(NULL, "<pattern argument>", pat_text, patlen);
-    maybe_pat_t maybe_pat = bp_pattern(pat_file->start, pat_file->end);
+    maybe_pat_t maybe_pat = bp_pattern(pat_text, pat_text + patlen);
     if (!maybe_pat.success) {
         push_parse_error(L, maybe_pat);
-        destroy_file(&pat_file);
         return 0;
     }
-    file_t *rep_file = spoof_file(NULL, "<replacement argument>", rep_text, replen);
-    maybe_pat = bp_replacement(maybe_pat.value.pat, rep_file->start, rep_file->end);
+    maybe_pat = bp_replacement(maybe_pat.value.pat, rep_text, rep_text + replen);
     if (!maybe_pat.success) {
         push_parse_error(L, maybe_pat);
-        destroy_file(&pat_file);
-        destroy_file(&rep_file);
         return 0;
     }
 
-    file_t *text_file = spoof_file(NULL, "<text argument>", text+(index-1), textlen);
     char *buf = NULL;
     size_t size = 0;
     FILE *out = open_memstream(&buf, &size);
-    printer_t pr = {
-        .file = text_file,
-        .context_before = ALL_CONTEXT,
-        .context_after = ALL_CONTEXT,
-        .use_color = 0,
-        .lineformat = "",
-    };
     int replacements = 0;
-    for (match_t *m = NULL; next_match(&m, NULL, text_file, maybe_pat.value.pat, NULL, false); ) {
-        print_match(out, &pr, m);
+    const char *prev = text;
+    for (match_t *m = NULL; next_match(&m, NULL, text, &text[textlen], maybe_pat.value.pat, NULL, false); ) {
+        fwrite(prev, sizeof(char), (size_t)(m->start - prev), out);
+        fprint_match(out, text, m);
+        prev = m->end;
         ++replacements;
     }
-    print_match(out, &pr, NULL);
+    fwrite(prev, sizeof(char), (size_t)(&text[textlen] - prev), out);
     fflush(out);
     lua_pushlstring(L, buf, size);
     lua_pushinteger(L, replacements);
     fclose(out);
 
-    // destroy_file(&pat_file);
-    // destroy_file(&rep_file);
-    // destroy_file(&text_file);
-    
     return 2;
 }
 
