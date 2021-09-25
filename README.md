@@ -146,9 +146,16 @@ File                           | Description
 [json.c](json.c)               | JSON output of matches.
 [match.c](match.c)             | Pattern matching code (match a pattern against an input string).
 [pattern.c](pattern.c)         | Pattern loading code (build a pattern out of an input string).
-[print.c](print.c)             | Print pattern match results.
 [utf8.c](utf8.c)               | UTF-8 helper code.
 [utils.c](utils.c)             | Miscellaneous helper functions.
+
+
+## Lua Bindings
+
+`bp` also comes with a set of Lua bindings, which can be found in the [Lua/
+directory](Lua). The bindings are currently a work in progress, but are fully
+usable at this point. Check [the Lua bindings README](Lua/README.md) for more
+details.
 
 
 ## Performance
