@@ -27,19 +27,14 @@ static void populate_lines(file_t *f)
     f->lines = new(const char*[linecap]);
     f->nlines = 0;
     char *p = f->start;
-    for (size_t n = 0; p && p < f->end; ++n) {
+    for (size_t n = 0; p && p <= f->end; ++n) {
         ++f->nlines;
         if (n >= linecap)
             f->lines = grow(f->lines, linecap *= 2);
         f->lines[n] = p;
-        do {
-            char *nl = memchr(p, '\n', (size_t)(f->end - p));
-            if (nl) {
-                p = nl+1;
-                break;
-            } else if (p < f->end)
-                p += strlen(p)+1;
-        } while (p < f->end);
+        char *nl = memchr(p, '\n', (size_t)(f->end - p));
+        if (nl && nl < f->end) p = nl+1;
+        else break;
     }
 }
 
