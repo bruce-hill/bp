@@ -1,6 +1,7 @@
 # Lua Bindings
 
-This directory contains Lua bindings for bp.
+This directory contains Lua bindings for bp. The bindings are intended to be roughly
+equivalent in usefulness to LPEG, but with a smaller codebase.
 
 ## API
 
