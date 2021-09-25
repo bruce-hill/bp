@@ -184,7 +184,7 @@ pat_t *chain_together(pat_t *first, pat_t *second)
         } else if (p->type == BP_CHAIN) {
             p = p->args.multiple.second;
         } else if (p->type == BP_MATCH || p->type == BP_NOT_MATCH) {
-            p = p->args.pat;
+            p = p->args.multiple.first;
         } else break;
     }
     return chain;
