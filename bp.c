@@ -343,8 +343,6 @@ static int print_matches(FILE *out, def_t *defs, file_t *f, pat_t *pattern)
         }
         fprint_context_between(out, prev, m->start);
         if (print_opts.normal_color) fprintf(out, "%s", print_opts.normal_color);
-        if (m->start == f->start || m->start[-1] == '\n')
-            fprint_linenum(out, f, (int)get_line_number(f, m->start), print_opts.normal_color);
         fprint_match(out, f->start, m, &print_opts);
         if (print_opts.normal_color) fprintf(out, "%s", print_opts.normal_color);
         prev = m->end;
