@@ -30,7 +30,7 @@ typedef struct {
     cache_t *cache;
     const char *start, *end;
     bool ignorecase;
-} match_context_t;
+} match_ctx_t;
 
 // New match objects are either recycled from unused match objects or allocated
 // from the heap. While it is in use, the match object is stored in the
@@ -44,7 +44,7 @@ static match_t *in_use_matches = NULL;
 #define MATCHES(...) (match_t*[]){__VA_ARGS__, NULL}
 
 __attribute__((hot, nonnull(1,2,3)))
-static match_t *match(match_context_t *ctx, const char *str, pat_t *pat);
+static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat);
 
 // Store a value and update its refcount
 static inline void add_owner(match_t** owner, match_t* owned)
@@ -250,7 +250,7 @@ static pat_t *first_pat(def_t *defs, pat_t *pat)
 // Find the next match after prev (or the first match if prev is NULL)
 //
 __attribute__((nonnull(1,2,3)))
-static match_t *_next_match(match_context_t *ctx, const char *str, pat_t *pat, pat_t *skip)
+static match_t *_next_match(match_ctx_t *ctx, const char *str, pat_t *pat, pat_t *skip)
 {
     // Prune the unnecessary entries from the cache (those not between start/end)
     if (ctx->cache->matches) {
@@ -294,11 +294,11 @@ static match_t *_next_match(match_context_t *ctx, const char *str, pat_t *pat, p
 // match object, or NULL if no match is found.
 // The returned value should be free()'d to avoid memory leaking.
 //
-static match_t *match(match_context_t *ctx, const char *str, pat_t *pat)
+static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
 {
     switch (pat->type) {
     case BP_DEFINITION: {
-        match_context_t ctx2 = *ctx;
+        match_ctx_t ctx2 = *ctx;
         ctx2.defs = with_def(ctx->defs, pat->args.def.namelen, pat->args.def.name, pat->args.def.def);
         match_t *m = match(&ctx2, str, pat->args.def.pat ? pat->args.def.pat : pat->args.def.def);
         free_defs(ctx2.defs, ctx->defs);
@@ -475,7 +475,7 @@ static match_t *match(match_context_t *ctx, const char *str, pat_t *pat)
         // current pos, so mock it out as a file slice.
         // TODO: this breaks ^/^^/$/$$, but that can probably be ignored
         // because you rarely need to check those in a backtrack.
-        match_context_t slice_ctx = *ctx;
+        match_ctx_t slice_ctx = *ctx;
         slice_ctx.cache = &(cache_t){0};
         slice_ctx.start = ctx->start;
         slice_ctx.end = str;
@@ -522,7 +522,7 @@ static match_t *match(match_context_t *ctx, const char *str, pat_t *pat)
             // Temporarily add a rule that the backref name matches the
             // exact string of the original match (no replacements)
             pat_t *backref = bp_raw_literal(m1->start, (size_t)(m1->end - m1->start));
-            match_context_t ctx2 = *ctx;
+            match_ctx_t ctx2 = *ctx;
             ctx2.defs = with_def(ctx->defs, m1->pat->args.capture.namelen, m1->pat->args.capture.name, backref);
             ++m1->refcount; {
                 m2 = match(&ctx2, m1->end, pat->args.multiple.second);
@@ -549,7 +549,7 @@ static match_t *match(match_context_t *ctx, const char *str, pat_t *pat)
 
         // <p1>~<p2> matches iff the text of <p1> matches <p2>
         // <p1>!~<p2> matches iff the text of <p1> does not match <p2>
-        match_context_t slice_ctx = *ctx;
+        match_ctx_t slice_ctx = *ctx;
         slice_ctx.cache = &(cache_t){0};
         slice_ctx.start = m1->start;
         slice_ctx.end = m1->end;
@@ -595,7 +595,7 @@ static match_t *match(match_context_t *ctx, const char *str, pat_t *pat)
                 .fallback = ref,
             },
         };
-        match_context_t ctx2 = *ctx;
+        match_ctx_t ctx2 = *ctx;
         ctx2.defs = &(def_t){
             .namelen = def->namelen,
             .name = def->name,
@@ -776,7 +776,7 @@ bool next_match(match_t **m, def_t *defs, const char *start, const char *end, pa
         cache_destroy(&cache);
     }
 
-    match_context_t ctx = {
+    match_ctx_t ctx = {
         .defs = defs,
         .cache = &cache,
         .start = start,
