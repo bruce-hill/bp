@@ -51,78 +51,84 @@ static void push_matchstring(lua_State *L, match_t *m)
     fclose(out);
 }
 
+static void push_match(lua_State *L, match_t *m);
+
+static void set_capture_fields(lua_State *L, match_t *m, int *n)
+{
+    if (m->pat->type == BP_CAPTURE) {
+        if (m->pat->args.capture.namelen > 0) {
+            lua_pushlstring(L, m->pat->args.capture.name, m->pat->args.capture.namelen);
+            push_match(L, m->children[0]);
+            lua_settable(L, -3);
+        } else {
+            push_match(L, m->children[0]);
+            lua_seti(L, -2, *(n++));
+        }
+    } else if (m->children) {
+        for (int i = 0; m->children[i]; i++)
+            set_capture_fields(L, m->children[i], n);
+    }
+}
+
+void push_match(lua_State *L, match_t *m)
+{
+    lua_createtable(L, 1, 0);
+    lua_pushlightuserdata(L, (void*)&MATCH_METATABLE);
+    lua_gettable(L, LUA_REGISTRYINDEX);
+    lua_setmetatable(L, -2);
+    push_matchstring(L, m);
+    lua_seti(L, -2, 0);
+    int capture_num = 1;
+    for (int i = 0; m->children && m->children[i]; i++)
+        set_capture_fields(L, m->children[i], &capture_num);
+}
+
 static int Ltostring(lua_State *L)
 {
-    match_t **m = (match_t**)lua_touserdata(L, 1);
-    push_matchstring(L, *m);
+    lua_geti(L, 1, 0);
     return 1;
-}
-
-static int Lgc(lua_State *L)
-{
-    match_t **m = (match_t**)lua_touserdata(L, 1);
-    recycle_if_unused(m);
-    return 0;
-}
-
-static int Llen(lua_State *L)
-{
-    match_t **m = (match_t**)lua_touserdata(L, 1);
-    lua_pushinteger(L, (int)((*m)->end - (*m)->start));
-    return 1;
-}
-
-static int Lindex(lua_State *L)
-{
-    match_t **m = (match_t**)lua_touserdata(L, 1);
-    int type = lua_type(L, 2);
-    match_t *ret = NULL;
-    if (type == LUA_TNUMBER) {
-        int n = luaL_checkinteger(L, 2);
-        if (n == 0) {
-            push_matchstring(L, *m);
-            return 1;
-        } else if (n > 0) {
-            ret = get_numbered_capture(*m, n);
-        }
-    } else if (type == LUA_TSTRING) {
-        size_t len;
-        const char *name = luaL_checklstring(L, 2, &len);
-        ret = get_named_capture(*m, name, len);
-    }
-
-    if (ret) {
-        match_t **userdata = (match_t**)lua_newuserdatauv(L, sizeof(match_t*), 0);
-        *userdata = ret;
-        lua_pushlightuserdata(L, (void*)&MATCH_METATABLE);
-        lua_gettable(L, LUA_REGISTRYINDEX);
-        lua_setmetatable(L, -2);
-        return 1;
-    }
-    return 0;
 }
 
 static const luaL_Reg Rinstance_metamethods[] =
 {
-    {"__len", Llen},
     {"__tostring", Ltostring},
-    {"__index", Lindex},
-    {"__gc", Lgc},
     {NULL, NULL}
 };
 
-// static void push_match(lua_State *L, match_t *m)
-// {
-//     lua_createtable(L, 0, 1);
-//     lua_pushlightuserdata(L, (void*)&MATCH_METATABLE);
-//     lua_gettable(L, LUA_REGISTRYINDEX);
-//     lua_setmetatable(L, -2);
-
-//     push_matchstring(L, m);
-//     lua_rawseti(L, -2, 0);
-//     int n = 1;
-//     assign_captures(L, m, &n);
-// }
+static void recursive_free_pat(pat_t *pat)
+{
+    // Do a depth-first traversal, freeing everyting along the way:
+    if (!pat) return;
+    switch (pat->type) {
+    case BP_DEFINITION:
+        recursive_free_pat(pat->args.def.def);
+        recursive_free_pat(pat->args.def.pat);
+        break;
+    case BP_REPEAT:
+        recursive_free_pat(pat->args.repetitions.sep);
+        recursive_free_pat(pat->args.repetitions.repeat_pat);
+        break;
+    case BP_CHAIN: case BP_UPTO: case BP_UPTO_STRICT:
+    case BP_OTHERWISE: case BP_NOT_MATCH: case BP_MATCH:
+        recursive_free_pat(pat->args.multiple.first);
+        recursive_free_pat(pat->args.multiple.second);
+        break;
+    case BP_REPLACE:
+        recursive_free_pat(pat->args.replace.pat);
+        break;
+    case BP_CAPTURE:
+        recursive_free_pat(pat->args.capture.capture_pat);
+        break;
+    case BP_NOT: case BP_AFTER: case BP_BEFORE:
+        recursive_free_pat(pat->args.pat);
+        break;
+    case BP_LEFTRECURSION:
+        recursive_free_pat(pat->args.leftrec.fallback);
+        break;
+    default: break;
+    }
+    free_pat(pat);
+}
 
 static int Lmatch(lua_State *L)
 {
@@ -141,26 +147,15 @@ static int Lmatch(lua_State *L)
 
     match_t *m = NULL;
     int ret = 0;
-    if (next_match(&m, builtins, text, &text[textlen], maybe_pat.value.pat, NULL, false)) {
-
-        // lua_createtable(L, 0, 1);
-
-        match_t **userdata = (match_t**)lua_newuserdatauv(L, sizeof(match_t*), 0);
-        *userdata = m;
-        lua_pushlightuserdata(L, (void*)&MATCH_METATABLE);
-        lua_gettable(L, LUA_REGISTRYINDEX);
-        lua_setmetatable(L, -2);
-        // push_matchstring(L, text_file, m);
-        // lua_rawseti(L, -2, 0);
-        // int n = 1;
-        // assign_captures(L, text_file, m, &n);
-
-        lua_pushinteger(L, (int)(m->start - text) + index);
+    if (next_match(&m, builtins, text+index-1, &text[textlen], maybe_pat.value.pat, NULL, false)) {
+        push_match(L, m);
+        lua_pushinteger(L, (int)(m->start - text) + 1);
         lua_pushinteger(L, (int)(m->end - m->start));
-
-        // stop_matching(&m);
+        stop_matching(&m);
         ret = 3;
     }
+
+    recursive_free_pat(maybe_pat.value.pat);
 
     return ret;
 }
@@ -180,9 +175,10 @@ static int Lreplace(lua_State *L)
         raise_parse_error(L, maybe_pat);
         return 0;
     }
-    maybe_pat = bp_replacement(maybe_pat.value.pat, rep_text, rep_text + replen);
-    if (!maybe_pat.success) {
-        raise_parse_error(L, maybe_pat);
+    maybe_pat_t maybe_replacement = bp_replacement(maybe_pat.value.pat, rep_text, rep_text + replen);
+    if (!maybe_replacement.success) {
+        recursive_free_pat(maybe_pat.value.pat);
+        raise_parse_error(L, maybe_replacement);
         return 0;
     }
 
@@ -191,7 +187,7 @@ static int Lreplace(lua_State *L)
     FILE *out = open_memstream(&buf, &size);
     int replacements = 0;
     const char *prev = text;
-    for (match_t *m = NULL; next_match(&m, builtins, text, &text[textlen], maybe_pat.value.pat, NULL, false); ) {
+    for (match_t *m = NULL; next_match(&m, builtins, text, &text[textlen], maybe_replacement.value.pat, NULL, false); ) {
         fwrite(prev, sizeof(char), (size_t)(m->start - prev), out);
         fprint_match(out, text, m, NULL);
         prev = m->end;
@@ -202,6 +198,9 @@ static int Lreplace(lua_State *L)
     lua_pushlstring(L, buf, size);
     lua_pushinteger(L, replacements);
     fclose(out);
+
+    // maybe_pat will get freed by this:
+    recursive_free_pat(maybe_replacement.value.pat);
 
     return 2;
 }
