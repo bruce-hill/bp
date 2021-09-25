@@ -285,6 +285,7 @@ void fprint_linenum(FILE *out, file_t *f, int linenum, const char *normal_color)
 }
 
 static file_t *printing_file = NULL;
+static int last_line_num = -1;
 static void _fprint_between(FILE *out, const char *start, const char *end, const char *normal_color)
 {
     if (!end) end = printing_file->end;
@@ -292,7 +293,10 @@ static void _fprint_between(FILE *out, const char *start, const char *end, const
         if (!start) start = printing_file->start;
         if (start == printing_file->start || start[-1] == '\n') {
             int linenum = (int)get_line_number(printing_file, start);
-            fprint_linenum(out, printing_file, linenum, normal_color);
+            if (last_line_num != linenum) {
+                fprint_linenum(out, printing_file, linenum, normal_color);
+                last_line_num = linenum;
+            }
         }
         const char *line_end = memchr(start, '\n', (size_t)(end - start));
         if (line_end && line_end != end) {
@@ -305,22 +309,9 @@ static void _fprint_between(FILE *out, const char *start, const char *end, const
     }
 }
 
-static void on_nl(FILE *out)
-{
-    switch (options.format) {
-    case FORMAT_FANCY: case FORMAT_PLAIN:
-        for (int i = (int)printing_file->nlines; i > 0; i /= 10) fputc('.', out);
-        fprintf(out, "%s", options.format == FORMAT_FANCY ? "\033[0;2m\033(0\x78\033(B\033[m" : "|");
-        break;
-    default: break;
-    }
-}
-
 static void fprint_context_between(FILE *out, const char *prev, const char *next)
 {
     if (!prev && !next) return;
-    // if (options.context_before == NO_CONTEXT && options.context_after == NO_CONTEXT)
-    //     return;
     if (options.context_before == ALL_CONTEXT || options.context_after == ALL_CONTEXT) {
         _fprint_between(out, prev, next, "\033[m");
         return;
@@ -347,6 +338,17 @@ static void fprint_context_between(FILE *out, const char *prev, const char *next
     }
 }
 
+static void on_nl(FILE *out)
+{
+    switch (options.format) {
+    case FORMAT_FANCY: case FORMAT_PLAIN:
+        for (int i = (int)printing_file->nlines; i > 0; i /= 10) fputc('.', out);
+        fprintf(out, "%s", options.format == FORMAT_FANCY ? "\033[0;2m\033(0\x78\033(B\033[m" : "|");
+        break;
+    default: break;
+    }
+}
+
 //
 // Print all the matches in a file.
 //
@@ -357,6 +359,7 @@ static int print_matches(FILE *out, def_t *defs, file_t *f, pat_t *pattern)
     const char *prev = NULL;
 
     printing_file = f;
+    last_line_num = -1;
 
     print_options_t print_opts = {.fprint_between = _fprint_between, .on_nl = on_nl};
     if (options.format == FORMAT_FANCY) {
@@ -379,6 +382,7 @@ static int print_matches(FILE *out, def_t *defs, file_t *f, pat_t *pattern)
         fprint_context_between(out, prev, NULL);
 
     printing_file = NULL;
+    last_line_num = -1;
     return matches;
 }
 
