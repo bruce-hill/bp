@@ -288,9 +288,8 @@ static file_t *printing_file = NULL;
 static int last_line_num = -1;
 static void _fprint_between(FILE *out, const char *start, const char *end, const char *normal_color)
 {
-    if (!end) end = printing_file->end;
     while (start < end) {
-        if (!start) start = printing_file->start;
+        // Cheeky lookbehind to see if line number should be printed
         if (start == printing_file->start || start[-1] == '\n') {
             int linenum = (int)get_line_number(printing_file, start);
             if (last_line_num != linenum) {
@@ -309,32 +308,31 @@ static void _fprint_between(FILE *out, const char *start, const char *end, const
     }
 }
 
-static void fprint_context_between(FILE *out, const char *prev, const char *next)
+static void fprint_context(FILE *out, file_t *f, const char *prev, const char *next)
 {
-    if (!prev && !next) return;
     if (options.context_before == ALL_CONTEXT || options.context_after == ALL_CONTEXT) {
-        _fprint_between(out, prev, next, "\033[m");
+        _fprint_between(out, prev ? prev : f->start, next ? next : f->end, "\033[m");
         return;
     }
-    const char *after_prev = prev, *before_next = next;
-    if (prev && options.context_after >= 0) {
-        size_t after_prev_line = get_line_number(printing_file, prev) + (size_t)options.context_after + 1;
-        after_prev = after_prev_line > printing_file->nlines ? printing_file->end : get_line(printing_file, after_prev_line > printing_file->nlines ? printing_file->nlines : after_prev_line);
-    }
+    const char *before_next = next;
     if (next && options.context_before >= 0) {
-        size_t before_next_line = get_line_number(printing_file, next);
-        before_next_line = options.context_before >= (int)before_next_line ? 1 : before_next_line - (size_t)options.context_before;
-        before_next = get_line(printing_file, before_next_line);
+        size_t line_before_next = get_line_number(printing_file, next);
+        line_before_next = options.context_before >= (int)line_before_next ? 1 : line_before_next - (size_t)options.context_before;
+        before_next = get_line(printing_file, line_before_next);
+        if (prev && before_next < prev) before_next = prev;
     }
-    if (!prev) {
-        _fprint_between(out, before_next, next, "\033[m");
-    } else if (!next) {
-        _fprint_between(out, prev, after_prev, "\033[m");
-    } else if (after_prev >= before_next) {
+    const char *after_prev = prev;
+    if (prev && options.context_after >= 0) {
+        size_t line_after_prev = get_line_number(printing_file, prev) + (size_t)options.context_after + 1;
+        after_prev = line_after_prev > printing_file->nlines ?
+            printing_file->end : get_line(printing_file, line_after_prev > printing_file->nlines ? printing_file->nlines : line_after_prev);
+        if (next && after_prev > next) after_prev = next;
+    }
+    if (next && prev && after_prev >= before_next) {
         _fprint_between(out, prev, next, "\033[m");
     } else {
-        _fprint_between(out, prev, after_prev, "\033[m");
-        _fprint_between(out, before_next, next, "\033[m");
+        if (prev) _fprint_between(out, prev, after_prev, "\033[m");
+        if (next) _fprint_between(out, before_next, next, "\033[m");
     }
 }
 
@@ -372,14 +370,15 @@ static int print_matches(FILE *out, def_t *defs, file_t *f, pat_t *pattern)
             if (printed_filenames++ > 0) printf("\n");
             fprint_filename(out, f->filename);
         }
-        fprint_context_between(out, prev, m->start);
+        fprint_context(out, f, prev, m->start);
         if (print_opts.normal_color) fprintf(out, "%s", print_opts.normal_color);
         fprint_match(out, f->start, m, &print_opts);
         if (print_opts.normal_color) fprintf(out, "%s", print_opts.normal_color);
         prev = m->end;
     }
+    // Print trailing context if needed:
     if (matches > 0)
-        fprint_context_between(out, prev, NULL);
+        fprint_context(out, f, prev, NULL);
 
     printing_file = NULL;
     last_line_num = -1;
