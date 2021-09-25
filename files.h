@@ -7,8 +7,6 @@
 #include <stdio.h>
 #include <unistd.h>
 
-#define file_err(f, ...) do { fprint_line(stderr, f, __VA_ARGS__); exit(EXIT_FAILURE); } while(false)
-
 typedef struct file_s {
     struct file_s *next;
     const char *filename;
@@ -31,8 +29,6 @@ __attribute__((pure, nonnull))
 size_t get_line_number(file_t *f, const char *p);
 __attribute__((pure, nonnull))
 const char *get_line(file_t *f, size_t line_number);
-__attribute__((nonnull(1,2,3), format(printf,5,6)))
-void fprint_line(FILE *dest, file_t *f, const char *start, const char *end, const char *fmt, ...);
 
 #endif
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1,\:0

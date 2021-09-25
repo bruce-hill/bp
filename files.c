@@ -2,16 +2,13 @@
 // files.c - Implementation of some file loading functionality.
 //
 
-#include <ctype.h>
 #include <err.h>
 #include <fcntl.h>
 #include <limits.h>
 #include <stdarg.h>
-#include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
-#include <unistd.h>
 
 #include "files.h"
 #include "match.h"
@@ -212,46 +209,6 @@ const char *get_line(file_t *f, size_t line_number)
 {
     if (line_number == 0 || line_number > f->nlines) return NULL;
     return f->lines[line_number - 1];
-}
-
-//
-// Print the filename/line number, followed by the given message, followed by
-// the line itself.
-//
-void fprint_line(FILE *dest, file_t *f, const char *start, const char *end, const char *fmt, ...)
-{
-    if (start < f->start) start = f->start;
-    if (start > f->end) start = f->end;
-    if (end < f->start) end = f->start;
-    if (end > f->end) end = f->end;
-    size_t linenum = get_line_number(f, start);
-    const char *line = get_line(f, linenum);
-    fprintf(dest, "\033[1m%s:%lu:\033[m ", f->filename[0] ? f->filename : "stdin", linenum);
-
-    va_list args;
-    va_start(args, fmt);
-    (void)vfprintf(dest, fmt, args);
-    va_end(args);
-    (void)fputc('\n', dest);
-
-    const char *eol = linenum == f->nlines ? f->end : strchr(line, '\n');
-    if (end == NULL || end > eol) end = eol;
-    fprintf(dest, "\033[2m%5lu\033(0\x78\033(B\033[m%.*s\033[41;30m%.*s\033[m%.*s\n",
-            linenum,
-            (int)(start - line), line,
-            (int)(end - start), start,
-            (int)(eol - end), end);
-    fprintf(dest, "      \033[34;1m");
-    const char *p = line;
-    for (; p < start; ++p) (void)fputc(*p == '\t' ? '\t' : ' ', dest);
-    if (start == end) ++end;
-    for (; p < end; ++p)
-        if (*p == '\t')
-            // Some janky hacks: 8 ^'s, backtrack 8 spaces, move forward a tab stop, clear any ^'s that overshot
-            fprintf(dest, "^^^^^^^^\033[8D\033[I\033[K");
-        else
-            (void)fputc('^', dest);
-    fprintf(dest, "\033[m\n");
 }
 
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1,\:0

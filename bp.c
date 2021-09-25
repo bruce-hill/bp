@@ -104,12 +104,40 @@ static inline void fprint_filename(FILE *out, const char *filename)
 //
 // If there was a parse error while building a pattern, print an error message and exit.
 //
-static inline pat_t *assert_pat(file_t *f, maybe_pat_t maybe_pat)
+static inline pat_t *assert_pat(const char *start, maybe_pat_t maybe_pat)
 {
-    if (!maybe_pat.success)
-        file_err(f, maybe_pat.value.error.start, maybe_pat.value.error.end, maybe_pat.value.error.msg);
+    if (!maybe_pat.success) {
+        const char *err_start = maybe_pat.value.error.start,
+              *err_end = maybe_pat.value.error.end,
+              *err_msg = maybe_pat.value.error.msg;
+
+        const char *sol = memrchr(start, '\n', (size_t)(err_start - 1 - start));
+        if (sol) start = sol+1;
+        const char *eol = memchr(err_start, '\n', (size_t)(err_end - err_start));
+        if (eol) err_end = eol;
+        const char *end = eol ? eol : strchr(err_end, '\n');
+
+        fprintf(stderr, "\033[31;1m%s\033[0m\n", err_msg);
+        fprintf(stderr, "%.*s\033[41;30m%.*s\033[m%.*s\n",
+                (int)(err_start - start), start,
+                (int)(err_end - err_start), err_start,
+                (int)(end - err_end), err_end);
+        fprintf(stderr, "\033[34;1m");
+        const char *p = start;
+        for (; p < err_start; ++p) (void)fputc(*p == '\t' ? '\t' : ' ', stderr);
+        if (err_start == err_end) ++err_end;
+        for (; p < err_end; ++p)
+            if (*p == '\t')
+                // Some janky hacks: 8 ^'s, backtrack 8 spaces, move forward a tab stop, clear any ^'s that overshot
+                fprintf(stderr, "^^^^^^^^\033[8D\033[I\033[K");
+            else
+                (void)fputc('^', stderr);
+        fprintf(stderr, "\033[m\n");
+        exit(EXIT_FAILURE);
+    }
     return maybe_pat.value.pat;
 }
+
 
 //
 // Look for a key/value flag at the first position in the given argument list.
@@ -486,10 +514,8 @@ static int process_git_files(def_t *defs, pat_t *pattern, int argc, char *argv[]
 //
 static def_t *load_grammar(def_t *defs, file_t *f)
 {
-    maybe_pat_t maybe_pat = bp_pattern(f->start, f->end);
-    if (!maybe_pat.success)
-        file_err(f, maybe_pat.value.error.start, maybe_pat.value.error.end, maybe_pat.value.error.msg);
-    for (pat_t *p = maybe_pat.value.pat; p && p->type == BP_DEFINITION; p = p->args.def.pat)
+    pat_t *pat = assert_pat(f->start, bp_pattern(f->start, f->end));
+    for (pat_t *p = pat; p && p->type == BP_DEFINITION; p = p->args.def.pat)
         defs = with_def(defs, p->args.def.namelen, p->args.def.name, p->args.def.def);
     return defs;
 }
@@ -550,8 +576,7 @@ int main(int argc, char *argv[])
                 errx(EXIT_FAILURE, "No pattern has been defined for replacement to operate on");
             // TODO: spoof file as sprintf("pattern => '%s'", flag)
             // except that would require handling edge cases like quotation marks etc.
-            file_t *replace_file = spoof_file(&loaded_files, "<replace argument>", flag, -1);
-            pattern = assert_pat(replace_file, bp_replacement(pattern, replace_file->start, replace_file->end));
+            pattern = assert_pat(flag, bp_replacement(pattern, flag, flag+strlen(flag)));
             if (options.context_before == USE_DEFAULT_CONTEXT) options.context_before = ALL_CONTEXT;
             if (options.context_after == USE_DEFAULT_CONTEXT) options.context_after = ALL_CONTEXT;
         } else if (FLAG("-g")     || FLAG("--grammar")) {
@@ -566,18 +591,16 @@ int main(int argc, char *argv[])
                 errx(EXIT_FAILURE, "Couldn't find grammar: %s", flag);
             defs = load_grammar(defs, f); // Keep in memory for debug output
         } else if (FLAG("-p")     || FLAG("--pattern")) {
-            file_t *arg_file = spoof_file(&loaded_files, "<pattern argument>", flag, -1);
-            pat_t *p = assert_pat(arg_file, bp_pattern(arg_file->start, arg_file->end));
+            pat_t *p = assert_pat(flag, bp_pattern(flag, flag+strlen(flag)));
             pattern = chain_together(pattern, p);
         } else if (FLAG("-w")     || FLAG("--word")) {
             require(asprintf(&flag, "\\|%s\\|", flag), "Could not allocate memory");
             file_t *arg_file = spoof_file(&loaded_files, "<word pattern>", flag, -1);
             delete(&flag);
-            pat_t *p = assert_pat(arg_file, bp_stringpattern(arg_file->start, arg_file->end));
+            pat_t *p = assert_pat(arg_file->start, bp_stringpattern(arg_file->start, arg_file->end));
             pattern = chain_together(pattern, p);
         } else if (FLAG("-s")     || FLAG("--skip")) {
-            file_t *arg_file = spoof_file(&loaded_files, "<skip argument>", flag, -1);
-            pat_t *s = assert_pat(arg_file, bp_pattern(arg_file->start, arg_file->end));
+            pat_t *s = assert_pat(flag, bp_pattern(flag, flag+strlen(flag)));
             options.skip = either_pat(options.skip, s);
         } else if (FLAG("-C")     || FLAG("--context")) {
             options.context_before = options.context_after = context_from_flag(flag);
@@ -598,8 +621,7 @@ int main(int argc, char *argv[])
             errx(EXIT_FAILURE, "Unrecognized flag: -%c\n\n%s", argv[0][1], usage);
         } else if (argv[0][0] != '-') {
             if (pattern != NULL) break;
-            file_t *arg_file = spoof_file(&loaded_files, "<pattern argument>", argv[0], -1);
-            pat_t *p = assert_pat(arg_file, bp_stringpattern(arg_file->start, arg_file->end));
+            pat_t *p = assert_pat(argv[0], bp_stringpattern(argv[0], argv[0]+strlen(argv[0])));
             pattern = chain_together(pattern, p);
             ++argv;
         } else {
