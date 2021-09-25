@@ -32,8 +32,7 @@
 #define BP_NAME "bp"
 #endif
 
-static const char *description = (
-    BP_NAME" - a Parsing Expression Grammar command line tool");
+static const char *description = BP_NAME" - a Parsing Expression Grammar command line tool";
 static const char *usage = (
     "Usage:\n"
     "  "BP_NAME" [flags] <pattern> [<files>...]\n\n"

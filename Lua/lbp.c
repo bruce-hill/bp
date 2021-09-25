@@ -1,8 +1,8 @@
 /*
 * lbp.c - bp library for lua
 * API:
-*   bp.match(str, pat[, start_index]) -> nil or (match_text, start_index, match_len_in_source)
-*   bp.replace(str, pat, replacement, start_index) -> str with replacements
+*   bp.match(str, pat[, start_index]) -> nil or (match_table, start_index, input_consumed)
+*   bp.replace(str, pat, replacement, start_index) -> str with replacements, num_replacements
 */
 
 #include <fcntl.h>
@@ -23,9 +23,9 @@
 #define luaL_register(L, _, R) luaL_setfuncs(L, R, 0)
 #endif
 
-static const char *builtins_source =
+static const char *builtins_source = (
 #include "builtins.h"
-;
+);
 
 static int MATCH_METATABLE = 0;
 
