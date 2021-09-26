@@ -1,15 +1,5 @@
 local bp = require 'bp'
 
-local function iter(state, _)
-    local m, start, len = bp.match(state[1], state[2], state[3])
-    state[3] = m and start+math.max(len,1)
-    return m, start, len
-end
-
-bp.each = function(s, pat, index)
-    return iter, {s, pat, index}, index
-end
-
 local function repr(obj)
     if type(obj) == 'table' then
         local ret = {}
@@ -23,26 +13,38 @@ local function repr(obj)
 end
 
 print("Matching:")
-for m, i,j in bp.each("one two  three", "(*`a-z) => '(@0)'") do
-    print(("%s @%d len=%d"):format(repr(m),i,j))
+for m in bp.eachmatch("(*`a-z) => '(@0)'", "one two  three") do
+    print(repr(m))
 end
 
-print(("Replacing: %q (%d replacements)"):format(bp.replace("one two  three", "+`a-z", "(@0)")))
+print(("Replacing: %q (%d replacements)"):format(bp.replace("+`a-z", "(@0)", "one two  three")))
 
 
 print("Captures:")
-local m = bp.match("one two three four", "@first=+`a-z _ @second=(+`a-z => 'XX@0XX') _ @+`a-z _ @last=+`a-z")
+local m = bp.match("@first=+`a-z _ @second=(+`a-z => 'XX@0XX') _ @+`a-z _ @last=+`a-z", "one two three four")
 print(repr(m))
 
-local m = bp.match("one two three four", "@dup=+`a-z _ @dup=+`a-z _ @two=(@a=+`a-z _ @b=+`a-z)")
+local m = bp.match("@dup=+`a-z _ @dup=+`a-z _ @two=(@a=+`a-z _ @b=+`a-z)", "one two three four")
 print(repr(m))
 
 
 print("Testing parse errors:")
 local ok, msg = pcall(function()
-    bp.match("xxx", ".;//;;; wtf")
+    bp.match(".;//;;; wtf", "xxx")
 end)
 if not ok then print(("\x1B[41;30mParse error:\x1B[0;1;31m %s\x1B[m\n"):format(msg)) end
 
 print("Testing builtins:")
-print(bp.match("...(foo())...", "parens"))
+print(bp.match("parens", "...(foo())..."))
+
+
+print("Testing pat objects")
+local pat = bp.compile("+`a-z")
+print(pat)
+print(pat:match("...foo..."))
+print(pat:match("...baz..."))
+print(pat:replace("{@0}", "...baz..."))
+
+for m in pat:eachmatch("hello world") do
+    print(m)
+end

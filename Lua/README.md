@@ -9,17 +9,30 @@ roughly equivalent in usefulness to LPEG, but with a smaller codebase (roughly
 The Lua `bp` bindings provide the following methods:
 
 ```lua
-bp.match(text, pattern, [start_index]) --> match, match_start, match_length / nil
-bp.replace(text, pattern, replacement, [start_index]) --> text_with_replacements, num_replacements
+bp.match(pattern, text, [start_index]) --> match / nil
+bp.replace(pattern, replacement, text, [start_index]) --> text_with_replacements, num_replacements
+bp.compile(pattern) --> pattern_object
+for m in bp.eachmatch(pattern, text, [start_index]) do ... end
+
+pattern_object:match(text, [start_index]) --> match / nil
+pattern_object:replace(replacement, text, [start_index]) --> text_with_replacements, num_replacements
+for m in pattern_object:eachmatch(text, [start_index]) do ... end
 ```
 
 Match objects returned by `bp.match()` are tables whose `__tostring` will
 return the text of the match. Additionally, match objects store the text of the
-match at index `0`, and any captures stored as match objects with a key
-corresponding to the capture's identifier (e.g. `@"a" @foo="bc"` will be
-encoded as `{[0]="abc", [1]="a", foo={[0]="bc"}}`. If multiple captures within
-a match share the same identifier, it is unspecified which captured match will
-be stored at that key, so it's best to be unambiguous.
+match at index `0`, the match's starting index in the source string as
+`.start`, the first index after the match as `.after`, and any captures stored
+as match objects with a key corresponding to the capture's identifier (e.g.
+`@"a" @foo="bc"` will be encoded as `{[0]="abc", [1]="a", foo={[0]="bc"}}`. If
+multiple captures within a match share the same identifier, it is unspecified
+which captured match will be stored at that key, so it's best to be
+unambiguous.
+
+Pattern objects returned by `bp.compile()` are pre-compiled patterns that are
+slightly faster to reuse than just calling `bp.match()` repeatedly. They have a
+`.source` attribute that holds the original text used to compile them and have
+`:match()`, `:replace()`, and `:eachmatch()` methods as described above.
 
 All methods will raise an error with a descriptive message if the given pattern
 has a syntax error.
@@ -28,9 +41,20 @@ has a syntax error.
 
 ```lua
 local bp = require("bp")
-local m, i, len = bp.match("like finding a needle in a haystack", '"n" @Es=+`e "dle"')
---> {[0]="needle", Es={[0]="ee"}}, 16, 6
+local m = bp.match('"n" @Es=+`e "dle"', "like finding a needle in a haystack")
+--> {[0]="needle", Es={[0]="ee", start=17, after=19}, start=16, after=22}
 --> tostring(m) == "needle", tostring(m.Es) == "ee"
-local replaced, nreplacements = bp.match("like finding a needle in a haystack", '"n" +`e "dle"', "cat")
+local replaced, nreplacements = bp.match('"n" +`e "dle"', "cat", "like finding a needle in a haystack")
 --> "like finding a cat in a haystack", 1
+
+for word in bp.eachmatch("+`A-Z,a-z", "one, two three... four!") do
+    print(word) --> prints "one" "two" "three" "four"
+end
+
+local pat = bp.compile("word parens")
+for _,s in ipairs(my_strings) do
+    for fncall in pat:eachmatch(s) do
+        print(fncall)
+    end
+end
 ```
