@@ -3,11 +3,11 @@
 * API:
 *   bp.match(pat, str, [start_index]) -> nil or match_table
 *   bp.replace(pat, replacement, str, [start_index]) -> str with replacements, num_replacements
-*   for match_table in bp.eachmatch(pat, str, [start_index]) do ... end
+*   for match_table in bp.matches(pat, str, [start_index]) do ... end
 *   bp.compile(pat) -> pattern object
 *       pat:match(str, [start_index])
 *       pat:replace(replacement, str, [start_index])
-*       for match in pat:eachmatch(str, [start_index]) do ... end
+*       for match in pat:matches(str, [start_index]) do ... end
 */
 
 #include <fcntl.h>
@@ -240,7 +240,7 @@ static int iter(lua_State *L)
     return Lmatch(L);
 }
 
-static int Leachmatch(lua_State *L)
+static int Lmatches(lua_State *L)
 {
     int nargs = lua_gettop(L);
     lua_pushcfunction(L, iter); // iter
@@ -294,7 +294,7 @@ static const luaL_Reg match_metamethods[] = {
 static const luaL_Reg pat_methods[] = {
     {"match", Lmatch},
     {"replace", Lreplace},
-    {"eachmatch", Leachmatch},
+    {"matches", Lmatches},
     {NULL, NULL}
 };
 
@@ -309,7 +309,7 @@ static const luaL_Reg bp_methods[] = {
     {"match", Lmatch},
     {"replace", Lreplace},
     {"compile", Lcompile},
-    {"eachmatch", Leachmatch},
+    {"matches", Lmatches},
     {NULL, NULL}
 };
 

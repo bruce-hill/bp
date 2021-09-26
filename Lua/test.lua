@@ -13,7 +13,7 @@ local function repr(obj)
 end
 
 print("Matching:")
-for m in bp.eachmatch("(*`a-z) => '(@0)'", "one two  three") do
+for m in bp.matches("(*`a-z) => '(@0)'", "one two  three") do
     print(repr(m))
 end
 
@@ -45,6 +45,6 @@ print(pat:match("...foo..."))
 print(pat:match("...baz..."))
 print(pat:replace("{@0}", "...baz..."))
 
-for m in pat:eachmatch("hello world") do
+for m in pat:matches("hello world") do
     print(m)
 end
