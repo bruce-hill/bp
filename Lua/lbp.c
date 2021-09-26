@@ -112,41 +112,6 @@ static void push_match(lua_State *L, match_t *m, const char *start)
     lua_setfield(L, -2, "after");
 }
 
-static void recursively_free_pat(pat_t *pat)
-{
-    // Do a depth-first traversal, freeing everyting along the way:
-    if (!pat) return;
-    switch (pat->type) {
-    case BP_DEFINITION:
-        recursively_free_pat(pat->args.def.def);
-        recursively_free_pat(pat->args.def.pat);
-        break;
-    case BP_REPEAT:
-        recursively_free_pat(pat->args.repetitions.sep);
-        recursively_free_pat(pat->args.repetitions.repeat_pat);
-        break;
-    case BP_CHAIN: case BP_UPTO: case BP_UPTO_STRICT:
-    case BP_OTHERWISE: case BP_NOT_MATCH: case BP_MATCH:
-        recursively_free_pat(pat->args.multiple.first);
-        recursively_free_pat(pat->args.multiple.second);
-        break;
-    case BP_REPLACE:
-        recursively_free_pat(pat->args.replace.pat);
-        break;
-    case BP_CAPTURE:
-        recursively_free_pat(pat->args.capture.capture_pat);
-        break;
-    case BP_NOT: case BP_AFTER: case BP_BEFORE:
-        recursively_free_pat(pat->args.pat);
-        break;
-    case BP_LEFTRECURSION:
-        recursively_free_pat(pat->args.leftrec.fallback);
-        break;
-    default: break;
-    }
-    free_pat(pat);
-}
-
 static int Lmatch(lua_State *L)
 {
     if (lua_isstring(L, 1)) {
@@ -226,7 +191,7 @@ static int Lreplace(lua_State *L)
     lua_pushinteger(L, replacements);
     fclose(out);
 
-    free_pat(maybe_replacement.value.pat);
+    delete_pat(&maybe_replacement.value.pat, false);
 
     return 2;
 }
@@ -281,8 +246,7 @@ static int Lpat_tostring(lua_State *L)
 static int Lpat_gc(lua_State *L)
 {
     pat_t *pat = lua_touserdata(L, 1);
-    if (pat)
-        recursively_free_pat(pat);
+    if (pat) delete_pat(&pat, true);
     return 0;
 }
 

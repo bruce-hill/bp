@@ -682,7 +682,7 @@ int main(int argc, char *argv[])
     // tracking down memory leaks.
     free_all_matches();
     defs = free_defs(defs, NULL);
-    free_pat(NULL);
+    free_all_pats();
     while (loaded_files) {
         file_t *next = loaded_files->next;
         destroy_file(&loaded_files);

@@ -52,6 +52,7 @@ static pat_t *new_pat(enum pattype_e type, const char *start, const char *end, s
     static size_t next_pat_id = 1;
     pat_t *pat = new(pat_t);
     *pat = (pat_t){
+        .home = &allocated_pats,
         .next = allocated_pats,
         .type = type,
         .start = start,
@@ -60,6 +61,7 @@ static pat_t *new_pat(enum pattype_e type, const char *start, const char *end, s
         .max_matchlen = maxlen,
         .id = next_pat_id++,
     };
+    if (allocated_pats) allocated_pats->home = &pat->next;
     allocated_pats = pat;
     return pat;
 }
@@ -635,24 +637,54 @@ maybe_pat_t bp_pattern(const char *str, const char *end)
         return (maybe_pat_t){.success = false, .value.error.start = str, .value.error.end = end, .value.error.msg = "Failed to parse this pattern"};
 }
 
-void free_pat(pat_t *target)
+void free_all_pats(void)
 {
-    if (target) {
-        for (pat_t **rem = &allocated_pats; *rem; rem = &(*rem)->next) {
-            if ((*rem) == target) {
-                pat_t *tmp = *rem;
-                *rem = (*rem)->next;
-                delete(&tmp);
-                break;
-            }
-        }
-    } else {
-        while (allocated_pats) {
-            pat_t *tofree = allocated_pats;
-            allocated_pats = tofree->next;
-            delete(&tofree);
+    while (allocated_pats) {
+        pat_t *tofree = allocated_pats;
+        allocated_pats = tofree->next;
+        delete(&tofree);
+    }
+}
+
+void delete_pat(pat_t **at_pat, bool recursive)
+{
+    pat_t *pat = *at_pat;
+    if (!pat) return;
+
+    if (recursive) {
+        switch (pat->type) {
+        case BP_DEFINITION:
+            delete_pat(&pat->args.def.def, true);
+            delete_pat(&pat->args.def.pat, true);
+            break;
+        case BP_REPEAT:
+            delete_pat(&pat->args.repetitions.sep, true);
+            delete_pat(&pat->args.repetitions.repeat_pat, true);
+            break;
+        case BP_CHAIN: case BP_UPTO: case BP_UPTO_STRICT:
+        case BP_OTHERWISE: case BP_NOT_MATCH: case BP_MATCH:
+            delete_pat(&pat->args.multiple.first, true);
+            delete_pat(&pat->args.multiple.second, true);
+            break;
+        case BP_REPLACE:
+            delete_pat(&pat->args.replace.pat, true);
+            break;
+        case BP_CAPTURE:
+            delete_pat(&pat->args.capture.capture_pat, true);
+            break;
+        case BP_NOT: case BP_AFTER: case BP_BEFORE:
+            delete_pat(&pat->args.pat, true);
+            break;
+        case BP_LEFTRECURSION:
+            delete_pat(&pat->args.leftrec.fallback, true);
+            break;
+        default: break;
         }
     }
+
+    if (pat->home) *(pat->home) = pat->next;
+    if (pat->next) pat->next->home = pat->home;
+    delete(at_pat);
 }
 
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1,\:0

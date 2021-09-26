@@ -42,7 +42,7 @@ enum pattype_e {
 // A struct reperesenting a BP virtual machine operation
 //
 typedef struct pat_s {
-    struct pat_s *next;
+    struct pat_s *next, **home;
     enum pattype_e type;
     const char *start, *end;
     // The bounds of the match length (used for backtracking)
@@ -115,8 +115,9 @@ pat_t *chain_together(pat_t *first, pat_t *second);
 pat_t *either_pat(pat_t *first, pat_t *second);
 __attribute__((nonnull))
 maybe_pat_t bp_pattern(const char *str, const char *end);
-
-void free_pat(pat_t *pat);
+void free_all_pats(void);
+__attribute__((nonnull))
+void delete_pat(pat_t **at_pat, bool recursive);
 
 
 #endif

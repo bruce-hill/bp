@@ -531,10 +531,8 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
             ctx2.defs = with_def(ctx->defs, m1->pat->args.capture.namelen, m1->pat->args.capture.name, backref);
             ++m1->refcount; {
                 m2 = match(&ctx2, m1->end, pat->args.multiple.second);
-                if (!m2) { // No need to keep the backref in memory if it didn't match
-                    free_pat(backref);
-                    backref = NULL;
-                }
+                if (!m2) // No need to keep the backref in memory if it didn't match
+                    delete_pat(&backref, false);
                 free_defs(ctx2.defs, ctx->defs);
             } --m1->refcount;
         } else {
