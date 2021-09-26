@@ -46,7 +46,7 @@ def_t *free_defs(def_t *defs, def_t *stop)
     while (defs != stop && defs != NULL) {
         def_t *next = defs->next;
         defs->next = NULL;
-        free(defs);
+        delete(&defs);
         defs = next;
     }
     return defs;

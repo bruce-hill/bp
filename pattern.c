@@ -642,7 +642,7 @@ void free_pat(pat_t *target)
             if ((*rem) == target) {
                 pat_t *tmp = *rem;
                 *rem = (*rem)->next;
-                free(tmp);
+                delete(&tmp);
                 break;
             }
         }
@@ -650,7 +650,7 @@ void free_pat(pat_t *target)
         while (allocated_pats) {
             pat_t *tofree = allocated_pats;
             allocated_pats = tofree->next;
-            free(tofree);
+            delete(&tofree);
         }
     }
 }

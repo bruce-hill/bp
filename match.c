@@ -109,7 +109,7 @@ static inline size_t hash(const char *str, pat_t *pat)
 //
 static bool cache_get(cache_t *cache, def_t *defs, const char *str, pat_t *pat, match_t **result)
 {
-    if (!cache->matches) return NULL;
+    if (!cache->matches) return false;
     size_t h = hash(str, pat) & (cache->size-1);
     for (match_t *c = cache->matches[h]; c; c = c->cache.next) {
         if (c->pat == pat && c->defs_id == (defs?defs->id:0) && c->start == str) {
@@ -159,20 +159,18 @@ static void cache_save(cache_t *cache, def_t *defs, const char *str, pat_t *pat,
             cache->matches = new(match_t*[cache->size]);
 
             // Rehash:
-            if (old_matches) {
-                for (size_t i = 0; i < old_size; i++) {
-                    for (match_t *o; (o = old_matches[i]); ) {
-                        *o->cache.home = o->cache.next;
-                        if (o->cache.next) o->cache.next->cache.home = o->cache.home;
-                        size_t h = hash(o->start, o->pat) & (cache->size-1);
-                        o->cache.home = &(cache->matches[h]);
-                        o->cache.next = cache->matches[h];
-                        if (cache->matches[h]) cache->matches[h]->cache.home = &o->cache.next;
-                        cache->matches[h] = o;
-                    }
+            for (size_t i = 0; i < old_size; i++) {
+                for (match_t *o; (o = old_matches[i]); ) {
+                    *o->cache.home = o->cache.next;
+                    if (o->cache.next) o->cache.next->cache.home = o->cache.home;
+                    size_t h = hash(o->start, o->pat) & (cache->size-1);
+                    o->cache.home = &(cache->matches[h]);
+                    o->cache.next = cache->matches[h];
+                    if (cache->matches[h]) cache->matches[h]->cache.home = &o->cache.next;
+                    cache->matches[h] = o;
                 }
-                free(old_matches);
             }
+            if (old_matches) delete(&old_matches);
         }
     }
 
@@ -190,13 +188,12 @@ static void cache_save(cache_t *cache, def_t *defs, const char *str, pat_t *pat,
 //
 void cache_destroy(cache_t *cache)
 {
-    if (!cache->matches) return;
     for (size_t i = 0; i < cache->size; i++) {
         while (cache->matches[i])
             cache_remove(cache, cache->matches[i]);
     }
     cache->occupancy = 0;
-    delete(&cache->matches);
+    if (cache->matches) delete(&cache->matches);
     cache->size = 0;
 }
 
@@ -262,13 +259,11 @@ static match_t *_next_match(match_ctx_t *ctx, const char *str, pat_t *pat, pat_t
     }
 
     // Prune the unnecessary entries from the cache (those not between start/end)
-    if (ctx->cache->matches) {
-        for (size_t i = 0; i < ctx->cache->size; i++) {
-            for (match_t *m = ctx->cache->matches[i], *next = NULL; m; m = next) {
-                next = m->cache.next;
-                if (m->start < ctx->start || (m->end ? m->end : m->start) > ctx->end)
-                    cache_remove(ctx->cache, m);
-            }
+    for (size_t i = 0; i < ctx->cache->size; i++) {
+        for (match_t *m = ctx->cache->matches[i], *next = NULL; m; m = next) {
+            next = m->cache.next;
+            if (m->start < ctx->start || (m->end ? m->end : m->start) > ctx->end)
+                cache_remove(ctx->cache, m);
         }
     }
 
@@ -757,7 +752,7 @@ size_t free_all_matches(void)
     while (unused_matches) {
         match_t *m = unused_matches;
         list_remove(m, &m->gc);
-        free(m);
+        delete(&m);
         ++count;
     }
     return count;
