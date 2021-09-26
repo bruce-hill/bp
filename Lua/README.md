@@ -31,7 +31,9 @@ unambiguous.
 
 Pattern objects returned by `bp.compile()` are pre-compiled patterns that are
 slightly faster to reuse than just calling `bp.match()` repeatedly. They have
-`:match()`, `:replace()`, and `:matches()` methods as described above.
+`:match()`, `:replace()`, and `:matches()` methods as described above, as well
+as a `:getsource()` method that returns the original source used to make the
+pattern.
 
 All methods will raise an error with a descriptive message if the given pattern
 has a syntax error.

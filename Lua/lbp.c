@@ -52,7 +52,6 @@ static int Lcompile(lua_State *L)
     *pat_storage = maybe_pat.value.pat;
     lua_pushvalue(L, 1);
     lua_setiuservalue(L, -2, 1);
-
     lua_pushlightuserdata(L, (void*)&PAT_METATABLE);
     lua_gettable(L, LUA_REGISTRYINDEX);
     lua_setmetatable(L, -2);
@@ -114,7 +113,7 @@ static int Lmatch(lua_State *L)
         lua_replace(L, 1);
     }
     pat_t **at_pat = lua_touserdata(L, 1);
-    pat_t *pat = *at_pat;
+    pat_t *pat = at_pat ? *at_pat : NULL;
     if (!pat) luaL_error(L, "Not a valid pattern");
 
     size_t textlen;
@@ -150,7 +149,7 @@ static int Lreplace(lua_State *L)
         lua_replace(L, 1);
     }
     pat_t **at_pat = lua_touserdata(L, 1);
-    pat_t *pat = *at_pat;
+    pat_t *pat = at_pat ? *at_pat : NULL;
     if (!pat) luaL_error(L, "Not a valid pattern");
 
     size_t replen, textlen;
@@ -249,6 +248,50 @@ static int Lpat_gc(lua_State *L)
     return 0;
 }
 
+static int Lpat_join(lua_State *L, const char *joiner)
+{
+    if (!lua_isstring(L, 1)) {
+        lua_pushcfunction(L, Lpat_source);
+        lua_pushvalue(L, 1);
+        lua_call(L, 1, 1);
+        lua_replace(L, 1);
+    }
+    if (!lua_isstring(L, 2)) {
+        lua_pushcfunction(L, Lpat_source);
+        lua_pushvalue(L, 2);
+        lua_call(L, 1, 1);
+        lua_replace(L, 2);
+    }
+
+    lua_pushcfunction(L, Lcompile);
+    luaL_Buffer b;
+    luaL_buffinit(L, &b);
+    luaL_addstring(&b, "(");
+    lua_pushvalue(L, 1);
+    luaL_addvalue(&b);
+    luaL_addstring(&b, ")");
+    luaL_addstring(&b, joiner);
+    luaL_addstring(&b, "(");
+    lua_pushvalue(L, 2);
+    luaL_addvalue(&b);
+    luaL_addstring(&b, ")");
+
+    luaL_pushresult(&b);
+    lua_call(L, 1, 1);
+
+    return 1;
+}
+
+static int Lpat_concat(lua_State *L)
+{
+    return Lpat_join(L, " ");
+}
+
+static int Lpat_div(lua_State *L)
+{
+    return Lpat_join(L, " / ");
+}
+
 static const luaL_Reg match_metamethods[] = {
     {"__tostring", Lmatch_tostring},
     {NULL, NULL}
@@ -264,6 +307,8 @@ static const luaL_Reg pat_methods[] = {
 
 static const luaL_Reg pat_metamethods[] = {
     {"__gc", Lpat_gc},
+    {"__concat", Lpat_concat},
+    {"__div", Lpat_div},
     {"__tostring", Lpat_tostring},
     {"__index", NULL}, // placeholder for pat_methods
     {NULL, NULL}
