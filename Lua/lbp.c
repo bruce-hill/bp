@@ -223,6 +223,12 @@ static int Lmatch_tostring(lua_State *L)
     return 1;
 }
 
+static int Lpat_source(lua_State *L)
+{
+    lua_getiuservalue(L, 1, 1);
+    return 1;
+}
+
 static int Lpat_tostring(lua_State *L)
 {
     luaL_Buffer b;
@@ -252,6 +258,7 @@ static const luaL_Reg pat_methods[] = {
     {"match", Lmatch},
     {"replace", Lreplace},
     {"matches", Lmatches},
+    {"getsource", Lpat_source},
     {NULL, NULL}
 };
 
