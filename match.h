@@ -16,8 +16,6 @@ typedef struct {
     struct match_s **home, *next;
 } match_dll_t;
 
-// #define MATCH_FROM(node, name) ((match_t*)((char*)node + (size_t)(&((match_t*)0)->name)))
-
 //
 // Pattern matching result object
 //

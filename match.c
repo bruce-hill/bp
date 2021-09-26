@@ -252,6 +252,15 @@ static pat_t *first_pat(def_t *defs, pat_t *pat)
 __attribute__((nonnull(1,2,3)))
 static match_t *_next_match(match_ctx_t *ctx, const char *str, pat_t *pat, pat_t *skip)
 {
+    // Definitions can be done once, ahead of time, instead of at each string position:
+    if (pat->type == BP_DEFINITION) {
+        match_ctx_t ctx2 = *ctx;
+        ctx2.defs = with_def(ctx->defs, pat->args.def.namelen, pat->args.def.name, pat->args.def.def);
+        match_t *m = _next_match(&ctx2, str, pat->args.def.pat ? pat->args.def.pat : pat->args.def.def, skip);
+        free_defs(ctx2.defs, ctx->defs);
+        return m;
+    }
+
     // Prune the unnecessary entries from the cache (those not between start/end)
     if (ctx->cache->matches) {
         for (size_t i = 0; i < ctx->cache->size; i++) {
@@ -263,8 +272,12 @@ static match_t *_next_match(match_ctx_t *ctx, const char *str, pat_t *pat, pat_t
         }
     }
 
-    pat = deref(ctx->defs, pat);
+    pat = deref(ctx->defs, pat); // Avoid repeated lookups
     pat_t *first = first_pat(ctx->defs, pat);
+
+    // Don't bother looping if this can only match at the start:
+    if (first->type == BP_START_OF_FILE)
+        return match(ctx, str, pat);
 
     // Performance optimization: if the pattern starts with a string literal,
     // we can just rely on the highly optimized memmem() implementation to skip
@@ -274,16 +287,13 @@ static match_t *_next_match(match_ctx_t *ctx, const char *str, pat_t *pat, pat_t
         str = found ? found : ctx->end;
     }
 
-    if (str > ctx->end) return NULL;
-
     do {
         match_t *m = match(ctx, str, pat);
         if (m) return m;
-        if (first->type == BP_START_OF_FILE) return NULL;
-        match_t *s;
-        if (skip && (s = match(ctx, str, skip))) {
-            str = s->end > str ? s->end : str + 1;
-            recycle_if_unused(&s);
+        match_t *skipped = skip ? match(ctx, str, skip) : NULL;
+        if (skipped) {
+            str = skipped->end > str ? skipped->end : str + 1;
+            recycle_if_unused(&skipped);
         } else str = next_char(str, ctx->end);
     } while (str < ctx->end);
     return NULL;
