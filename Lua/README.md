@@ -30,8 +30,7 @@ which captured match will be stored at that key, so it's best to be
 unambiguous.
 
 Pattern objects returned by `bp.compile()` are pre-compiled patterns that are
-slightly faster to reuse than just calling `bp.match()` repeatedly. They have a
-`.source` attribute that holds the original text used to compile them and have
+slightly faster to reuse than just calling `bp.match()` repeatedly. They have
 `:match()`, `:replace()`, and `:matches()` methods as described above.
 
 All methods will raise an error with a descriptive message if the given pattern

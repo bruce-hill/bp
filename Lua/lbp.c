@@ -22,12 +22,6 @@
 #include "../pattern.h"
 #include "../match.h"
 
-// The C API changed from 5.1 to 5.2, so these shims help the code compile on >=5.2
-#if LUA_VERSION_NUM >= 502
-#define lua_objlen(L, i) lua_rawlen(L, i)
-#define luaL_register(L, _, R) luaL_setfuncs(L, R, 0)
-#endif
-
 static const char *builtins_source = (
 #include "builtins.h"
 );
@@ -54,14 +48,14 @@ static int Lcompile(lua_State *L)
         raise_parse_error(L, maybe_pat);
         return 0;
     }
-    lua_createtable(L, 2, 0);
+    pat_t **pat_storage = (pat_t**)lua_newuserdatauv(L, sizeof(pat_t*), 1);
+    *pat_storage = maybe_pat.value.pat;
+    lua_pushvalue(L, 1);
+    lua_setiuservalue(L, -2, 1);
+
     lua_pushlightuserdata(L, (void*)&PAT_METATABLE);
     lua_gettable(L, LUA_REGISTRYINDEX);
     lua_setmetatable(L, -2);
-    lua_pushvalue(L, 1);
-    lua_setfield(L, -2, "source");
-    lua_pushlightuserdata(L, maybe_pat.value.pat);
-    lua_setfield(L, -2, "pattern");
     return 1;
 }
 
@@ -119,9 +113,8 @@ static int Lmatch(lua_State *L)
             return 0;
         lua_replace(L, 1);
     }
-    lua_getfield(L, 1, "pattern");
-    pat_t *pat = lua_touserdata(L, -1);
-    lua_pop(L, 1);
+    pat_t **at_pat = lua_touserdata(L, 1);
+    pat_t *pat = *at_pat;
     if (!pat) luaL_error(L, "Not a valid pattern");
 
     size_t textlen;
@@ -156,9 +149,8 @@ static int Lreplace(lua_State *L)
             return 0;
         lua_replace(L, 1);
     }
-    lua_getfield(L, 1, "pattern");
-    pat_t *pat = lua_touserdata(L, -1);
-    lua_pop(L, 1);
+    pat_t **at_pat = lua_touserdata(L, 1);
+    pat_t *pat = *at_pat;
     if (!pat) luaL_error(L, "Not a valid pattern");
 
     size_t replen, textlen;
@@ -236,7 +228,7 @@ static int Lpat_tostring(lua_State *L)
     luaL_Buffer b;
     luaL_buffinit(L, &b);
     luaL_addstring(&b, "Pattern [[");
-    lua_getfield(L, 1, "source");
+    lua_getiuservalue(L, 1, 1);
     luaL_addvalue(&b);
     luaL_addstring(&b, "]]");
     luaL_pushresult(&b);
@@ -245,8 +237,9 @@ static int Lpat_tostring(lua_State *L)
 
 static int Lpat_gc(lua_State *L)
 {
-    pat_t *pat = lua_touserdata(L, 1);
-    if (pat) delete_pat(&pat, true);
+    pat_t **at_pat = lua_touserdata(L, 1);
+    pat_t *pat = *at_pat;
+    if (pat) delete_pat(at_pat, true);
     return 0;
 }
 

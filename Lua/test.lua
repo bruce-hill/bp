@@ -13,6 +13,12 @@ local function repr(obj)
 end
 
 print("Matching:")
+print(bp.match(".", "ABC"))
+print(bp.match(".", "ABC", 2))
+print(bp.match(".", "ABC", 3))
+print(bp.match(".", "ABC", 4) or "no match")
+print(bp.match(".", "ABC", 5) or "no match")
+
 for m in bp.matches("(*`a-z) => '(@0)'", "one two  three") do
     print(repr(m))
 end
