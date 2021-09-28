@@ -126,14 +126,14 @@ static bool cache_get(match_ctx_t *ctx, const char *str, pat_t *pat, match_t **r
 //
 // Remove an item from the cache.
 //
-static void cache_remove(match_ctx_t *ctx, match_t *m)
+static void cache_remove(match_ctx_t *ctx, match_t *m, bool do_recycle)
 {
     if (!m->cache.home) return;
     *m->cache.home = m->cache.next;
     if (m->cache.next) m->cache.next->cache.home = m->cache.home;
     m->cache.next = NULL;
     m->cache.home = NULL;
-    if (--m->refcount == 0) recycle_if_unused(&m);
+    if (--m->refcount == 0 && do_recycle) recycle_if_unused(&m);
     --ctx->cache->occupancy;
 }
 
@@ -153,7 +153,7 @@ static void cache_save(match_ctx_t *ctx, const char *str, pat_t *pat, match_t *m
             for (int quota = 2; cache->matches[h] && quota > 0; quota--) {
                 match_t *last = cache->matches[h];
                 while (last->cache.next) last = last->cache.next;
-                cache_remove(ctx, last);
+                cache_remove(ctx, last, true);
             }
         } else {
             match_t **old_matches = cache->matches;
@@ -189,12 +189,12 @@ static void cache_save(match_ctx_t *ctx, const char *str, pat_t *pat, match_t *m
 //
 // Clear and deallocate the cache.
 //
-void cache_destroy(match_ctx_t *ctx)
+void cache_destroy(match_ctx_t *ctx, match_t *preserve)
 {
     cache_t *cache = ctx->cache;
-    for (size_t i = 0; i < cache->size; i++) {
+    for (size_t i = 0; cache->occupancy > 0 && i < cache->size; i++) {
         while (cache->matches[i])
-            cache_remove(ctx, cache->matches[i]);
+            cache_remove(ctx, cache->matches[i], cache->matches[i] != preserve);
     }
     cache->occupancy = 0;
     if (cache->matches) delete(&cache->matches);
@@ -274,18 +274,12 @@ static match_t *_next_match(match_ctx_t *ctx, const char *str, pat_t *pat, pat_t
         ctx2.defs = pat->type == BP_DEFINITIONS ? pat : pat->args.multiple.first;
         pat_t *match_pat = pat->type == BP_DEFINITIONS ? pat->args.def.meaning : pat->args.multiple.second;
         match_t *m = _next_match(&ctx2, str, match_pat, skip);
-        cache_destroy(&ctx2);
+        cache_destroy(&ctx2, m);
         return m;
     }
 
-    // Prune the unnecessary entries from the cache (those not between start/end)
-    for (size_t i = 0; i < ctx->cache->size; i++) {
-        for (match_t *m = ctx->cache->matches[i], *next = NULL; m; m = next) {
-            next = m->cache.next;
-            if (m->start < ctx->start || (m->end ? m->end : m->start) > ctx->end)
-                cache_remove(ctx, m);
-        }
-    }
+    // Clear the cache so it's not full of old cache values from different parts of the file:
+    cache_destroy(ctx, NULL);
 
     pat = deref(ctx, pat); // Avoid repeated lookups
     pat_t *first = first_pat(ctx, pat);
@@ -328,7 +322,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
         ctx2.parent_ctx = ctx;
         ctx2.defs = pat;
         match_t *m = match(&ctx2, str, pat->args.def.meaning);
-        cache_destroy(&ctx2);
+        cache_destroy(&ctx2, m);
         return m;
     }
     case BP_LEFTRECURSION: {
@@ -509,14 +503,14 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
         for (const char *pos = &str[-(long)back->min_matchlen];
              pos >= ctx->start && (back->max_matchlen == -1 || pos >= &str[-(int)back->max_matchlen]);
              pos = prev_char(ctx->start, pos)) {
-            cache_destroy(&slice_ctx);
+            cache_destroy(&slice_ctx, NULL);
             slice_ctx.start = (char*)pos;
             match_t *m = match(&slice_ctx, pos, back);
             // Match should not go past str (i.e. (<"AB" "B") should match "ABB", but not "AB")
             if (m && m->end != str)
                 recycle_if_unused(&m);
             else if (m) {
-                cache_destroy(&slice_ctx);
+                cache_destroy(&slice_ctx, NULL);
                 return new_match(pat, str, str, MATCHES(m));
             }
             if (pos == ctx->start) break;
@@ -524,7 +518,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
             // walking backwards endlessly over newlines.
             if (back->max_matchlen == -1 && *pos == '\n') break;
         }
-        cache_destroy(&slice_ctx);
+        cache_destroy(&slice_ctx, NULL);
         return NULL;
     }
     case BP_BEFORE: {
@@ -546,7 +540,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
             ctx2.parent_ctx = ctx;
             ctx2.defs = pat->args.multiple.first;
             match_t *m = match(&ctx2, str, pat->args.multiple.second);
-            cache_destroy(&ctx2);
+            cache_destroy(&ctx2, m);
             return m;
         }
 
@@ -578,7 +572,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
                 if (!m2) // No need to keep the backref in memory if it didn't match
                     delete_pat(&backref, false);
             } --m1->refcount;
-            cache_destroy(&ctx2);
+            cache_destroy(&ctx2, m2);
         } else {
             m2 = match(ctx, m1->end, pat->args.multiple.second);
         }
@@ -602,13 +596,13 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
         slice_ctx.end = m1->end;
         match_t *m2 = _next_match(&slice_ctx, slice_ctx.start, pat->args.multiple.second, NULL);
         if ((!m2 && pat->type == BP_MATCH) || (m2 && pat->type == BP_NOT_MATCH)) {
-            cache_destroy(&slice_ctx);
+            cache_destroy(&slice_ctx, NULL);
             if (m2) recycle_if_unused(&m2);
             recycle_if_unused(&m1);
             return NULL;
         }
         match_t *ret = new_match(pat, m1->start, m1->end, (pat->type == BP_MATCH) ? MATCHES(m1, m2) : MATCHES(m1));
-        cache_destroy(&slice_ctx);
+        cache_destroy(&slice_ctx, ret);
         return ret;
     }
     case BP_REPLACE: {
@@ -810,14 +804,6 @@ size_t free_all_matches(void)
 //
 bool next_match(match_t **m, const char *start, const char *end, pat_t *pat, pat_t *skip, bool ignorecase)
 {
-    static cache_t cache = {0};
-    match_ctx_t ctx = {
-        .cache = &cache,
-        .start = start,
-        .end = end,
-        .ignorecase = ignorecase,
-    };
-
     const char *pos;
     if (*m) {
         // Make sure forward progress is occurring, even after zero-width matches:
@@ -825,12 +811,18 @@ bool next_match(match_t **m, const char *start, const char *end, pat_t *pat, pat
         recycle_if_unused(m);
     } else {
         pos = start;
-        cache_destroy(&ctx);
     }
 
     if (!pat) return false;
+
+    match_ctx_t ctx = {
+        .cache = &(cache_t){0},
+        .start = start,
+        .end = end,
+        .ignorecase = ignorecase,
+    };
     *m = (pos <= end) ? _next_match(&ctx, pos, pat, skip) : NULL;
-    if (!*m) cache_destroy(&ctx);
+    cache_destroy(&ctx, *m);
     return *m != NULL;
 }
 
