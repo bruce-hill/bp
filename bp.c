@@ -377,7 +377,7 @@ static int print_matches(FILE *out, file_t *f, pat_t *pattern)
     // Print trailing context if needed:
     if (matches > 0) {
         fprint_context(out, f, prev, NULL);
-        if (last_line_num < 0) {
+        if (last_line_num < 0) { // Hacky fix to ensure line number gets printed for `bp -p '$$'`
             fprint_linenum(out, f, f->nlines, print_opts.normal_color);
             fputc('\n', out);
         }
