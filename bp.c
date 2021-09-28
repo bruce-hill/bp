@@ -371,6 +371,12 @@ static int print_matches(FILE *out, file_t *f, pat_t *pattern)
         fprint_context(out, f, prev, m->start);
         if (print_opts.normal_color) fprintf(out, "%s", print_opts.normal_color);
         fprint_match(out, f->start, m, &print_opts);
+        size_t linenum = get_line_number(f, m->end);
+        if (last_line_num < (int)linenum) {
+            fprint_linenum(out, f, linenum, print_opts.normal_color);
+            fputc('\n', out);
+            last_line_num = (int)linenum;
+        }
         if (print_opts.normal_color) fprintf(out, "%s", print_opts.normal_color);
         prev = m->end;
     }
