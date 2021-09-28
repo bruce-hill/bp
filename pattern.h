@@ -34,7 +34,7 @@ enum pattype_e {
     BP_END_OF_FILE   = 22,
     BP_END_OF_LINE   = 23,
     BP_WORD_BOUNDARY = 24,
-    BP_DEFINITION    = 25,
+    BP_DEFINITIONS   = 25,
     BP_LEFTRECURSION = 26,
 };
 
@@ -57,7 +57,7 @@ typedef struct pat_s {
         struct {
             const char *name;
             size_t namelen;
-            struct pat_s *def, *pat;
+            struct pat_s *meaning, *next_def;
         } def;
         struct {
             unsigned char low, high;

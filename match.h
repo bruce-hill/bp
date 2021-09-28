@@ -8,7 +8,6 @@
 #include <stdio.h>
 
 #include "pattern.h"
-#include "definitions.h"
 
 struct match_s; // forward declared to resolve circular struct defs
 
@@ -25,7 +24,6 @@ typedef struct match_s {
     pat_t *pat;
     // Intrusive linked list nodes for garbage collection and cache buckets:
     match_dll_t gc, cache;
-    size_t defs_id;
     int refcount;
     struct match_s **children;
     struct match_s *_children[3];
@@ -37,14 +35,12 @@ typedef struct {
     void (*on_nl)(FILE *out);
 } print_options_t;
 
-__attribute__((returns_nonnull))
-match_t *new_match(def_t *defs, pat_t *pat, const char *start, const char *end, match_t *children[]);
 __attribute__((nonnull))
 void recycle_if_unused(match_t **at_m);
 size_t free_all_matches(void);
 size_t recycle_all_matches(void);
-bool next_match(match_t **m, def_t *defs, const char *start, const char *end, pat_t *pat, pat_t *skip, bool ignorecase);
-#define stop_matching(m) next_match(m, NULL, NULL, NULL, NULL, NULL, 0)
+bool next_match(match_t **m, const char *start, const char *end, pat_t *pat, pat_t *skip, bool ignorecase);
+#define stop_matching(m) next_match(m, NULL, NULL, NULL, NULL, 0)
 __attribute__((nonnull))
 match_t *get_numbered_capture(match_t *m, int n);
 __attribute__((nonnull, pure))

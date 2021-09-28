@@ -20,7 +20,6 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#include "definitions.h"
 #include "explain.h"
 #include "files.h"
 #include "json.h"
@@ -207,10 +206,10 @@ static int is_text_file(const char *filename)
 //
 // Print matches in JSON format.
 //
-static int print_matches_as_json(def_t *defs, file_t *f, pat_t *pattern)
+static int print_matches_as_json(file_t *f, pat_t *pattern)
 {
     int nmatches = 0;
-    for (match_t *m = NULL; next_match(&m, defs, f->start, f->end, pattern, options.skip, options.ignorecase); ) {
+    for (match_t *m = NULL; next_match(&m, f->start, f->end, pattern, options.skip, options.ignorecase); ) {
         if (++nmatches > 1)
             printf(",\n");
         printf("{\"filename\":\"%s\",\"match\":", f->filename);
@@ -223,10 +222,10 @@ static int print_matches_as_json(def_t *defs, file_t *f, pat_t *pattern)
 //
 // Print matches in a visual explanation style
 //
-static int explain_matches(def_t *defs, file_t *f, pat_t *pattern)
+static int explain_matches(file_t *f, pat_t *pattern)
 {
     int nmatches = 0;
-    for (match_t *m = NULL; next_match(&m, defs, f->start, f->end, pattern, options.skip, options.ignorecase); ) {
+    for (match_t *m = NULL; next_match(&m, f->start, f->end, pattern, options.skip, options.ignorecase); ) {
         if (++nmatches == 1) {
             if (options.print_filenames)
                 fprint_filename(stdout, f->filename);
@@ -349,7 +348,7 @@ static void on_nl(FILE *out)
 //
 // Print all the matches in a file.
 //
-static int print_matches(FILE *out, def_t *defs, file_t *f, pat_t *pattern)
+static int print_matches(FILE *out, file_t *f, pat_t *pattern)
 {
     static int printed_filenames = 0;
     int matches = 0;
@@ -364,7 +363,7 @@ static int print_matches(FILE *out, def_t *defs, file_t *f, pat_t *pattern)
         print_opts.replace_color = "\033[0;34;1m";
         print_opts.normal_color = "\033[m";
     }
-    for (match_t *m = NULL; next_match(&m, defs, f->start, f->end, pattern, options.skip, options.ignorecase); ) {
+    for (match_t *m = NULL; next_match(&m, f->start, f->end, pattern, options.skip, options.ignorecase); ) {
         if (++matches == 1 && options.print_filenames) {
             if (printed_filenames++ > 0) printf("\n");
             fprint_filename(out, f->filename);
@@ -388,8 +387,8 @@ static int print_matches(FILE *out, def_t *defs, file_t *f, pat_t *pattern)
 // For a given filename, open the file and attempt to match the given pattern
 // against it, printing any results according to the flags.
 //
-__attribute__((nonnull(2,3)))
-static int process_file(def_t *defs, const char *filename, pat_t *pattern)
+__attribute__((nonnull))
+static int process_file(const char *filename, pat_t *pattern)
 {
     file_t *f = load_file(NULL, filename);
     if (f == NULL) {
@@ -399,19 +398,19 @@ static int process_file(def_t *defs, const char *filename, pat_t *pattern)
 
     int matches = 0;
     if (options.mode == MODE_EXPLAIN) {
-        matches += explain_matches(defs, f, pattern);
+        matches += explain_matches(f, pattern);
     } else if (options.mode == MODE_LISTFILES) {
         match_t *m = NULL;
-        if (next_match(&m, defs, f->start, f->end, pattern, options.skip, options.ignorecase)) {
+        if (next_match(&m, f->start, f->end, pattern, options.skip, options.ignorecase)) {
             printf("%s\n", f->filename);
             matches += 1;
         }
         stop_matching(&m);
     } else if (options.mode == MODE_JSON) {
-        matches += print_matches_as_json(defs, f, pattern);
+        matches += print_matches_as_json(f, pattern);
     } else if (options.mode == MODE_INPLACE) {
         match_t *m = NULL;
-        bool found = next_match(&m, defs, f->start, f->end, pattern, options.skip, options.ignorecase);
+        bool found = next_match(&m, f->start, f->end, pattern, options.skip, options.ignorecase);
         stop_matching(&m);
         if (!found) return 0;
 
@@ -427,12 +426,12 @@ static int process_file(def_t *defs, const char *filename, pat_t *pattern)
         // are used to restore the original file contents.
         modifying_file = out; backup_file = f;
         {
-            matches += print_matches(out, defs, f, pattern);
+            matches += print_matches(out, f, pattern);
         }
         modifying_file = NULL; backup_file = NULL;
         fclose(out);
     } else {
-        matches += print_matches(stdout, defs, f, pattern);
+        matches += print_matches(stdout, f, pattern);
     }
     fflush(stdout);
 
@@ -446,8 +445,8 @@ static int process_file(def_t *defs, const char *filename, pat_t *pattern)
 //
 // Recursively process all non-dotfile files in the given directory.
 //
-__attribute__((nonnull(2,3)))
-static int process_dir(def_t *defs, const char *dirname, pat_t *pattern)
+__attribute__((nonnull))
+static int process_dir(const char *dirname, pat_t *pattern)
 {
     int matches = 0;
     glob_t globbuf;
@@ -464,9 +463,9 @@ static int process_dir(def_t *defs, const char *dirname, pat_t *pattern)
             if (S_ISLNK(statbuf.st_mode))
                 continue; // Skip symbolic links
             else if (S_ISDIR(statbuf.st_mode))
-                matches += process_dir(defs, globbuf.gl_pathv[i], pattern);
+                matches += process_dir(globbuf.gl_pathv[i], pattern);
             else if (is_text_file(globbuf.gl_pathv[i]))
-                matches += process_file(defs, globbuf.gl_pathv[i], pattern);
+                matches += process_file(globbuf.gl_pathv[i], pattern);
         }
     }
     globfree(&globbuf);
@@ -476,8 +475,8 @@ static int process_dir(def_t *defs, const char *dirname, pat_t *pattern)
 //
 // Process git files using `git ls-files ...`
 //
-__attribute__((nonnull(2)))
-static int process_git_files(def_t *defs, pat_t *pattern, int argc, char *argv[])
+__attribute__((nonnull(1)))
+static int process_git_files(pat_t *pattern, int argc, char *argv[])
 {
     int fds[2];
     require(pipe(fds), "Failed to create pipe");
@@ -500,7 +499,7 @@ static int process_git_files(def_t *defs, pat_t *pattern, int argc, char *argv[]
     size_t path_size = 0;
     int found = 0;
     while (getdelim(&path, &path_size, '\0', fp) > 0)
-        found += process_file(defs, path, pattern);
+        found += process_file(path, pattern);
     if (path) delete(&path);
     require(fclose(fp), "Failed to close read end of pipe");
     int status;
@@ -514,12 +513,9 @@ static int process_git_files(def_t *defs, pat_t *pattern, int argc, char *argv[]
 // Load the given grammar (semicolon-separated definitions)
 // and return the first rule defined.
 //
-static def_t *load_grammar(def_t *defs, file_t *f)
+static pat_t *load_grammar(pat_t *defs, file_t *f)
 {
-    pat_t *pat = assert_pat(f->start, bp_pattern(f->start, f->end));
-    for (pat_t *p = pat; p && p->type == BP_DEFINITION; p = p->args.def.pat)
-        defs = with_def(defs, p->args.def.namelen, p->args.def.name, p->args.def.def);
-    return defs;
+    return chain_together(defs, assert_pat(f->start, bp_pattern(f->start, f->end)));
 }
 
 //
@@ -539,7 +535,7 @@ int main(int argc, char *argv[])
 {
     char *flag = NULL;
 
-    def_t *defs = NULL;
+    pat_t *defs = NULL;
     file_t *loaded_files = NULL;
     pat_t *pattern = NULL;
 
@@ -634,6 +630,9 @@ int main(int argc, char *argv[])
     if (pattern == NULL)
         errx(EXIT_FAILURE, "No pattern provided.\n\n%s", usage);
 
+    // Hook up definitions:
+    pattern = chain_together(defs, pattern);
+
     for (argc = 0; argv[argc]; ++argc) ; // update argc
 
     if (options.context_before == USE_DEFAULT_CONTEXT) options.context_before = 0;
@@ -655,7 +654,7 @@ int main(int argc, char *argv[])
     int found = 0;
     if (options.mode == MODE_JSON) printf("[");
     if (options.git_mode) { // Get the list of files from `git --ls-files ...`
-        found = process_git_files(defs, pattern, argc, argv);
+        found = process_git_files(pattern, argc, argv);
     } else if (argv[0]) {
         // Files pass in as command line args:
         struct stat statbuf;
@@ -663,17 +662,17 @@ int main(int argc, char *argv[])
             options.print_filenames = false;
         for ( ; argv[0]; argv++) {
             if (stat(argv[0], &statbuf) == 0 && S_ISDIR(statbuf.st_mode)) // Symlinks are okay if manually specified
-                found += process_dir(defs, argv[0], pattern);
+                found += process_dir(argv[0], pattern);
             else
-                found += process_file(defs, argv[0], pattern);
+                found += process_file(argv[0], pattern);
         }
     } else if (isatty(STDIN_FILENO)) {
         // No files, no piped in input, so use files in current dir, recursively
-        found += process_dir(defs, ".", pattern);
+        found += process_dir(".", pattern);
     } else {
         // Piped in input:
         options.print_filenames = false; // Don't print filename on stdin
-        found += process_file(defs, "", pattern);
+        found += process_file("", pattern);
     }
     if (options.mode == MODE_JSON) printf("]\n");
 
@@ -681,7 +680,6 @@ int main(int argc, char *argv[])
     // is about to exit, this step is unnecessary. However, it is useful for
     // tracking down memory leaks.
     free_all_matches();
-    defs = free_defs(defs, NULL);
     free_all_pats();
     while (loaded_files) {
         file_t *next = loaded_files->next;

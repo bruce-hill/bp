@@ -26,7 +26,7 @@ static const char *builtins_source = (
 #include "builtins.h"
 );
 static int MATCH_METATABLE = 0, PAT_METATABLE = 0;
-static def_t *builtins;
+static pat_t *builtins;
 
 static void push_match(lua_State *L, match_t *m, const char *start);
 
@@ -133,11 +133,13 @@ static int Lmatch(lua_State *L)
 
     match_t *m = NULL;
     int ret = 0;
-    if (next_match(&m, builtins, text+index-1, &text[textlen], pat, NULL, false)) {
+    pat_t *def_pat = chain_together(builtins, pat);
+    if (next_match(&m, text+index-1, &text[textlen], def_pat, NULL, false)) {
         push_match(L, m, text);
         stop_matching(&m);
         ret = 1;
     }
+    delete_pat(&def_pat, false);
     return ret;
 }
 
@@ -170,7 +172,8 @@ static int Lreplace(lua_State *L)
     FILE *out = open_memstream(&buf, &size);
     int replacements = 0;
     const char *prev = text;
-    for (match_t *m = NULL; next_match(&m, builtins, text, &text[textlen], maybe_replacement.value.pat, NULL, false); ) {
+    pat_t *rep_pat = chain_together(builtins, maybe_replacement.value.pat);
+    for (match_t *m = NULL; next_match(&m, text, &text[textlen], rep_pat, NULL, false); ) {
         fwrite(prev, sizeof(char), (size_t)(m->start - prev), out);
         fprint_match(out, text, m, NULL);
         prev = m->end;
@@ -329,8 +332,7 @@ LUALIB_API int luaopen_bp(lua_State *L)
         raise_parse_error(L, maybe_pat);
         return 0;
     }
-    for (pat_t *p = maybe_pat.value.pat; p && p->type == BP_DEFINITION; p = p->args.def.pat)
-        builtins = with_def(builtins, p->args.def.namelen, p->args.def.name, p->args.def.def);
+    builtins = maybe_pat.value.pat;
 
     lua_pushlightuserdata(L, (void*)&PAT_METATABLE);
     luaL_newlib(L, pat_metamethods);

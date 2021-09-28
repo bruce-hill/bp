@@ -167,6 +167,15 @@ pat_t *chain_together(pat_t *first, pat_t *second)
 {
     if (first == NULL) return second;
     if (second == NULL) return first;
+
+    if (first->type == BP_DEFINITIONS && second->type == BP_DEFINITIONS) {
+        pat_t *first_end = first;
+        while (first_end->args.def.next_def != NULL)
+            first_end = first_end->args.def.next_def;
+        first_end->args.def.next_def = second;
+        return first;
+    }
+
     size_t minlen = first->min_matchlen + second->min_matchlen;
     ssize_t maxlen = (UNBOUNDED(first) || UNBOUNDED(second)) ? (ssize_t)-1 : first->max_matchlen + second->max_matchlen;
     pat_t *chain = new_pat(BP_CHAIN, first->start, second->end, minlen, maxlen);
@@ -207,6 +216,30 @@ pat_t *either_pat(pat_t *first, pat_t *second)
     either->args.multiple.first = first;
     either->args.multiple.second = second;
     return either;
+}
+
+//
+// Parse a definition
+//
+__attribute__((nonnull))
+static pat_t *_bp_definition(const char *start, const char *end)
+{
+    if (start >= end || !(isalpha(*start) || *start == '_')) return NULL;
+    const char *str = after_name(start);
+    size_t namelen = (size_t)(str - start);
+    if (!matchchar(&str, ':', false)) return NULL;
+    pat_t *def = bp_pattern_nl(str, end, false);
+    if (!def) parse_err(str, end, "Could not parse this definition.");
+    str = def->end;
+    (void)matchchar(&str, ';', false); // Optional semicolon
+    pat_t *ret = new_pat(BP_DEFINITIONS, start, str, 0, -1);
+    ret->args.def.name = start;
+    ret->args.def.namelen = namelen;
+    ret->args.def.meaning = def;
+    ret->args.def.next_def = _bp_definition(after_spaces(str, true), end);
+    if (ret->args.def.next_def)
+        ret->end = ret->args.def.next_def->end;
+    return ret;
 }
 
 //
@@ -475,26 +508,12 @@ static pat_t *_bp_simplepattern(const char *str, const char *end)
         return new_pat(BP_END_OF_LINE, start, str, 0, 0);
     }
     default: {
+        pat_t *def = _bp_definition(start, end);
+        if (def) return def;
         // Reference
         if (!isalpha(c) && c != '_') return NULL;
         str = after_name(start);
         size_t namelen = (size_t)(str - start);
-        if (matchchar(&str, ':', false)) { // Definitions
-            pat_t *def = bp_pattern_nl(str, end, false);
-            if (!def) parse_err(str, end, "Could not parse this definition.");
-            str = def->end;
-            (void)matchchar(&str, ';', false); // Optional semicolon
-            str = after_spaces(str, true);
-            pat_t *pat = bp_pattern_nl(str, end, false);
-            if (pat) str = pat->end;
-            else pat = def;
-            pat_t *ret = new_pat(BP_DEFINITION, start, str, pat->min_matchlen, pat->max_matchlen);
-            ret->args.def.name = start;
-            ret->args.def.namelen = namelen;
-            ret->args.def.def = def;
-            ret->args.def.pat = pat;
-            return ret;
-        }
         pat_t *ref = new_pat(BP_REF, start, str, 0, -1);
         ref->args.ref.name = start;
         ref->args.ref.len = namelen;
@@ -653,9 +672,9 @@ void delete_pat(pat_t **at_pat, bool recursive)
 
     if (recursive) {
         switch (pat->type) {
-        case BP_DEFINITION:
-            delete_pat(&pat->args.def.def, true);
-            delete_pat(&pat->args.def.pat, true);
+        case BP_DEFINITIONS:
+            delete_pat(&pat->args.def.meaning, true);
+            delete_pat(&pat->args.def.next_def, true);
             break;
         case BP_REPEAT:
             delete_pat(&pat->args.repetitions.sep, true);
