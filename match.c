@@ -231,9 +231,10 @@ static inline pat_t *deref(match_ctx_t *ctx, pat_t *pat)
 
 //
 // Find and return the first and simplest pattern that will definitely have to
-// match for the whole pattern to match (if any)
+// match for the whole pattern to match (if any). Ideally, this would be a
+// string literal that can be quickly scanned for.
 //
-static pat_t *first_pat(match_ctx_t *ctx, pat_t *pat)
+static pat_t *get_prerequisite(match_ctx_t *ctx, pat_t *pat)
 {
     for (pat_t *p = pat; p; ) {
         switch (p->type) {
@@ -245,7 +246,13 @@ static pat_t *first_pat(match_ctx_t *ctx, pat_t *pat)
             p = p->args.repetitions.repeat_pat; break;
         case BP_CAPTURE:
             p = p->args.capture.capture_pat; break;
-        case BP_CHAIN: case BP_MATCH: case BP_NOT_MATCH:
+        case BP_CHAIN: {
+            pat_t *f = p->args.multiple.first;
+            // If pattern is something like (|"foo"|), then use "foo" as the first thing to scan for
+            p = (f->type == BP_WORD_BOUNDARY || f->type == BP_START_OF_LINE) ? p->args.multiple.second : f;
+            break;
+        }
+        case BP_MATCH: case BP_NOT_MATCH:
             p = p->args.multiple.first; break;
         case BP_REPLACE:
             p = p->args.replace.pat; break;
@@ -282,11 +289,13 @@ static match_t *_next_match(match_ctx_t *ctx, const char *str, pat_t *pat, pat_t
     cache_destroy(ctx, NULL);
 
     pat = deref(ctx, pat); // Avoid repeated lookups
-    pat_t *first = first_pat(ctx, pat);
+    pat_t *first = get_prerequisite(ctx, pat);
 
-    // Don't bother looping if this can only match at the start:
+    // Don't bother looping if this can only match at the start/end:
     if (first->type == BP_START_OF_FILE)
         return match(ctx, str, pat);
+    else if (first->type == BP_END_OF_FILE)
+        return match(ctx, ctx->end, pat);
 
     // Performance optimization: if the pattern starts with a string literal,
     // we can just rely on the highly optimized memmem() implementation to skip
@@ -294,6 +303,9 @@ static match_t *_next_match(match_ctx_t *ctx, const char *str, pat_t *pat, pat_t
     if (!skip && first->type == BP_STRING && first->min_matchlen > 0 && !ctx->ignorecase) {
         char *found = memmem(str, (size_t)(ctx->end - str), first->args.string, first->min_matchlen);
         str = found ? found : ctx->end;
+    } else if (!skip && str > ctx->start && (first->type == BP_START_OF_LINE || first->type == BP_END_OF_LINE)) {
+        char *found = memchr(str, '\n', (size_t)(ctx->end - str));
+        str = found ? (first->type == BP_START_OF_LINE ? found+1 : found) : ctx->end;
     }
 
     do {
