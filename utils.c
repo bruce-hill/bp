@@ -15,10 +15,11 @@
 // Helper function to skip past all spaces (and comments)
 // Returns a pointer to the first non-space character.
 //
-const char *after_spaces(const char *str, bool skip_nl)
+const char *after_spaces(const char *str, bool skip_nl, const char *end)
 {
     // Skip whitespace and comments:
   skip_whitespace:
+    if (str >= end) return str;
     switch (*str) {
     case '\r': case '\n':
         if (!skip_nl) break;
@@ -28,7 +29,7 @@ const char *after_spaces(const char *str, bool skip_nl)
         goto skip_whitespace;
     }
     case '#': {
-        while (*str && *str != '\n') ++str;
+        while (str < end && *str != '\n') ++str;
         goto skip_whitespace;
     }
     default: break;
@@ -40,14 +41,15 @@ const char *after_spaces(const char *str, bool skip_nl)
 // Return the first character after a valid BP name, or NULL if none is
 // found.
 //
-const char *after_name(const char *str)
+const char *after_name(const char *str, const char *end)
 {
+    if (str >= end) return NULL;
     if (*str == '|') return &str[1];
     if (*str == '^' || *str == '_' || *str == '$') {
-        return (str[1] == *str) ? &str[2] : &str[1];
+        return (&str[1] < end && str[1] == *str) ? &str[2] : &str[1];
     }
     if (!isalpha(*str)) return NULL;
-    for (++str; *str; ++str) {
+    for (++str; str < end; ++str) {
         if (!(isalnum(*str) || *str == '-'))
             break;
     }
@@ -57,9 +59,10 @@ const char *after_name(const char *str)
 //
 // Check if a character is found and if so, move past it.
 //
-bool matchchar(const char **str, char c, bool skip_nl)
+bool matchchar(const char **str, char c, bool skip_nl, const char *end)
 {
-    const char *next = after_spaces(*str, skip_nl);
+    const char *next = after_spaces(*str, skip_nl, end);
+    if (next >= end) return false;
     if (*next == c) {
         *str = next + 1;
         return true;
@@ -70,9 +73,10 @@ bool matchchar(const char **str, char c, bool skip_nl)
 //
 // Check if a string is found and if so, move past it.
 //
-bool matchstr(const char **str, const char *target, bool skip_nl)
+bool matchstr(const char **str, const char *target, bool skip_nl, const char *end)
 {
-    const char *next = after_spaces(*str, skip_nl);
+    const char *next = after_spaces(*str, skip_nl, end);
+    if (next + strlen(target) > end) return false;
     if (strncmp(next, target, strlen(target)) == 0) {
         *str = &next[strlen(target)];
         return true;
@@ -85,10 +89,13 @@ bool matchstr(const char **str, const char *target, bool skip_nl)
 // character that was escaped.
 // Set *end = the first character past the end of the escape sequence.
 //
-char unescapechar(const char *escaped, const char **end)
+char unescapechar(const char *escaped, const char **after, const char *end)
 {
-    size_t len = 1;
-    unsigned char ret = (unsigned char)*escaped;
+    size_t len = 0;
+    unsigned char ret = '\\';
+    if (escaped >= end) goto finished;
+    ret = (unsigned char)*escaped;
+    ++len;
     switch (*escaped) {
     case 'a': ret = '\a'; break; case 'b': ret = '\b'; break;
     case 'n': ret = '\n'; break; case 'r': ret = '\r'; break;
@@ -101,7 +108,10 @@ char unescapechar(const char *escaped, const char **end)
             ['a']=0xa, ['b']=0xb, ['c']=0xc, ['d']=0xd, ['e']=0xe, ['f']=0xf,
             ['A']=0xa, ['B']=0xb, ['C']=0xc, ['D']=0xd, ['E']=0xe, ['F']=0xf,
         };
-        if (hextable[(int)escaped[1]] && hextable[(int)escaped[2]]) {
+        if (escaped + 2 >= end) {
+            len = 0;
+            goto finished;
+        } else if (hextable[(int)escaped[1]] && hextable[(int)escaped[2]]) {
             ret = (hextable[(int)escaped[1]] << 4) | (hextable[(int)escaped[2]] & 0xF);
             len = 3;
         }
@@ -109,7 +119,10 @@ char unescapechar(const char *escaped, const char **end)
     }
     case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7': { // Octal
         ret = (unsigned char)(escaped[0] - '0');
-        if ('0' <= escaped[1] && escaped[1] <= '7') {
+        if (escaped + 2 >= end) {
+            len = 0;
+            goto finished;
+        } else if ('0' <= escaped[1] && escaped[1] <= '7') {
             ++len;
             ret = (ret << 3) | (escaped[1] - '0');
             if ('0' <= escaped[2] && escaped[2] <= '7') {
@@ -120,10 +133,11 @@ char unescapechar(const char *escaped, const char **end)
         break;
     }
     default:
-        if (end) *end = escaped;
-        return '\\';
+        len = 0;
+        goto finished;
     }
-    if (end) *end = &escaped[len];
+  finished:
+    if (after) *after = &escaped[len];
     return (char)ret;
 }
 

@@ -12,8 +12,6 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "match.h"
-
 #define S1(x) #x
 #define S2(x) S1(x)
 #define __LOCATION__ __FILE__ ":" S2(__LINE__)
@@ -48,15 +46,15 @@ DEFINE_CHECK_TYPE(_Bool, bool, b, b);
 #define streq(a, b) (strcmp(a, b) == 0)
 
 __attribute__((nonnull(1)))
-char unescapechar(const char *escaped, const char **end);
+char unescapechar(const char *escaped, const char **after, const char *end);
 __attribute__((pure, nonnull))
-const char *after_name(const char *str);
+const char *after_name(const char *str, const char *end);
 __attribute__((pure, nonnull, returns_nonnull))
-const char *after_spaces(const char *str, bool skip_nl);
+const char *after_spaces(const char *str, bool skip_nl, const char *end);
 __attribute__((nonnull))
-bool matchchar(const char **str, char c, bool skip_nl);
+bool matchchar(const char **str, char c, bool skip_nl, const char *end);
 __attribute__((nonnull))
-bool matchstr(const char **str, const char *target, bool skip_nl);
+bool matchstr(const char **str, const char *target, bool skip_nl, const char *end);
 __attribute__((nonnull))
 void delete(void *p);
 

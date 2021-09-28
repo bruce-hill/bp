@@ -911,10 +911,10 @@ void fprint_match(FILE *out, const char *file_start, match_t *m, print_options_t
                     int n = (int)strtol(next, (char**)&next, 10);
                     cap = get_numbered_capture(m->children[0], n);
                 } else {
-                    const char *name = next, *end = after_name(next);
-                    if (end > name) {
-                        cap = get_named_capture(m->children[0], name, (size_t)(end - name));
-                        next = end;
+                    const char *name = next, *name_end = after_name(next, end);
+                    if (name_end) {
+                        cap = get_named_capture(m->children[0], name, (size_t)(name_end - name));
+                        next = name_end;
                         if (next < m->end && *next == ';') ++next;
                     }
                 }
@@ -941,7 +941,7 @@ void fprint_match(FILE *out, const char *file_start, match_t *m, print_options_t
                         fputc(*p, out);
                     continue;
                 }
-                fputc_safe(out, unescapechar(r, &r), opts);
+                fputc_safe(out, unescapechar(r, &r, end), opts);
             } else {
                 fputc_safe(out, *r, opts);
                 ++r;
