@@ -140,12 +140,11 @@ so use at your own risk! These grammar files are only approximations of syntax.
 File                           | Description
 -------------------------------|-----------------------------------------------------
 [bp.c](bp.c)                   | The main program.
-[definitions.c](definitions.c) | Defining pattern rules.
-[explain.c]( explain.c)        | Printing a visual explanation of a match.
-[files.c](files.c)             | Loading files and match memoization.
+[explain.c](explain.c)         | Printing a visual explanation of a match.
+[files.c](files.c)             | Loading files into memory.
 [json.c](json.c)               | JSON output of matches.
-[match.c](match.c)             | Pattern matching code (match a pattern against an input string).
-[pattern.c](pattern.c)         | Pattern loading code (build a pattern out of an input string).
+[match.c](match.c)             | Pattern matching code (find occurrences of a bp pattern within an input string).
+[pattern.c](pattern.c)         | Pattern compiling code (compile a bp pattern from an input string).
 [utf8.c](utf8.c)               | UTF-8 helper code.
 [utils.c](utils.c)             | Miscellaneous helper functions.
 
