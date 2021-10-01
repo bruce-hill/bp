@@ -55,26 +55,6 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat);
 __attribute__((returns_nonnull))
 static match_t *new_match(pat_t *pat, const char *start, const char *end, match_t *children[]);
 
-// Store a value and update its refcount
-static inline void add_owner(match_t** owner, match_t* owned)
-{
-    if (*owner != NULL)
-        errx(EXIT_FAILURE, "Ownership is being overwritten");
-    *owner = owned;
-    ++owned->refcount;
-}
-
-// Unstore a value and update its refcount
-static inline void remove_ownership(match_t** owner)
-{
-    if (*owner) {
-        --(*owner)->refcount;
-        if ((*owner)->refcount == 0)
-            recycle_if_unused(owner);
-        *owner = NULL;
-    }
-}
-
 // Prepend to a doubly linked list
 static inline void list_prepend(match_t **head, match_t *m, match_dll_t *node)
 {
@@ -302,7 +282,7 @@ static match_t *_next_match(match_ctx_t *ctx, const char *str, pat_t *pat, pat_t
         match_t *skipped = skip ? match(ctx, str, skip) : NULL;
         if (skipped) {
             str = skipped->end > str ? skipped->end : str + 1;
-            recycle_if_unused(&skipped);
+            recycle_match(&skipped);
         } else str = next_char(str, ctx->end);
     } while (str < ctx->end);
     return NULL;
@@ -378,7 +358,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
     case BP_NOT: {
         match_t *m = match(ctx, str, pat->args.pat);
         if (m != NULL) {
-            recycle_if_unused(&m);
+            recycle_match(&m);
             return NULL;
         }
         return new_match(pat, str, str, NULL);
@@ -399,7 +379,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
             if (target) {
                 match_t *p = match(ctx, str, target);
                 if (p != NULL) {
-                    recycle_if_unused(&p);
+                    recycle_match(&p);
                     m->end = str;
                     return m;
                 }
@@ -415,7 +395,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
                         m->children = grow(m->children, child_cap += 5);
                         for (size_t i = nchildren; i < child_cap; i++) m->children[i] = NULL;
                     }
-                    add_owner(&m->children[nchildren++], s);
+                    m->children[nchildren++] = s;
                     continue;
                 }
             }
@@ -425,7 +405,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
             if (str < ctx->end && *str != '\n' && pat->type != BP_UPTO_STRICT)
                 str = next_char(str, ctx->end);
         }
-        recycle_if_unused(&m);
+        recycle_match(&m);
         return NULL;
     }
     case BP_REPEAT: {
@@ -447,7 +427,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
             match_t *mp = match(ctx, str, repeating);
             if (mp == NULL) {
                 str = start;
-                if (msep) recycle_if_unused(&msep);
+                if (msep) recycle_match(&msep);
                 break;
             }
             if (mp->end == start && reps > 0) {
@@ -457,8 +437,8 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
                 // loop either. We know that this will continue to loop
                 // until reps==max, so let's just cut to the chase instead
                 // of looping infinitely.
-                if (msep) recycle_if_unused(&msep);
-                recycle_if_unused(&mp);
+                if (msep) recycle_match(&msep);
+                recycle_match(&mp);
                 if (pat->args.repetitions.max == -1)
                     reps = ~(size_t)0;
                 else
@@ -470,19 +450,19 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
                     m->children = grow(m->children, child_cap += 5);
                     for (size_t i = nchildren; i < child_cap; i++) m->children[i] = NULL;
                 }
-                add_owner(&m->children[nchildren++], msep);
+                m->children[nchildren++] = msep;
             }
 
             if (nchildren+2 >= child_cap) {
                 m->children = grow(m->children, child_cap += 5);
                 for (size_t i = nchildren; i < child_cap; i++) m->children[i] = NULL;
             }
-            add_owner(&m->children[nchildren++], mp);
+            m->children[nchildren++] = mp;
             str = mp->end;
         }
 
         if (reps < (size_t)pat->args.repetitions.min) {
-            recycle_if_unused(&m);
+            recycle_match(&m);
             return NULL;
         }
         m->end = str;
@@ -508,7 +488,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
             match_t *m = match(&slice_ctx, pos, back);
             // Match should not go past str (i.e. (<"AB" "B") should match "ABB", but not "AB")
             if (m && m->end != str)
-                recycle_if_unused(&m);
+                recycle_match(&m);
             else if (m) {
                 cache_destroy(&slice_ctx);
                 return new_match(pat, str, str, MATCHES(m));
@@ -567,18 +547,16 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
                     }
                 },
             };
-            ++m1->refcount; {
-                m2 = match(&ctx2, m1->end, pat->args.multiple.second);
-                if (!m2) // No need to keep the backref in memory if it didn't match
-                    delete_pat(&backref, false);
-            } --m1->refcount;
+            m2 = match(&ctx2, m1->end, pat->args.multiple.second);
+            if (!m2) // No need to keep the backref in memory if it didn't match
+                delete_pat(&backref, false);
             cache_destroy(&ctx2);
         } else {
             m2 = match(ctx, m1->end, pat->args.multiple.second);
         }
 
         if (m2 == NULL) {
-            recycle_if_unused(&m1);
+            recycle_match(&m1);
             return NULL;
         }
 
@@ -597,8 +575,8 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
         match_t *m2 = _next_match(&slice_ctx, slice_ctx.start, pat->args.multiple.second, NULL);
         if ((!m2 && pat->type == BP_MATCH) || (m2 && pat->type == BP_NOT_MATCH)) {
             cache_destroy(&slice_ctx);
-            if (m2) recycle_if_unused(&m2);
-            recycle_if_unused(&m1);
+            if (m2) recycle_match(&m2);
+            recycle_match(&m1);
             return NULL;
         }
         match_t *ret = new_match(pat, m1->start, m1->end, (pat->type == BP_MATCH) ? MATCHES(m1, m2) : MATCHES(m1));
@@ -657,13 +635,13 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
 
         while (rec_op.args.leftrec.visits > 0) {
             rec_op.args.leftrec.visits = 0;
-            remove_ownership(&rec_op.args.leftrec.match);
-            add_owner(&rec_op.args.leftrec.match, m);
+            recycle_match(&rec_op.args.leftrec.match);
+            rec_op.args.leftrec.match = m;
             prev = m->end;
             match_t *m2 = match(&ctx2, str, ref);
             if (m2 == NULL) break;
             if (m2->end <= prev) {
-                recycle_if_unused(&m2);
+                recycle_match(&m2);
                 break;
             }
             m = m2;
@@ -678,7 +656,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
         cache_save(ctx, str, pat, wrap);
 
         if (rec_op.args.leftrec.match)
-            remove_ownership(&rec_op.args.leftrec.match);
+            recycle_match(&rec_op.args.leftrec.match);
 
         return wrap;
     }
@@ -732,7 +710,7 @@ match_t *new_match(pat_t *pat, const char *start, const char *end, match_t *chil
 
     if (children) {
         for (int i = 0; children[i]; i++)
-            add_owner(&m->_children[i], children[i]);
+            m->_children[i] = children[i];
         m->children = m->_children;
     }
     return m;
@@ -742,18 +720,12 @@ match_t *new_match(pat_t *pat, const char *start, const char *end, match_t *chil
 // If the given match is not currently a child member of another match (or
 // otherwise reserved) then put it back in the pool of unused match objects.
 //
-void recycle_if_unused(match_t **at_m)
+void recycle_match(match_t **at_m)
 {
     match_t *m = *at_m;
-    if (m == NULL) return;
-    if (m->refcount > 0) {
-        *at_m = NULL;
-        return;
-    }
-
     if (m->children) {
         for (int i = 0; m->children[i]; i++)
-            remove_ownership(&m->children[i]);
+            recycle_match(&m->children[i]);
         if (m->children != m->_children)
             delete(&m->children);
     }
@@ -770,13 +742,11 @@ void recycle_if_unused(match_t **at_m)
 size_t recycle_all_matches(void)
 {
     size_t count = 0;
-    while (in_use_matches) {
-        match_t *m = in_use_matches;
+    for (match_t *m; (m = in_use_matches); ++count) {
         list_remove(m, &m->gc);
         if (m->children && m->children != m->_children)
             delete(&m->children);
         list_prepend(&unused_matches, m, &m->gc);
-        ++count;
     }
     return count;
 }
@@ -788,11 +758,9 @@ size_t free_all_matches(void)
 {
     size_t count = 0;
     recycle_all_matches();
-    while (unused_matches) {
-        match_t *m = unused_matches;
+    for (match_t *m; (m = unused_matches); ++count) {
         list_remove(m, &m->gc);
         delete(&m);
-        ++count;
     }
     return count;
 }
@@ -807,7 +775,7 @@ bool next_match(match_t **m, const char *start, const char *end, pat_t *pat, pat
     if (*m) {
         // Make sure forward progress is occurring, even after zero-width matches:
         pos = ((*m)->end > (*m)->start) ? (*m)->end : (*m)->end+1;
-        recycle_if_unused(m);
+        recycle_match(m);
     } else {
         pos = start;
     }

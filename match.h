@@ -24,7 +24,6 @@ typedef struct match_s {
     pat_t *pat;
     // Intrusive linked list nodes for garbage collection and cache buckets:
     match_dll_t gc, cache;
-    int refcount;
     struct match_s **children;
     struct match_s *_children[3];
 } match_t;
@@ -36,7 +35,7 @@ typedef struct {
 } print_options_t;
 
 __attribute__((nonnull))
-void recycle_if_unused(match_t **at_m);
+void recycle_match(match_t **at_m);
 size_t free_all_matches(void);
 size_t recycle_all_matches(void);
 bool next_match(match_t **m, const char *start, const char *end, pat_t *pat, pat_t *skip, bool ignorecase);
