@@ -17,17 +17,15 @@
 
 #define MAX_CACHE_SIZE (1<<14)
 
-typedef struct cache_hit_s {
-    size_t pat_id;
-    const char *start;
-    bool does_match;
-    struct cache_hit_s *next;
+typedef struct {
+    pat_t *pat;
+    const char *start, *end;
 } cache_hit_t;
 
 // Cache datastructure
 typedef struct {
     size_t size, occupancy;
-    cache_hit_t **matches;
+    cache_hit_t *hits;
 } cache_t;
 
 // Data structure for various ambient state for matching
@@ -96,15 +94,14 @@ static inline size_t hash(const char *str, size_t pat_id)
 // given definitions. If a result has been memoized, set *result to the
 // memoized value and return true, otherwise return false.
 //
-static enum {CACHE_MISSING, CACHE_MATCH, CACHE_NOMATCH} cache_get(match_ctx_t *ctx, const char *str, pat_t *pat)
+static cache_hit_t cache_get(match_ctx_t *ctx, const char *str, pat_t *pat)
 {
-    if (!ctx->cache->matches) return CACHE_MISSING;
+    if (!ctx->cache->hits) return (cache_hit_t){0};
     size_t h = hash(str, pat->id) & (ctx->cache->size-1);
-    for (cache_hit_t *c = ctx->cache->matches[h]; c; c = c->next) {
-        if (c->pat_id == pat->id && c->start == str)
-            return c->does_match ? CACHE_MATCH : CACHE_NOMATCH;
-    }
-    return CACHE_MISSING;
+    cache_hit_t c = ctx->cache->hits[h];
+    if (c.pat == pat && c.start == str)
+        return c;
+    return (cache_hit_t){0};
 }
 
 //
@@ -113,42 +110,27 @@ static enum {CACHE_MISSING, CACHE_MATCH, CACHE_NOMATCH} cache_get(match_ctx_t *c
 static void cache_save(match_ctx_t *ctx, const char *str, pat_t *pat, match_t *m)
 {
     cache_t *cache = ctx->cache;
-    if (cache->occupancy+1 > 3*cache->size) {
-        if (cache->size == MAX_CACHE_SIZE) {
-            size_t h = hash(str, pat->id) & (cache->size-1);
-            for (int quota = 2; cache->matches[h] && quota > 0; quota--) {
-                cache_hit_t **last_home = &cache->matches[h];
-                while ((*last_home)->next)
-                    last_home = &(*last_home)->next;
-                delete(last_home);
-            }
-        } else {
-            cache_hit_t **old_matches = cache->matches;
-            size_t old_size = cache->size;
-            cache->size = old_size == 0 ? 16 : 2*old_size;
-            cache->matches = new(cache_hit_t*[cache->size]);
+    if (cache->occupancy+1 > (cache->size*1)/5) {
+        cache_hit_t *old_hits = cache->hits;
+        size_t old_size = cache->size;
+        cache->size = old_size == 0 ? 16 : 2*old_size;
+        cache->hits = new(cache_hit_t[cache->size]);
 
-            // Rehash:
-            for (size_t i = 0; i < old_size; i++) {
-                for (cache_hit_t *o; (o = old_matches[i]); ) {
-                    old_matches[i] = o->next;
-                    size_t h = hash(o->start, o->pat_id) & (cache->size-1);
-                    o->next = cache->matches[h];
-                    cache->matches[h] = o;
-                }
+        // Rehash:
+        for (size_t i = 0; i < old_size; i++) {
+            if (old_hits[i].pat) {
+                size_t h = hash(old_hits[i].start, old_hits[i].pat->id) & (cache->size-1);
+                cache->hits[h] = old_hits[i];
             }
-            if (old_matches) delete(&old_matches);
         }
+        if (old_hits) delete(&old_hits);
     }
 
     size_t h = hash(str, pat->id) & (cache->size-1);
-    cache_hit_t *hit = new(cache_hit_t);
-    hit->pat_id = pat->id;
-    hit->start = str;
-    hit->does_match = (m != NULL);
-    hit->next = cache->matches[h];
-    cache->matches[h] = hit;
-    ++cache->occupancy;
+    if (!cache->hits[h].start) ++cache->occupancy;
+    cache->hits[h].start = str;
+    cache->hits[h].end = m ? m->end : NULL;
+    cache->hits[h].pat = pat;
 }
 
 //
@@ -157,15 +139,8 @@ static void cache_save(match_ctx_t *ctx, const char *str, pat_t *pat, match_t *m
 void cache_destroy(match_ctx_t *ctx)
 {
     cache_t *cache = ctx->cache;
-    for (size_t i = 0; cache->occupancy > 0 && i < cache->size; i++) {
-        while (cache->matches[i]) {
-            cache_hit_t *next = cache->matches[i]->next;
-            delete(&cache->matches[i]);
-            cache->matches[i] = next;
-        }
-    }
+    if (cache->hits) delete(&cache->hits);
     cache->occupancy = 0;
-    if (cache->matches) delete(&cache->matches);
     cache->size = 0;
 }
 
@@ -592,7 +567,8 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
         return new_match(pat, str, p ? p->end : str, MATCHES(p));
     }
     case BP_REF: {
-        if (cache_get(ctx, str, pat) == CACHE_NOMATCH)
+        cache_hit_t hit = cache_get(ctx, str, pat);
+        if (hit.start && !hit.end)
             return NULL;
 
         pat_t *ref = lookup(ctx, pat->args.ref.name, pat->args.ref.len);
@@ -647,17 +623,14 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
             m = m2;
         }
 
-        // This match wrapper mainly exists for record-keeping purposes.
-        // However, it also keeps `m` from getting garbage collected with
-        // leftrec.match is GC'd. It also helps with visualization of match
-        // results.
-        // OPTIMIZE: remove this if necessary
-        match_t *wrap = new_match(pat, m->start, m->end, MATCHES(m));
-        cache_save(ctx, str, pat, wrap);
-
         if (rec_op.args.leftrec.match)
             recycle_match(&rec_op.args.leftrec.match);
 
+        // This match wrapper mainly exists for record-keeping purposes.
+        // It also helps with visualization of match results.
+        // OPTIMIZE: remove this if necessary
+        match_t *wrap = new_match(pat, m->start, m->end, MATCHES(m));
+        cache_save(ctx, str, pat, wrap);
         return wrap;
     }
     case BP_NODENT: {
