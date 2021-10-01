@@ -54,31 +54,25 @@ __attribute__((returns_nonnull))
 static match_t *new_match(pat_t *pat, const char *start, const char *end, match_t *children[]);
 
 // Prepend to a doubly linked list
-static inline void list_prepend(match_t **head, match_t *m, match_dll_t *node)
+static inline void gc_list_prepend(match_t **head, match_t *m)
 {
-    if (node->home)
+    if (m->gc.home)
         errx(1, "Node already has a home");
-    node->home = head;
-    node->next = *head;
-    if (*head) {
-        match_dll_t *head_node = (match_dll_t*)((char*)(*head) + ((char*)node - (char*)m));
-        head_node->home = &node->next;
-    }
+    m->gc.home = head;
+    m->gc.next = *head;
+    if (*head) (*head)->gc.home = &m->gc.next;
     *head = m;
 }
 
 // Remove from a doubly linked list
-static inline void list_remove(match_t *m, match_dll_t *node)
+static inline void gc_list_remove(match_t *m)
 {
-    if (!node->home)
+    if (!m->gc.home)
         errx(1, "Attempt to remove something that isn't in a list");
-    *node->home = node->next;
-    if (node->next) {
-        match_dll_t *next_node = (match_dll_t*)((char*)(node->next) + ((char*)node - (char*)m));
-        next_node->home = node->home;
-    }
-    node->home = NULL;
-    node->next = NULL;
+    *m->gc.home = m->gc.next;
+    if (m->gc.next) m->gc.next->gc.home = m->gc.home;
+    m->gc.home = NULL;
+    m->gc.next = NULL;
 }
 
 //
@@ -669,13 +663,13 @@ match_t *new_match(pat_t *pat, const char *start, const char *end, match_t *chil
     match_t *m;
     if (unused_matches) {
         m = unused_matches;
-        list_remove(m, &m->gc);
+        gc_list_remove(m);
         memset(m, 0, sizeof(match_t));
     } else {
         m = new(match_t);
     }
     // Keep track of the object:
-    list_prepend(&in_use_matches, m, &m->gc);
+    gc_list_prepend(&in_use_matches, m);
 
     m->pat = pat;
     m->start = start;
@@ -703,9 +697,9 @@ void recycle_match(match_t **at_m)
             delete(&m->children);
     }
 
-    list_remove(m, &m->gc);
+    gc_list_remove(m);
     (void)memset(m, 0, sizeof(match_t));
-    list_prepend(&unused_matches, m, &m->gc);
+    gc_list_prepend(&unused_matches, m);
     *at_m = NULL;
 }
 
@@ -716,10 +710,10 @@ size_t recycle_all_matches(void)
 {
     size_t count = 0;
     for (match_t *m; (m = in_use_matches); ++count) {
-        list_remove(m, &m->gc);
+        gc_list_remove(m);
         if (m->children && m->children != m->_children)
             delete(&m->children);
-        list_prepend(&unused_matches, m, &m->gc);
+        gc_list_prepend(&unused_matches, m);
     }
     return count;
 }
@@ -732,7 +726,7 @@ size_t free_all_matches(void)
     size_t count = 0;
     recycle_all_matches();
     for (match_t *m; (m = unused_matches); ++count) {
-        list_remove(m, &m->gc);
+        gc_list_remove(m);
         delete(&m);
     }
     return count;

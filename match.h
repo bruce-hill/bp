@@ -9,12 +9,6 @@
 
 #include "pattern.h"
 
-struct match_s; // forward declared to resolve circular struct defs
-
-typedef struct {
-    struct match_s **home, *next;
-} match_dll_t;
-
 //
 // Pattern matching result object
 //
@@ -22,8 +16,10 @@ typedef struct match_s {
     // Where the match starts and ends (end is after the last character)
     const char *start, *end;
     pat_t *pat;
-    // Intrusive linked list nodes for garbage collection and cache buckets:
-    match_dll_t gc, cache;
+    // Intrusive linked list node for garbage collection:
+    struct {
+        struct match_s **home, *next;
+    } gc;
     struct match_s **children;
     struct match_s *_children[3];
 } match_t;
