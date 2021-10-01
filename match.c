@@ -17,10 +17,17 @@
 
 #define MAX_CACHE_SIZE (1<<14)
 
+typedef struct cache_hit_s {
+    size_t pat_id;
+    const char *start;
+    bool does_match;
+    struct cache_hit_s *next;
+} cache_hit_t;
+
 // Cache datastructure
 typedef struct {
     size_t size, occupancy;
-    match_t **matches;
+    cache_hit_t **matches;
 } cache_t;
 
 // Data structure for various ambient state for matching
@@ -99,9 +106,9 @@ static inline void list_remove(match_t *m, match_dll_t *node)
 //
 // Hash a string position/pattern.
 //
-static inline size_t hash(const char *str, pat_t *pat)
+static inline size_t hash(const char *str, size_t pat_id)
 {
-    return (size_t)str + 2*pat->id;
+    return (size_t)str + 2*pat_id;
 }
 
 //
@@ -109,32 +116,15 @@ static inline size_t hash(const char *str, pat_t *pat)
 // given definitions. If a result has been memoized, set *result to the
 // memoized value and return true, otherwise return false.
 //
-static bool cache_get(match_ctx_t *ctx, const char *str, pat_t *pat, match_t **result)
+static enum {CACHE_MISSING, CACHE_MATCH, CACHE_NOMATCH} cache_get(match_ctx_t *ctx, const char *str, pat_t *pat)
 {
-    if (!ctx->cache->matches) return false;
-    size_t h = hash(str, pat) & (ctx->cache->size-1);
-    for (match_t *c = ctx->cache->matches[h]; c; c = c->cache.next) {
-        if (c->pat == pat && c->start == str) {
-            // If c->end == NULL, that means no match occurs here
-            *result = c->end == NULL ? NULL : c;
-            return true;
-        }
+    if (!ctx->cache->matches) return CACHE_MISSING;
+    size_t h = hash(str, pat->id) & (ctx->cache->size-1);
+    for (cache_hit_t *c = ctx->cache->matches[h]; c; c = c->next) {
+        if (c->pat_id == pat->id && c->start == str)
+            return c->does_match ? CACHE_MATCH : CACHE_NOMATCH;
     }
-    return false;
-}
-
-//
-// Remove an item from the cache.
-//
-static void cache_remove(match_ctx_t *ctx, match_t *m, bool do_recycle)
-{
-    if (!m->cache.home) return;
-    *m->cache.home = m->cache.next;
-    if (m->cache.next) m->cache.next->cache.home = m->cache.home;
-    m->cache.next = NULL;
-    m->cache.home = NULL;
-    if (--m->refcount == 0 && do_recycle) recycle_if_unused(&m);
-    --ctx->cache->occupancy;
+    return CACHE_MISSING;
 }
 
 //
@@ -142,34 +132,28 @@ static void cache_remove(match_ctx_t *ctx, match_t *m, bool do_recycle)
 //
 static void cache_save(match_ctx_t *ctx, const char *str, pat_t *pat, match_t *m)
 {
-    // As a convention, a match with {.pat=pat, .start=str, .end==NULL} is used
-    // to memoize the fact that `pat` will *not* match at `str`.
-    if (m == NULL) m = new_match(pat, str, NULL, NULL);
-
     cache_t *cache = ctx->cache;
     if (cache->occupancy+1 > 3*cache->size) {
         if (cache->size == MAX_CACHE_SIZE) {
-            size_t h = hash(m->start, m->pat) & (cache->size-1);
+            size_t h = hash(m->start, m->pat->id) & (cache->size-1);
             for (int quota = 2; cache->matches[h] && quota > 0; quota--) {
-                match_t *last = cache->matches[h];
-                while (last->cache.next) last = last->cache.next;
-                cache_remove(ctx, last, true);
+                cache_hit_t **last_home = &cache->matches[h];
+                while ((*last_home)->next)
+                    last_home = &(*last_home)->next;
+                delete(last_home);
             }
         } else {
-            match_t **old_matches = cache->matches;
+            cache_hit_t **old_matches = cache->matches;
             size_t old_size = cache->size;
             cache->size = old_size == 0 ? 16 : 2*old_size;
-            cache->matches = new(match_t*[cache->size]);
+            cache->matches = new(cache_hit_t*[cache->size]);
 
             // Rehash:
             for (size_t i = 0; i < old_size; i++) {
-                for (match_t *o; (o = old_matches[i]); ) {
-                    *o->cache.home = o->cache.next;
-                    if (o->cache.next) o->cache.next->cache.home = o->cache.home;
-                    size_t h = hash(o->start, o->pat) & (cache->size-1);
-                    o->cache.home = &(cache->matches[h]);
-                    o->cache.next = cache->matches[h];
-                    if (cache->matches[h]) cache->matches[h]->cache.home = &o->cache.next;
+                for (cache_hit_t *o; (o = old_matches[i]); ) {
+                    old_matches[i] = o->next;
+                    size_t h = hash(o->start, o->pat_id) & (cache->size-1);
+                    o->next = cache->matches[h];
                     cache->matches[h] = o;
                 }
             }
@@ -177,24 +161,28 @@ static void cache_save(match_ctx_t *ctx, const char *str, pat_t *pat, match_t *m
         }
     }
 
-    size_t h = hash(m->start, m->pat) & (cache->size-1);
-    m->cache.home = &(cache->matches[h]);
-    m->cache.next = cache->matches[h];
-    if (cache->matches[h]) cache->matches[h]->cache.home = &m->cache.next;
-    cache->matches[h] = m;
-    ++m->refcount;
+    size_t h = hash(str, pat->id) & (cache->size-1);
+    cache_hit_t *hit = new(cache_hit_t);
+    hit->pat_id = pat->id;
+    hit->start = str;
+    hit->does_match = (m != NULL);
+    hit->next = cache->matches[h];
+    cache->matches[h] = hit;
     ++cache->occupancy;
 }
 
 //
 // Clear and deallocate the cache.
 //
-void cache_destroy(match_ctx_t *ctx, match_t *preserve)
+void cache_destroy(match_ctx_t *ctx)
 {
     cache_t *cache = ctx->cache;
     for (size_t i = 0; cache->occupancy > 0 && i < cache->size; i++) {
-        while (cache->matches[i])
-            cache_remove(ctx, cache->matches[i], cache->matches[i] != preserve);
+        while (cache->matches[i]) {
+            cache_hit_t *next = cache->matches[i]->next;
+            delete(&cache->matches[i]);
+            cache->matches[i] = next;
+        }
     }
     cache->occupancy = 0;
     if (cache->matches) delete(&cache->matches);
@@ -281,12 +269,12 @@ static match_t *_next_match(match_ctx_t *ctx, const char *str, pat_t *pat, pat_t
         ctx2.defs = pat->type == BP_DEFINITIONS ? pat : pat->args.multiple.first;
         pat_t *match_pat = pat->type == BP_DEFINITIONS ? pat->args.def.meaning : pat->args.multiple.second;
         match_t *m = _next_match(&ctx2, str, match_pat, skip);
-        cache_destroy(&ctx2, m);
+        cache_destroy(&ctx2);
         return m;
     }
 
     // Clear the cache so it's not full of old cache values from different parts of the file:
-    cache_destroy(ctx, NULL);
+    cache_destroy(ctx);
 
     pat = deref(ctx, pat); // Avoid repeated lookups
     pat_t *first = get_prerequisite(ctx, pat);
@@ -334,7 +322,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
         ctx2.parent_ctx = ctx;
         ctx2.defs = pat;
         match_t *m = match(&ctx2, str, pat->args.def.meaning);
-        cache_destroy(&ctx2, m);
+        cache_destroy(&ctx2);
         return m;
     }
     case BP_LEFTRECURSION: {
@@ -515,14 +503,14 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
         for (const char *pos = &str[-(long)back->min_matchlen];
              pos >= ctx->start && (back->max_matchlen == -1 || pos >= &str[-(int)back->max_matchlen]);
              pos = prev_char(ctx->start, pos)) {
-            cache_destroy(&slice_ctx, NULL);
+            cache_destroy(&slice_ctx);
             slice_ctx.start = (char*)pos;
             match_t *m = match(&slice_ctx, pos, back);
             // Match should not go past str (i.e. (<"AB" "B") should match "ABB", but not "AB")
             if (m && m->end != str)
                 recycle_if_unused(&m);
             else if (m) {
-                cache_destroy(&slice_ctx, NULL);
+                cache_destroy(&slice_ctx);
                 return new_match(pat, str, str, MATCHES(m));
             }
             if (pos == ctx->start) break;
@@ -530,7 +518,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
             // walking backwards endlessly over newlines.
             if (back->max_matchlen == -1 && *pos == '\n') break;
         }
-        cache_destroy(&slice_ctx, NULL);
+        cache_destroy(&slice_ctx);
         return NULL;
     }
     case BP_BEFORE: {
@@ -552,7 +540,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
             ctx2.parent_ctx = ctx;
             ctx2.defs = pat->args.multiple.first;
             match_t *m = match(&ctx2, str, pat->args.multiple.second);
-            cache_destroy(&ctx2, m);
+            cache_destroy(&ctx2);
             return m;
         }
 
@@ -584,7 +572,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
                 if (!m2) // No need to keep the backref in memory if it didn't match
                     delete_pat(&backref, false);
             } --m1->refcount;
-            cache_destroy(&ctx2, m2);
+            cache_destroy(&ctx2);
         } else {
             m2 = match(ctx, m1->end, pat->args.multiple.second);
         }
@@ -608,13 +596,13 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
         slice_ctx.end = m1->end;
         match_t *m2 = _next_match(&slice_ctx, slice_ctx.start, pat->args.multiple.second, NULL);
         if ((!m2 && pat->type == BP_MATCH) || (m2 && pat->type == BP_NOT_MATCH)) {
-            cache_destroy(&slice_ctx, NULL);
+            cache_destroy(&slice_ctx);
             if (m2) recycle_if_unused(&m2);
             recycle_if_unused(&m1);
             return NULL;
         }
         match_t *ret = new_match(pat, m1->start, m1->end, (pat->type == BP_MATCH) ? MATCHES(m1, m2) : MATCHES(m1));
-        cache_destroy(&slice_ctx, ret);
+        cache_destroy(&slice_ctx);
         return ret;
     }
     case BP_REPLACE: {
@@ -626,9 +614,8 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
         return new_match(pat, str, p ? p->end : str, MATCHES(p));
     }
     case BP_REF: {
-        match_t *cached;
-        if (cache_get(ctx, str, pat, &cached))
-            return cached;
+        if (cache_get(ctx, str, pat) == CACHE_NOMATCH)
+            return NULL;
 
         pat_t *ref = lookup(ctx, pat->args.ref.name, pat->args.ref.len);
         if (ref == NULL)
@@ -834,7 +821,7 @@ bool next_match(match_t **m, const char *start, const char *end, pat_t *pat, pat
         .ignorecase = ignorecase,
     };
     *m = (pos <= end) ? _next_match(&ctx, pos, pat, skip) : NULL;
-    cache_destroy(&ctx, *m);
+    cache_destroy(&ctx);
     return *m != NULL;
 }
 
