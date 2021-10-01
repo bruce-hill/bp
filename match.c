@@ -115,7 +115,7 @@ static void cache_save(match_ctx_t *ctx, const char *str, pat_t *pat, match_t *m
     cache_t *cache = ctx->cache;
     if (cache->occupancy+1 > 3*cache->size) {
         if (cache->size == MAX_CACHE_SIZE) {
-            size_t h = hash(m->start, m->pat->id) & (cache->size-1);
+            size_t h = hash(str, pat->id) & (cache->size-1);
             for (int quota = 2; cache->matches[h] && quota > 0; quota--) {
                 cache_hit_t **last_home = &cache->matches[h];
                 while ((*last_home)->next)
