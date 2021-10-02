@@ -17,7 +17,7 @@
 
 #define MAX_CACHE_SIZE (1<<14)
 
-// Cache datastructures
+// Cache entries for results of matching a pattern at a string position
 typedef struct cache_hit_s {
     pat_t *pat;
     const char *start, *end;
@@ -25,12 +25,13 @@ typedef struct cache_hit_s {
     struct cache_hit_s *next_probe;
 } cache_hit_t;
 
+// Cache uses a hash table
 typedef struct {
     unsigned int size, occupancy, next_free;
     cache_hit_t *hits;
 } cache_t;
 
-// Data structure for various ambient state for matching
+// Data structure for holding ambient state values during matching
 typedef struct match_ctx_s {
     struct match_ctx_s *parent_ctx;
     pat_t *defs;
