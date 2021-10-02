@@ -602,10 +602,8 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
 
         pat_t rec_op = {
             .type = BP_LEFTRECURSION,
-            .start = ref->start,
-            .end = ref->end,
-            .min_matchlen = 0,
-            .max_matchlen = -1,
+            .start = ref->start, .end = ref->end,
+            .min_matchlen = 0, .max_matchlen = -1,
             .args.leftrec = {
                 .match = NULL,
                 .visits = 0,
@@ -627,31 +625,21 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
                 },
         };
 
-        const char *prev = str;
-        match_t *m = match(&ctx2, str, ref);
-        if (m == NULL) {
-            cache_failure(ctx, str, pat);
-            return NULL;
-        }
-
-        while (rec_op.args.leftrec.visits > 0) {
-            rec_op.args.leftrec.visits = 0;
-            if (rec_op.args.leftrec.match && rec_op.args.leftrec.match != m)
-                recycle_match(&rec_op.args.leftrec.match);
+        match_t *m = NULL;
+        // Keep matching as long as left recursion keeps happening and forward progress is made
+        for (const char *prev = str; m == NULL || (rec_op.args.leftrec.visits > 0 && m->end > prev); prev = m->end) {
             rec_op.args.leftrec.match = m;
-            prev = m->end;
+            rec_op.args.leftrec.visits = 0;
             match_t *m2 = match(&ctx2, str, ref);
-            if (m2 == NULL) break;
-            if (m2->end <= prev) {
-                recycle_match(&m2);
-                break;
-            }
-            recycle_match(&m);
+            if (!m2) break;
+            if (m) recycle_match(&m);
             m = m2;
         }
 
-        if (rec_op.args.leftrec.match && rec_op.args.leftrec.match != m)
-            recycle_match(&rec_op.args.leftrec.match);
+        if (!m) {
+            cache_failure(ctx, str, pat);
+            return NULL;
+        }
 
         // This match wrapper mainly exists for record-keeping purposes.
         // It also helps with visualization of match results.
