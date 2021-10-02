@@ -105,8 +105,7 @@ static bool has_cached_failure(match_ctx_t *ctx, const char *str, pat_t *pat)
 static void _hash_insert(cache_t *cache, const char *str, pat_t *pat)
 {
     size_t h = hash(str, pat->id) & (cache->size-1);
-    cache_entry_t collision = cache->fails[h];
-    if (collision.pat == NULL) { // No collision
+    if (cache->fails[h].pat == NULL) { // No collision
         cache->fails[h].pat = pat;
         cache->fails[h].start = str;
         cache->fails[h].next_probe = NULL;
@@ -114,26 +113,26 @@ static void _hash_insert(cache_t *cache, const char *str, pat_t *pat)
         return;
     }
 
-    if (collision.pat == pat && collision.start == str)
+    if (cache->fails[h].pat == pat && cache->fails[h].start == str)
         return; // Duplicate entry, just leave it be
 
-    // Shuffle the collision along to a free space:
+    // Shuffle the colliding entry along to a free space:
     while (cache->fails[cache->next_free].pat) ++cache->next_free;
-    cache->fails[cache->next_free] = collision;
+    cache_entry_t *free_slot = &cache->fails[cache->next_free];
+    *free_slot = cache->fails[h];
+    size_t h_orig = hash(free_slot->start, free_slot->pat->id) & (cache->size-1);
+
+    // Put the new entry in its desired slot
     cache->fails[h].pat = pat;
     cache->fails[h].start = str;
-
-    size_t hcol = hash(collision.start, collision.pat->id) & (cache->size-1);
-    if (hcol == h) { // Chain `collision` afterwards
-        cache->fails[h].next_probe = &cache->fails[cache->next_free];
-    } else { // Keep `collision` in its own chain
-        cache_entry_t *prev = &cache->fails[hcol]; // Where `collision` wanted to be originally
-        while (prev->next_probe != &cache->fails[h]) prev = prev->next_probe;
-        prev->next_probe = &cache->fails[cache->next_free];
-        cache->fails[h].next_probe = NULL;
-    }
-    ++cache->next_free;
+    cache->fails[h].next_probe = h_orig == h ? free_slot : NULL;
     ++cache->occupancy;
+
+    if (h_orig != h) { // Maintain the chain that points to the colliding entry
+        cache_entry_t *prev = &cache->fails[h_orig]; // Start of the chain
+        while (prev->next_probe != &cache->fails[h]) prev = prev->next_probe;
+        prev->next_probe = free_slot;
+    }
 }
 
 //
