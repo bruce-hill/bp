@@ -636,7 +636,8 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
 
         while (rec_op.args.leftrec.visits > 0) {
             rec_op.args.leftrec.visits = 0;
-            recycle_match(&rec_op.args.leftrec.match);
+            if (rec_op.args.leftrec.match && rec_op.args.leftrec.match != m)
+                recycle_match(&rec_op.args.leftrec.match);
             rec_op.args.leftrec.match = m;
             prev = m->end;
             match_t *m2 = match(&ctx2, str, ref);
@@ -645,10 +646,11 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
                 recycle_match(&m2);
                 break;
             }
+            recycle_match(&m);
             m = m2;
         }
 
-        if (rec_op.args.leftrec.match)
+        if (rec_op.args.leftrec.match && rec_op.args.leftrec.match != m)
             recycle_match(&rec_op.args.leftrec.match);
 
         // This match wrapper mainly exists for record-keeping purposes.

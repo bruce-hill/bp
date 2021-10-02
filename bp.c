@@ -521,7 +521,7 @@ static int process_git_files(pat_t *pattern, int argc, char *argv[])
 //
 static pat_t *load_grammar(pat_t *defs, file_t *f)
 {
-    return chain_together(defs, assert_pat(f->start, f->end, bp_pattern(f->start, f->end)));
+    return chain_together(assert_pat(f->start, f->end, bp_pattern(f->start, f->end)), defs);
 }
 
 //
