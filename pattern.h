@@ -83,9 +83,10 @@ typedef struct pat_s {
         } capture;
         struct {
             struct match_s *match;
-            unsigned int visits;
             const char *at;
             struct pat_s *fallback;
+            void *ctx;
+            bool visited;
         } leftrec;
         struct {
             const char *start, *end, *msg;
