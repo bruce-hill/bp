@@ -205,6 +205,7 @@ static inline pat_t *deref(match_ctx_t *ctx, pat_t *pat)
 //
 static pat_t *get_prerequisite(match_ctx_t *ctx, pat_t *pat)
 {
+    int derefs = 0;
     for (pat_t *p = pat; p; ) {
         switch (p->type) {
         case BP_BEFORE:
@@ -226,6 +227,7 @@ static pat_t *get_prerequisite(match_ctx_t *ctx, pat_t *pat)
         case BP_REPLACE:
             p = p->args.replace.pat; break;
         case BP_REF: {
+            if (++derefs > 10) return p;
             pat_t *p2 = deref(ctx, p);
             if (p2 == p) return p2;
             p = p2;
