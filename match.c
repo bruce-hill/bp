@@ -18,17 +18,17 @@
 #define MAX_CACHE_SIZE (1<<14)
 
 // Cache entries for results of matching a pattern at a string position
-typedef struct cache_hit_s {
+typedef struct cache_entry_s {
     pat_t *pat;
-    const char *start, *end;
+    const char *start;
     // Cache entries use a chained scatter approach modeled after Lua's tables
-    struct cache_hit_s *next_probe;
-} cache_hit_t;
+    struct cache_entry_s *next_probe;
+} cache_entry_t;
 
-// Cache uses a hash table
+// Cache uses a hash table to store places where matches will always fail
 typedef struct {
     unsigned int size, occupancy, next_free;
-    cache_hit_t *hits;
+    cache_entry_t *fails;
 } cache_t;
 
 // Data structure for holding ambient state values during matching
@@ -87,48 +87,51 @@ static inline size_t hash(const char *str, size_t pat_id)
 }
 
 //
-// Check if we have memoized a pattern match at the given position for the
-// given definitions. If a result has been memoized, set *result to the
-// memoized value and return true, otherwise return false.
+// Check if we have cached a failure to match a given pattern at the given position.
 //
-static cache_hit_t *cache_get(match_ctx_t *ctx, const char *str, pat_t *pat)
+static bool has_cached_failure(match_ctx_t *ctx, const char *str, pat_t *pat)
 {
-    if (!ctx->cache->hits) return NULL;
-    for (cache_hit_t *hit = &ctx->cache->hits[hash(str, pat->id) & (ctx->cache->size-1)]; hit; hit = hit->next_probe) {
-        if (hit->pat == pat && hit->start == str)
-            return hit;
+    if (!ctx->cache->fails) return false;
+    for (cache_entry_t *fail = &ctx->cache->fails[hash(str, pat->id) & (ctx->cache->size-1)]; fail; fail = fail->next_probe) {
+        if (fail->pat == pat && fail->start == str)
+            return true;
     }
-    return NULL;
+    return false;
 }
 
-static void _hash_insert(cache_t *cache, cache_hit_t hit)
+//
+// Insert into the hash table using a chained scatter table approach.
+//
+static void _hash_insert(cache_t *cache, const char *str, pat_t *pat)
 {
-    size_t h = hash(hit.start, hit.pat->id) & (cache->size-1);
-    cache_hit_t collision = cache->hits[h];
+    size_t h = hash(str, pat->id) & (cache->size-1);
+    cache_entry_t collision = cache->fails[h];
     if (collision.pat == NULL) { // No collision
-        hit.next_probe = NULL;
-        cache->hits[h] = hit;
+        cache->fails[h].pat = pat;
+        cache->fails[h].start = str;
+        cache->fails[h].next_probe = NULL;
         ++cache->occupancy;
         return;
     }
 
-    if (collision.pat == hit.pat && collision.start == hit.start)
+    if (collision.pat == pat && collision.start == str)
         return; // Duplicate entry, just leave it be
 
     // Shuffle the collision along to a free space:
-    while (cache->hits[cache->next_free].pat) ++cache->next_free;
-    cache->hits[cache->next_free] = collision;
+    while (cache->fails[cache->next_free].pat) ++cache->next_free;
+    cache->fails[cache->next_free] = collision;
+    cache->fails[h].pat = pat;
+    cache->fails[h].start = str;
 
     size_t hcol = hash(collision.start, collision.pat->id) & (cache->size-1);
-    if (hcol == h) { // Chain `collision` after `hit`
-        hit.next_probe = &cache->hits[cache->next_free];
+    if (hcol == h) { // Chain `collision` afterwards
+        cache->fails[h].next_probe = &cache->fails[cache->next_free];
     } else { // Keep `collision` in its own chain
-        cache_hit_t *prev = &cache->hits[hcol]; // Where `collision` wanted to be originally
-        while (prev->next_probe != &cache->hits[h]) prev = prev->next_probe;
-        prev->next_probe = &cache->hits[cache->next_free];
-        hit.next_probe = NULL;
+        cache_entry_t *prev = &cache->fails[hcol]; // Where `collision` wanted to be originally
+        while (prev->next_probe != &cache->fails[h]) prev = prev->next_probe;
+        prev->next_probe = &cache->fails[cache->next_free];
+        cache->fails[h].next_probe = NULL;
     }
-    cache->hits[h] = hit;
     ++cache->next_free;
     ++cache->occupancy;
 }
@@ -136,26 +139,26 @@ static void _hash_insert(cache_t *cache, cache_hit_t hit)
 //
 // Save a match in the cache.
 //
-static void cache_save(match_ctx_t *ctx, const char *str, pat_t *pat, match_t *m)
+static void cache_failure(match_ctx_t *ctx, const char *str, pat_t *pat)
 {
     cache_t *cache = ctx->cache;
     // Grow the hash if needed (>99% utilization):
     if (cache->occupancy+1 > (cache->size*99)/100) {
-        cache_hit_t *old_hits = cache->hits;
+        cache_entry_t *old_fails = cache->fails;
         size_t old_size = cache->size;
         cache->size = old_size == 0 ? 16 : 2*old_size;
-        cache->hits = new(cache_hit_t[cache->size]);
+        cache->fails = new(cache_entry_t[cache->size]);
         cache->next_free = 0;
 
         // Rehash:
         for (size_t i = 0; i < old_size; i++) {
-            if (old_hits[i].pat)
-                _hash_insert(cache, old_hits[i]);
+            if (old_fails[i].pat)
+                _hash_insert(cache, old_fails[i].start, old_fails[i].pat);
         }
-        if (old_hits) delete(&old_hits);
+        if (old_fails) delete(&old_fails);
     }
 
-    _hash_insert(cache, (cache_hit_t){.pat = pat, .start = str, .end = m ? m->end : NULL});
+    _hash_insert(cache, str, pat);
 }
 
 //
@@ -164,7 +167,7 @@ static void cache_save(match_ctx_t *ctx, const char *str, pat_t *pat, match_t *m
 void cache_destroy(match_ctx_t *ctx)
 {
     cache_t *cache = ctx->cache;
-    if (cache->hits) delete(&cache->hits);
+    if (cache->fails) delete(&cache->fails);
     memset(cache, 0, sizeof(cache_t));
 }
 
@@ -591,8 +594,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
         return new_match(pat, str, p ? p->end : str, MATCHES(p));
     }
     case BP_REF: {
-        cache_hit_t *hit = cache_get(ctx, str, pat);
-        if (hit && !hit->end)
+        if (has_cached_failure(ctx, str, pat))
             return NULL;
 
         pat_t *ref = lookup(ctx, pat->args.ref.name, pat->args.ref.len);
@@ -629,7 +631,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
         const char *prev = str;
         match_t *m = match(&ctx2, str, ref);
         if (m == NULL) {
-            cache_save(ctx, str, pat, NULL);
+            cache_failure(ctx, str, pat);
             return NULL;
         }
 
@@ -653,9 +655,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
         // This match wrapper mainly exists for record-keeping purposes.
         // It also helps with visualization of match results.
         // OPTIMIZE: remove this if necessary
-        match_t *wrap = new_match(pat, m->start, m->end, MATCHES(m));
-        cache_save(ctx, str, pat, wrap);
-        return wrap;
+        return new_match(pat, m->start, m->end, MATCHES(m));
     }
     case BP_NODENT: {
         if (*str != '\n') return NULL;
