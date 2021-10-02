@@ -17,7 +17,7 @@ String-pattern: ..%(\n / Nodent / Identifier-char / Identifier-start / Escape / 
 pat: simple-pat !(__("!~"/"~")) / suffixed-pat
 simple-pat: (Upto-and / Dot / Word-boundary/ String / Chars / Nodent
     / Identifier-char / Identifier-start / Escape-range
-    / Escape / Repeat / Optional / No / After / Before / Capture  / Empty-replacement
+    / Escape / Repeat / Optional / No / After / Before / Capture
     / Start-of-File / Start-of-Line / End-of-File / End-of-Line / Ref / parens)
 
 suffixed-pat: (
@@ -63,10 +63,11 @@ After: `< __ pat
 Before: `> __ pat
 Capture: `@ [__ @capture-name=(id/`!) __ !"=>" `=] __ (@capture=pat / @error=(=>"Expected pattern to capture"))
 Replace: (
-      @replace-pat=(Replace / Chain / pat) __ "=>" (__ @replacement=String / @error=(=>"Expected replacement string"))
+      @replace-pat=[Chain-noreplace / pat] __ "=>" (__ @replacement=String / @error=(=>"Expected replacement string"))
     )
+Replace-chain: Replace-chain __ "=>" (__ @replacement=String / @error=(=>"Expected replacement string"))
 Empty-replacement: (
-       @replace-pat=(=>"''") "=>" (__ @replacement=String / @error=(=>"Expected replacement string"))
+       (=>"EMPTY") @replace-pat=(=>"''") "=>" (__ @replacement=String / @error=(=>"Expected replacement string"))
     )
 Ref: @name=id !(__`:)
 Start-of-File: "^^"
@@ -76,9 +77,10 @@ End-of-Line: "$"
 
 parens: `( __ extended-pat (__ `) / @error=(=>"Expected closing parenthesis here"))
 
-Chain: 2+@(pat !(__"=>") / Replace)%__
-Otherwise: 2+@(Replace / Chain / pat)%(__`/__)
-extended-pat: Otherwise / Replace / Chain / pat
+Chain: @(Replace/pat) __ @(Chain/Replace/pat)
+Chain-noreplace: @pat __ @(Chain-noreplace/pat)
+Otherwise: 2+@(Chain / Replace / pat)%(__`/__)
+extended-pat: Otherwise / Chain / Replace / pat
 
 # Special-symbol rules:
 _:  *(`  / \t)

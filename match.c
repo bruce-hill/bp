@@ -56,6 +56,27 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat);
 __attribute__((returns_nonnull))
 static match_t *new_match(pat_t *pat, const char *start, const char *end, match_t *children[]);
 
+static match_t *clone_match(match_t *m)
+{
+    if (!m) return NULL;
+    match_t *ret = new_match(m->pat, m->start, m->end, NULL);
+    if (m->children) {
+        size_t child_cap = 0, nchildren = 0;
+        if (!m->children[0] || !m->children[1] || !m->children[2]) {
+            child_cap = 3;
+            ret->children = ret->_children;
+        }
+        for (int i = 0; m->children[i]; i++) {
+            if (nchildren+1 >= child_cap) {
+                ret->children = grow(ret->children, child_cap += 5);
+                for (size_t i = nchildren; i < child_cap; i++) ret->children[i] = NULL;
+            }
+            ret->children[nchildren++] = clone_match(m->children[i]);
+        }
+    }
+    return ret;
+}
+
 // Prepend to a doubly linked list
 static inline void gc_list_prepend(match_t **head, match_t *m)
 {
@@ -227,7 +248,7 @@ static pat_t *get_prerequisite(match_ctx_t *ctx, pat_t *pat)
         case BP_REPLACE:
             p = p->args.replace.pat; break;
         case BP_REF: {
-            if (++derefs > 10) return p;
+            if (++derefs > 10) return p; // In case of left recursion
             pat_t *p2 = deref(ctx, p);
             if (p2 == p) return p2;
             p = p2;
@@ -259,7 +280,6 @@ static match_t *_next_match(match_ctx_t *ctx, const char *str, pat_t *pat, pat_t
     // Clear the cache so it's not full of old cache values from different parts of the file:
     cache_destroy(ctx);
 
-    pat = deref(ctx, pat); // Avoid repeated lookups
     pat_t *first = get_prerequisite(ctx, pat);
 
     // Don't bother looping if this can only match at the start/end:
@@ -316,7 +336,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
         // See: left-recursion.md for more details.
         if (str == pat->args.leftrec.at) {
             ++pat->args.leftrec.visits;
-            return pat->args.leftrec.match;
+            return clone_match(pat->args.leftrec.match);
         } else {
             return match(ctx, str, pat->args.leftrec.fallback);
         }
@@ -602,6 +622,9 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
         if (ref == NULL)
             errx(EXIT_FAILURE, "Unknown identifier: '%.*s'", (int)pat->args.ref.len, pat->args.ref.name);
 
+        if (ref->type == BP_LEFTRECURSION)
+            return match(ctx, str, ref);
+
         pat_t rec_op = {
             .type = BP_LEFTRECURSION,
             .start = ref->start, .end = ref->end,
@@ -627,15 +650,21 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
                 },
         };
 
-        match_t *m = NULL;
-        // Keep matching as long as left recursion keeps happening and forward progress is made
-        for (const char *prev = str; m == NULL || (rec_op.args.leftrec.visits > 0 && m->end > prev); prev = m->end) {
-            rec_op.args.leftrec.match = m;
-            rec_op.args.leftrec.visits = 0;
-            match_t *m2 = match(&ctx2, str, ref);
-            if (!m2) break;
-            if (m) recycle_match(&m);
-            m = m2;
+        match_t *m = match(&ctx2, str, ref);
+        // If left recursion was involved, keep retrying while forward progress can be made:
+        if (m && rec_op.args.leftrec.visits > 0) {
+            while (1) {
+                const char *prev = m->end;
+                rec_op.args.leftrec.match = m;
+                match_t *m2 = match(&ctx2, str, ref);
+                if (!m2) break;
+                if (m2->end <= prev) {
+                    recycle_match(&m2);
+                    break;
+                }
+                recycle_match(&m);
+                m = m2;
+            }
         }
 
         if (!m) {
