@@ -287,7 +287,7 @@ static file_t *printing_file = NULL;
 static int last_line_num = -1;
 static void _fprint_between(FILE *out, const char *start, const char *end, const char *normal_color)
 {
-    while (start < end) {
+    do {
         // Cheeky lookbehind to see if line number should be printed
         if (start == printing_file->start || start[-1] == '\n') {
             int linenum = (int)get_line_number(printing_file, start);
@@ -301,10 +301,10 @@ static void _fprint_between(FILE *out, const char *start, const char *end, const
             fwrite(start, sizeof(char), (size_t)(line_end - start + 1), out);
             start = line_end + 1;
         } else {
-            fwrite(start, sizeof(char), (size_t)(end - start), out);
+            if (end > start) fwrite(start, sizeof(char), (size_t)(end - start), out);
             break;
         }
-    }
+    } while (start < end);
 }
 
 static void fprint_context(FILE *out, file_t *f, const char *prev, const char *next)
