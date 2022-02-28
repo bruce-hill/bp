@@ -48,7 +48,7 @@ static const char *usage = (
     " -r --replace <replacement>       replace the input pattern with the given replacement\n"
     " -s --skip <skip-pattern>         skip over the given pattern when looking for matches\n"
     " -B --context-before <n>          set number of lines of context to print before the match\n"
-    " -B --context-after <n>           set number of lines of context to print after the match\n"
+    " -A --context-after <n>           set number of lines of context to print after the match\n"
     " -C --context <context>           set number of lines of context to print before and after the match\n"
     " -f --format fancy|plain|bare|file:line    set the output format\n"
     " -g --grammar <grammar-file>      use the specified file as a grammar");
