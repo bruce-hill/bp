@@ -202,11 +202,11 @@ by the same indentation that occurs on the current line.
 **"xx"**, **"xxx"**, **"xxxx"**, etc.)
 
 `*` *pat*
-: Some *pat*s (zero or more, e.g. `* "x"` matches **""**, **"x"**, **"xx"**,
+: Any *pat*s (zero or more, e.g. `* "x"` matches **""**, **"x"**, **"xx"**,
 etc.)
 
 `+` *pat*
-: At least one *pat*s (e.g. `+ "x"` matches **"x"**, **"xx"**, **"xxx"**, etc.)
+: Some *pat*s (e.g. `+ "x"` matches **"x"**, **"xx"**, **"xxx"**, etc.)
 
 *repeating-pat* `%` *sep*
 : *repeating-pat* (see the examples above) separated by *sep* (e.g. `*word %
