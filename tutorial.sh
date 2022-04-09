@@ -12,7 +12,7 @@ for t in $([ $# -gt 0 ] && echo "$@" || ls -v tests/*.sh); do
     printf "\033[33;1mGiven these lines:              Give this output:\033[m\n"
     diff -y -W60 --color=always "${t/.sh/.in}" "${t/.sh/.out}"
     while true; do
-        printf "\n\033[1mbp pattern: \033[m"
+        printf "\n\033[1mbp --pattern \033[m"
         read -r pat
         printf "\033[0;2mRunning: \033[32m%s\033[m\n\n" "bp -p '$pat'"
         printf "\033[33;1mExpected output:                Your pattern's output:\033[m\n"
