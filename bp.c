@@ -20,11 +20,11 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#include "explain.h"
 #include "files.h"
 #include "json.h"
 #include "match.h"
 #include "pattern.h"
+#include "printmatch.h"
 #include "utils.h"
 
 #ifndef BP_NAME

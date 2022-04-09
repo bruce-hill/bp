@@ -1,11 +1,13 @@
 //
-// explain.c - Debug visualization of pattern matches.
+// printmatch.c - Debug visualization of pattern matches.
 //
 
 #include <stdio.h>
 #include <string.h>
+#include <ctype.h>
 
 #include "match.h"
+#include "printmatch.h"
 #include "utils.h"
 
 typedef struct match_node_s {
@@ -169,5 +171,93 @@ void explain_match(match_t *m)
     _explain_matches(&first, 0, m->start, (size_t)(m->end - m->start));
     printf("\033[?7h"); // Re-enable line wrapping
 }
+
+static inline void fputc_safe(FILE *out, char c, print_options_t *opts)
+{
+    (void)fputc(c, out);
+    if (c == '\n' && opts && opts->on_nl) {
+        opts->on_nl(out);
+        if (opts->replace_color) fprintf(out, "%s", opts->replace_color);
+    }
+}
+
+void fprint_match(FILE *out, const char *file_start, match_t *m, print_options_t *opts)
+{
+    if (m->pat->type == BP_REPLACE) {
+        const char *text = m->pat->args.replace.text;
+        const char *end = &text[m->pat->args.replace.len];
+        if (opts && opts->replace_color) fprintf(out, "%s", opts->replace_color);
+
+        // TODO: clean up the line numbering code
+        for (const char *r = text; r < end; ) {
+            // Capture substitution
+            if (*r == '@' && r+1 < end && r[1] != '@') {
+                const char *next = r+1;
+                // Retrieve the capture value:
+                match_t *cap = NULL;
+                if (isdigit(*next)) {
+                    int n = (int)strtol(next, (char**)&next, 10);
+                    cap = get_numbered_capture(m->children[0], n);
+                } else {
+                    const char *name = next, *name_end = after_name(next, end);
+                    if (name_end) {
+                        cap = get_named_capture(m->children[0], name, (size_t)(name_end - name));
+                        next = name_end;
+                        if (next < m->end && *next == ';') ++next;
+                    }
+                }
+
+                if (cap != NULL) {
+                    fprint_match(out, file_start, cap, opts);
+                    if (opts && opts->replace_color) fprintf(out, "%s", opts->replace_color);
+                    r = next;
+                    continue;
+                }
+            }
+
+            if (*r == '\\') {
+                ++r;
+                if (*r == 'N') { // \N (nodent)
+                    ++r;
+                    // Mildly hacky: nodents here are based on the *first line*
+                    // of the match. If the match spans multiple lines, or if
+                    // the replacement text contains newlines, this may get weird.
+                    const char *line_start = m->start;
+                    while (line_start > file_start && line_start[-1] != '\n') --line_start;
+                    fputc_safe(out, '\n', opts);
+                    for (const char *p = line_start; p < m->start && (*p == ' ' || *p == '\t'); ++p)
+                        fputc(*p, out);
+                    continue;
+                }
+                fputc_safe(out, unescapechar(r, &r, end), opts);
+            } else {
+                fputc_safe(out, *r, opts);
+                ++r;
+            }
+        }
+    } else {
+        if (opts && opts->match_color) fprintf(out, "%s", opts->match_color);
+        const char *prev = m->start;
+        for (int i = 0; m->children && m->children[i]; i++) {
+            match_t *child = m->children[i];
+            // Skip children from e.g. zero-width matches like >@foo
+            if (!(prev <= child->start && child->start <= m->end &&
+                  prev <= child->end && child->end <= m->end))
+                continue;
+            if (child->start > prev) {
+                if (opts && opts->fprint_between) opts->fprint_between(out, prev, child->start, opts->match_color);
+                else fwrite(prev, sizeof(char), (size_t)(child->start - prev), out);
+            }
+            fprint_match(out, file_start, child, opts);
+            if (opts && opts->match_color) fprintf(out, "%s", opts->match_color);
+            prev = child->end;
+        }
+        if (m->end > prev) {
+            if (opts && opts->fprint_between) opts->fprint_between(out, prev, m->end, opts->match_color);
+            else fwrite(prev, sizeof(char), (size_t)(m->end - prev), out);
+        }
+    }
+}
+
 
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1,\:0

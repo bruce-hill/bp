@@ -24,12 +24,6 @@ typedef struct match_s {
     struct match_s *_children[3];
 } match_t;
 
-typedef struct {
-    const char *normal_color, *match_color, *replace_color;
-    void (*fprint_between)(FILE *out, const char *start, const char *end, const char *normal_color);
-    void (*on_nl)(FILE *out);
-} print_options_t;
-
 __attribute__((nonnull))
 void recycle_match(match_t **at_m);
 size_t free_all_matches(void);
@@ -40,9 +34,6 @@ __attribute__((nonnull))
 match_t *get_numbered_capture(match_t *m, int n);
 __attribute__((nonnull, pure))
 match_t *get_named_capture(match_t *m, const char *name, size_t namelen);
-__attribute__((nonnull(1,2,3)))
-//void fprint_match(FILE *out, const char *file_start, match_t *m, const char *colors[3]);
-void fprint_match(FILE *out, const char *file_start, match_t *m, print_options_t *opts);
 
 #endif
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1,\:0

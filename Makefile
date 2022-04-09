@@ -22,7 +22,7 @@ G=
 O=-O3
 ALL_FLAGS=$(CFLAGS) $(OSFLAGS) -DBP_NAME="\"$(NAME)\"" $(EXTRA) $(CWARN) $(G) $(O)
 
-CFILES=pattern.c utils.c match.c files.c explain.c json.c utf8.c
+CFILES=pattern.c utils.c match.c files.c printmatch.c json.c utf8.c
 OBJFILES=$(CFILES:.c=.o)
 
 all: $(NAME) bp.1
