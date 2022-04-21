@@ -528,6 +528,7 @@ static pat_t *_bp_simplepattern(const char *str, const char *end)
 maybe_pat_t bp_stringpattern(const char *str, const char *end)
 {
     __TRY_PATTERN__
+    if (!end) end = str + strlen(str);
     pat_t *ret = NULL;
     while (str < end) {
         char *start = (char*)str;
@@ -602,6 +603,7 @@ maybe_pat_t bp_replacement(pat_t *replacepat, const char *replacement, const cha
     pat_t *pat = new_pat(BP_REPLACE, replacepat->start, replacepat->end, replacepat->min_matchlen, replacepat->max_matchlen);
     pat->args.replace.pat = replacepat;
     const char *p = replacement;
+    if (!end) end = replacement + strlen(replacement);
     __TRY_PATTERN__
     for (; p < end; p++) {
         if (*p == '\\') {
@@ -645,6 +647,7 @@ pat_t *bp_raw_literal(const char *str, size_t len)
 maybe_pat_t bp_pattern(const char *str, const char *end)
 {
     str = after_spaces(str, true, end);
+    if (!end) end = str + strlen(str);
     __TRY_PATTERN__
     pat_t *ret = bp_pattern_nl(str, end, false);
     __END_TRY_PATTERN__
