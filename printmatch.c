@@ -85,10 +85,24 @@ static void _explain_matches(match_node_t *firstmatch, int depth, const char *te
     // Print nonzero-width first:
     for (match_node_t *m = firstmatch; m; m = m->next) {
         if (RIGHT_TYPE(m)) {
-            for (int i = 0; m->m->children && m->m->children[i]; i++) {
+            // Instead of printing each subchain on its own line, flatten them all out at once:
+            if (m->m->pat->type == BP_CHAIN) {
+                match_t *tmp = m->m;
+                while (tmp->pat->type == BP_CHAIN) {
+                    *nextchild = new(match_node_t);
+                    (*nextchild)->m = tmp->children[0];
+                    nextchild = &((*nextchild)->next);
+                    tmp = tmp->children[1];
+                }
                 *nextchild = new(match_node_t);
-                (*nextchild)->m = m->m->children[i];
+                (*nextchild)->m = tmp;
                 nextchild = &((*nextchild)->next);
+            } else {
+                for (int i = 0; m->m->children && m->m->children[i]; i++) {
+                    *nextchild = new(match_node_t);
+                    (*nextchild)->m = m->m->children[i];
+                    nextchild = &((*nextchild)->next);
+                }
             }
             if (m->m->end == m->m->start) continue;
             printf("\033[%ldG\033[0;2m%s\033[0;7;%sm", 1+2*(m->m->start - text), V, color);
