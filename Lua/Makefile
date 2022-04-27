@@ -39,7 +39,7 @@ clean:
 lbp.o: lbp.c builtins.h
 	$(CC) -c $(ALL_FLAGS) -o $@ $<
 
-bp.so: lbp.o ../pattern.o ../utils.o ../utf8.o ../match.o
+bp.so: lbp.o ../pattern.o ../utils.o ../utf8.o ../match.o ../printmatch.o
 	$(MAKESO) -o $@ $^
 
 builtins.h: ../grammars/builtins.bp

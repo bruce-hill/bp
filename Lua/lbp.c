@@ -21,6 +21,7 @@
 
 #include "../pattern.h"
 #include "../match.h"
+#include "../printmatch.h"
 
 static const char *builtins_source = (
 #include "builtins.h"
@@ -245,9 +246,10 @@ static int Lpat_tostring(lua_State *L)
 
 static int Lpat_gc(lua_State *L)
 {
-    pat_t **at_pat = lua_touserdata(L, 1);
-    pat_t *pat = *at_pat;
-    if (pat) delete_pat(at_pat, true);
+    (void)L;
+    // pat_t **at_pat = lua_touserdata(L, 1);
+    // pat_t *pat = *at_pat;
+    // if (pat) delete_pat(at_pat, true);
     return 0;
 }
 
