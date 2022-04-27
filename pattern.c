@@ -169,11 +169,11 @@ pat_t *chain_together(pat_t *first, pat_t *second)
     if (second == NULL) return first;
 
     if (first->type == BP_DEFINITIONS && second->type == BP_DEFINITIONS) {
-        pat_t *first_end = first;
-        while (first_end->args.def.next_def != NULL)
-            first_end = first_end->args.def.next_def;
-        first_end->args.def.next_def = second;
-        return first;
+        pat_t *second_end = second;
+        while (second_end->args.def.next_def != NULL)
+            second_end = second_end->args.def.next_def;
+        second_end->args.def.next_def = first;
+        return second;
     }
 
     size_t minlen = first->min_matchlen + second->min_matchlen;
