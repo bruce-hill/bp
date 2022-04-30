@@ -192,16 +192,37 @@ void cache_destroy(match_ctx_t *ctx)
 }
 
 //
-// Look up a pattern definition by name.
+// Look up a pattern definition by name from a definition pattern.
+//
+__attribute__((nonnull(2)))
+static pat_t *_lookup_def(pat_t *defs, const char *name, size_t namelen)
+{
+    while (defs) {
+        if (defs->type == BP_CHAIN) {
+            pat_t *second = _lookup_def(defs->args.multiple.second, name, namelen);
+            if (second) return second;
+            defs = defs->args.multiple.first;
+        } else if (defs->type == BP_DEFINITIONS) {
+            if (namelen == defs->args.def.namelen && strncmp(defs->args.def.name, name, namelen) == 0)
+                return defs->args.def.meaning;
+            defs = defs->args.def.next_def;
+        } else {
+            errx(1, "Invalid pattern type in definitions");
+        }
+    }
+    return NULL;
+}
+
+//
+// Look up a pattern definition by name from a context.
 //
 __attribute__((nonnull))
-pat_t *lookup(match_ctx_t *ctx, const char *name, size_t namelen)
+pat_t *lookup_ctx(match_ctx_t *ctx, const char *name, size_t namelen)
 {
-    for (pat_t *def = ctx->defs; def; def = def->args.def.next_def) {
-        if (namelen == def->args.def.namelen && strncmp(def->args.def.name, name, namelen) == 0)
-            return def->args.def.meaning;
+    for (; ctx; ctx = ctx->parent_ctx) {
+        pat_t *def = _lookup_def(ctx->defs, name, namelen);
+        if (def) return def;
     }
-    if (ctx->parent_ctx) return lookup(ctx->parent_ctx, name, namelen);
     return NULL;
 }
 
@@ -213,7 +234,7 @@ __attribute__((nonnull(1)))
 static inline pat_t *deref(match_ctx_t *ctx, pat_t *pat)
 {
     if (pat && pat->type == BP_REF) {
-        pat_t *def = lookup(ctx, pat->args.ref.name, pat->args.ref.len);
+        pat_t *def = lookup_ctx(ctx, pat->args.ref.name, pat->args.ref.len);
         if (def) return def;
     }
     return pat;
@@ -266,17 +287,6 @@ static pat_t *get_prerequisite(match_ctx_t *ctx, pat_t *pat)
 __attribute__((nonnull(1,2,3)))
 static match_t *_next_match(match_ctx_t *ctx, const char *str, pat_t *pat, pat_t *skip)
 {
-    if (pat->type == BP_DEFINITIONS || (pat->type == BP_CHAIN && pat->args.multiple.first->type == BP_DEFINITIONS)) {
-        match_ctx_t ctx2 = *ctx;
-        ctx2.cache = &(cache_t){0};
-        ctx2.parent_ctx = ctx;
-        ctx2.defs = pat->type == BP_DEFINITIONS ? pat : pat->args.multiple.first;
-        pat_t *match_pat = pat->type == BP_DEFINITIONS ? pat->args.def.meaning : pat->args.multiple.second;
-        match_t *m = _next_match(&ctx2, str, match_pat, skip);
-        cache_destroy(&ctx2);
-        return m;
-    }
-
     // Clear the cache so it's not full of old cache values from different parts of the file:
     cache_destroy(ctx);
 
@@ -618,7 +628,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
         if (has_cached_failure(ctx, str, pat))
             return NULL;
 
-        pat_t *ref = lookup(ctx, pat->args.ref.name, pat->args.ref.len);
+        pat_t *ref = lookup_ctx(ctx, pat->args.ref.name, pat->args.ref.len);
         if (ref == NULL)
             errx(EXIT_FAILURE, "Unknown identifier: '%.*s'", (int)pat->args.ref.len, pat->args.ref.name);
 
@@ -787,7 +797,7 @@ size_t free_all_matches(void)
 // Iterate over matches.
 // Usage: for (match_t *m = NULL; next_match(&m, ...); ) {...}
 //
-bool next_match(match_t **m, const char *start, const char *end, pat_t *pat, pat_t *skip, bool ignorecase)
+bool next_match(match_t **m, const char *start, const char *end, pat_t *pat, pat_t *defs, pat_t *skip, bool ignorecase)
 {
     const char *pos;
     if (*m) {
@@ -805,6 +815,7 @@ bool next_match(match_t **m, const char *start, const char *end, pat_t *pat, pat
         .start = start,
         .end = end,
         .ignorecase = ignorecase,
+        .defs = defs,
     };
     *m = (pos <= end) ? _next_match(&ctx, pos, pat, skip) : NULL;
     cache_destroy(&ctx);

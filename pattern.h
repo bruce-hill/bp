@@ -120,6 +120,5 @@ void free_all_pats(void);
 __attribute__((nonnull))
 void delete_pat(pat_t **at_pat, bool recursive);
 
-
 #endif
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1,\:0

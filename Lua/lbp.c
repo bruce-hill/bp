@@ -134,13 +134,11 @@ static int Lmatch(lua_State *L)
 
     match_t *m = NULL;
     int ret = 0;
-    pat_t *def_pat = chain_together(builtins, pat);
-    if (next_match(&m, text+index-1, &text[textlen], def_pat, NULL, false)) {
+    if (next_match(&m, text+index-1, &text[textlen], pat, builtins, NULL, false)) {
         push_match(L, m, text);
         stop_matching(&m);
         ret = 1;
     }
-    delete_pat(&def_pat, false);
     return ret;
 }
 
@@ -173,8 +171,8 @@ static int Lreplace(lua_State *L)
     FILE *out = open_memstream(&buf, &size);
     int replacements = 0;
     const char *prev = text;
-    pat_t *rep_pat = chain_together(builtins, maybe_replacement.value.pat);
-    for (match_t *m = NULL; next_match(&m, text, &text[textlen], rep_pat, NULL, false); ) {
+    pat_t *rep_pat = maybe_replacement.value.pat;
+    for (match_t *m = NULL; next_match(&m, text, &text[textlen], rep_pat, builtins, NULL, false); ) {
         fwrite(prev, sizeof(char), (size_t)(m->start - prev), out);
         fprint_match(out, text, m, NULL);
         prev = m->end;
@@ -186,7 +184,7 @@ static int Lreplace(lua_State *L)
     lua_pushinteger(L, replacements);
     fclose(out);
 
-    delete_pat(&maybe_replacement.value.pat, false);
+    delete_pat(&rep_pat, false);
 
     return 2;
 }
@@ -247,9 +245,10 @@ static int Lpat_tostring(lua_State *L)
 static int Lpat_gc(lua_State *L)
 {
     (void)L;
-    // pat_t **at_pat = lua_touserdata(L, 1);
-    // pat_t *pat = *at_pat;
-    // if (pat) delete_pat(at_pat, true);
+    pat_t **at_pat = lua_touserdata(L, 1);
+    pat_t *pat = *at_pat;
+    if (pat) delete_pat(at_pat, true);
+    (void)pat;
     return 0;
 }
 

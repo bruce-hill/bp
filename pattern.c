@@ -169,11 +169,10 @@ pat_t *chain_together(pat_t *first, pat_t *second)
     if (second == NULL) return first;
 
     if (first->type == BP_DEFINITIONS && second->type == BP_DEFINITIONS) {
-        pat_t *second_end = second;
-        while (second_end->args.def.next_def != NULL)
-            second_end = second_end->args.def.next_def;
-        second_end->args.def.next_def = first;
-        return second;
+        pat_t *chain = new_pat(BP_CHAIN, first->start, second->end, second->min_matchlen, second->max_matchlen);
+        chain->args.multiple.first = first;
+        chain->args.multiple.second = second;
+        return chain;
     }
 
     size_t minlen = first->min_matchlen + second->min_matchlen;
@@ -181,23 +180,6 @@ pat_t *chain_together(pat_t *first, pat_t *second)
     pat_t *chain = new_pat(BP_CHAIN, first->start, second->end, minlen, maxlen);
     chain->args.multiple.first = first;
     chain->args.multiple.second = second;
-
-    // If `first` is an UPTO operator (..) or contains one, then let it know
-    // that `second` is what it's up *to*.
-    for (pat_t *p = first; p; ) {
-        if (p->type == BP_UPTO || p->type == BP_UPTO_STRICT) {
-            p->args.multiple.first = second;
-            p->min_matchlen = second->min_matchlen;
-            p->max_matchlen = -1;
-            break;
-        } else if (p->type == BP_CAPTURE) {
-            p = p->args.capture.capture_pat;
-        } else if (p->type == BP_CHAIN) {
-            p = p->args.multiple.second;
-        } else if (p->type == BP_MATCH || p->type == BP_NOT_MATCH) {
-            p = p->args.multiple.first;
-        } else break;
-    }
     return chain;
 }
 
@@ -246,7 +228,7 @@ static pat_t *_bp_definition(const char *start, const char *end)
 // Compile a string of BP code into a BP pattern object.
 //
 __attribute__((nonnull))
-static pat_t *_bp_simplepattern(const char *str, const char *end)
+static pat_t *_bp_simplepattern(const char *str, const char *end, bool inside_stringpattern)
 {
     str = after_spaces(str, false, end);
     if (!*str) return NULL;
@@ -272,6 +254,12 @@ static pat_t *_bp_simplepattern(const char *str, const char *end)
             }
             pat_t *upto = new_pat(type, start, extra_arg ? extra_arg->end : str, 0, -1);
             upto->args.multiple.second = extra_arg;
+            if (inside_stringpattern) {
+                maybe_pat_t target = bp_stringpattern(upto->end, end);
+                upto->args.multiple.first = target.success ? target.value.pat : NULL;
+            } else {
+                upto->args.multiple.first = bp_simplepattern(upto->end, end);
+            }
             return upto;
         } else {
             return new_pat(BP_ANYCHAR, start, str, 1, UTF8_MAXCHARLEN);
@@ -536,9 +524,9 @@ maybe_pat_t bp_stringpattern(const char *str, const char *end)
         for (; str < end; str = next_char(str, end)) {
             if (*str == '\\' && str+1 < end) {
                 if (str[1] == '\\' || isalnum(str[1]))
-                    interp = bp_simplepattern(str, end);
+                    interp = _bp_simplepattern(str, end, true);
                 else
-                    interp = bp_simplepattern(str+1, end);
+                    interp = _bp_simplepattern(str+1, end, true);
                 if (interp) break;
                 // If there is no interpolated value, this is just a plain ol' regular backslash
             }
@@ -567,7 +555,7 @@ maybe_pat_t bp_stringpattern(const char *str, const char *end)
 //
 static pat_t *bp_simplepattern(const char *str, const char *end)
 {
-    pat_t *pat = _bp_simplepattern(str, end);
+    pat_t *pat = _bp_simplepattern(str, end, false);
     if (pat == NULL) return pat;
     str = pat->end;
 

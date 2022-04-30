@@ -28,8 +28,8 @@ __attribute__((nonnull))
 void recycle_match(match_t **at_m);
 size_t free_all_matches(void);
 size_t recycle_all_matches(void);
-bool next_match(match_t **m, const char *start, const char *end, pat_t *pat, pat_t *skip, bool ignorecase);
-#define stop_matching(m) next_match(m, NULL, NULL, NULL, NULL, 0)
+bool next_match(match_t **m, const char *start, const char *end, pat_t *pat, pat_t *defs, pat_t *skip, bool ignorecase);
+#define stop_matching(m) next_match(m, NULL, NULL, NULL, NULL, NULL, 0)
 __attribute__((nonnull))
 match_t *get_numbered_capture(match_t *m, int n);
 __attribute__((nonnull, pure))

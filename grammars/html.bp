@@ -14,9 +14,9 @@ void-element: `< ("area"/"base"/"br"/"col"/"embed"/"hr"/"img"/"input"/"link"/"me
 
 template-element: "<template>" ..%(\n / comment / element) "</template>"
 
-raw-element: `< @tag=("script"/"style"/"textarea"/"title") __attributes__ `> ..%\n "</"tag__`>
+raw-element: `< @tag=("script"/"style"/"textarea"/"title") __attributes__ `> ..%\n ("</"tag__`>)
 
-normal-element: `< @tag=id __attributes__ `> ..%(\n / comment / element) "</"tag__`>
+normal-element: `< @tag=id __attributes__ `> ..%(\n / comment / element) ("</"tag__`>)
 
 comment: "<!--" ..%\n "-->"
 
