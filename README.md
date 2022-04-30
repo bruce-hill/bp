@@ -78,7 +78,8 @@ Pattern            | Meaning
 `(pat1 @keep=pat2) => "@keep"` | Match `pat1` followed by `pat2` and replace it with the text of `pat2`
 `pat1~pat2`        | `pat1` when `pat2` can be found within the result
 `pat1!~pat2`       | `pat1` when `pat2` can not be found within the result
-`name:pat2`        | `name` is defined to mean `pat`
+`name: pat2`       | `name` is defined to mean `pat`
+`name:: pat2`      | `name` is defined to mean `pat` and matches have `name` attached to the result as metadata
 `# line comment`   | A line comment
 
 See `man ./bp.1` for more details.
