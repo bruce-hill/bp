@@ -35,7 +35,8 @@ enum pattype_e {
     BP_END_OF_LINE   = 23,
     BP_WORD_BOUNDARY = 24,
     BP_DEFINITIONS   = 25,
-    BP_LEFTRECURSION = 26,
+    BP_TAGGED        = 26,
+    BP_LEFTRECURSION = 27,
 };
 
 //

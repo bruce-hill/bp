@@ -30,6 +30,9 @@ static int _json_match(const char *text, match_t *m, int comma, bool verbose)
     }
     printf("\",\"range\":[%ld,%ld]", m->start - text, m->end - text);
 
+    if (m->pat->type == BP_TAGGED)
+        printf(",\"tag\":\"%.*s\"", (int)m->pat->args.capture.namelen, m->pat->args.capture.name);
+
     if (m->children && (verbose || m->pat->type != BP_REF)) {
         printf(",\"children\":[");
         for (int i = 0; m->children && m->children[i]; i++)

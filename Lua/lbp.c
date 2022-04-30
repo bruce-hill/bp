@@ -72,7 +72,11 @@ static void push_matchstring(lua_State *L, match_t *m)
 
 static void set_capture_fields(lua_State *L, match_t *m, int *n, const char *start)
 {
-    if (m->pat->type == BP_CAPTURE) {
+    if (m->pat->type == BP_TAGGED) {
+        lua_pushlstring(L, m->pat->args.capture.name, m->pat->args.capture.namelen);
+        lua_setfield(L, -2, "__tag");
+        set_capture_fields(L, m->children[0], n, start);
+    } else if (m->pat->type == BP_CAPTURE) {
         if (m->pat->args.capture.namelen > 0) {
             lua_pushlstring(L, m->pat->args.capture.name, m->pat->args.capture.namelen);
             push_match(L, m->children[0], start);

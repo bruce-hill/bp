@@ -256,7 +256,7 @@ static pat_t *get_prerequisite(match_ctx_t *ctx, pat_t *pat)
             if (p->args.repetitions.min == 0)
                 return p;
             p = p->args.repetitions.repeat_pat; break;
-        case BP_CAPTURE:
+        case BP_CAPTURE: case BP_TAGGED:
             p = p->args.capture.capture_pat; break;
         case BP_CHAIN: {
             pat_t *f = p->args.multiple.first;
@@ -538,7 +538,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
         match_t *after = match(ctx, str, pat->args.pat);
         return after ? new_match(pat, str, str, MATCHES(after)) : NULL;
     }
-    case BP_CAPTURE: {
+    case BP_CAPTURE: case BP_TAGGED: {
         match_t *p = match(ctx, str, pat->args.pat);
         return p ? new_match(pat, str, p->end, MATCHES(p)) : NULL;
     }

@@ -210,6 +210,7 @@ static pat_t *_bp_definition(const char *start, const char *end)
     const char *str = after_name(start, end);
     size_t namelen = (size_t)(str - start);
     if (!matchchar(&str, ':', false, end)) return NULL;
+    bool is_tagged = matchchar(&str, ':', false, end);
     pat_t *def = bp_pattern_nl(str, end, false);
     if (!def) parse_err(str, end, "Could not parse this definition.");
     str = def->end;
@@ -217,6 +218,13 @@ static pat_t *_bp_definition(const char *start, const char *end)
     pat_t *ret = new_pat(BP_DEFINITIONS, start, str, 0, -1);
     ret->args.def.name = start;
     ret->args.def.namelen = namelen;
+    if (is_tagged) { // `id:: foo` means define a rule named `id` that gives captures an `id` tag
+        pat_t *capture = new_pat(BP_TAGGED, def->start, def->end, def->min_matchlen, def->max_matchlen);
+        capture->args.capture.capture_pat = def;
+        capture->args.capture.name = start;
+        capture->args.capture.namelen = namelen;
+        def = capture;
+    }
     ret->args.def.meaning = def;
     ret->args.def.next_def = _bp_definition(after_spaces(str, true, end), end);
     if (ret->args.def.next_def)
@@ -679,7 +687,7 @@ void delete_pat(pat_t **at_pat, bool recursive)
         case BP_REPLACE:
             delete_pat(&pat->args.replace.pat, true);
             break;
-        case BP_CAPTURE:
+        case BP_CAPTURE: case BP_TAGGED:
             delete_pat(&pat->args.capture.capture_pat, true);
             break;
         case BP_NOT: case BP_AFTER: case BP_BEFORE:
