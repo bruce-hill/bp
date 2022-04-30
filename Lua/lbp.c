@@ -73,9 +73,8 @@ static void push_matchstring(lua_State *L, match_t *m)
 static void set_capture_fields(lua_State *L, match_t *m, int *n, const char *start)
 {
     if (m->pat->type == BP_TAGGED) {
-        lua_pushlstring(L, m->pat->args.capture.name, m->pat->args.capture.namelen);
-        lua_setfield(L, -2, "__tag");
-        set_capture_fields(L, m->children[0], n, start);
+        push_match(L, m, start);
+        lua_seti(L, -2, (*n)++);
     } else if (m->pat->type == BP_CAPTURE) {
         if (m->pat->args.capture.namelen > 0) {
             lua_pushlstring(L, m->pat->args.capture.name, m->pat->args.capture.namelen);
@@ -83,22 +82,38 @@ static void set_capture_fields(lua_State *L, match_t *m, int *n, const char *sta
             lua_settable(L, -3);
         } else {
             push_match(L, m->children[0], start);
-            lua_seti(L, -2, *(n++));
+            lua_seti(L, -2, (*n)++);
         }
     } else if (m->children) {
-        for (int i = 0; m->children[i]; i++)
-            set_capture_fields(L, m->children[i], n, start);
+        for (int i = 0; m->children[i]; i++) {
+            if (m->children[i]->pat->type == BP_TAGGED) {
+                push_match(L, m->children[i], start);
+                lua_seti(L, -2, (*n)++);
+            } else {
+                set_capture_fields(L, m->children[i], n, start);
+            }
+        }
     }
 }
 
 static void push_match(lua_State *L, match_t *m, const char *start)
 {
+    // Given tag::id,
+    // Case 1: (@id _ tag _ @id)  -> {[0]="foo baz qux", 1={[0]="foo", __tag="tag"}, 2={[0]="qux"}}
+    // Case 2: (@id _ @tag _ @id) -> {[0]="foo baz qux", 1={[0]="foo"}, 2={[0]="baz", 1={[0]="baz", __tag="tag"}}, 3={[0]="qux"}}
+    // Case 3: (@id @(_tag_) @id) -> {[0]="foo baz qux", 1={[0]="foo"}, 2={[0]=" baz ", 1={[0]="baz", __tag="tag"}}, 3={[0]="qux"}}
+    // Case 4: (@first=id _ @second=tag _ @third=id) -> {[0]="foo baz qux", first={[0]="foo"}, second={[0]="baz", 1={[0]="baz", __tag="tag"}}, third={[0]="qux"}}
     lua_createtable(L, 1, 2);
     lua_pushlightuserdata(L, (void*)&MATCH_METATABLE);
     lua_gettable(L, LUA_REGISTRYINDEX);
     lua_setmetatable(L, -2);
     push_matchstring(L, m);
     lua_seti(L, -2, 0);
+
+    if (m->pat->type == BP_TAGGED) {
+        lua_pushlstring(L, m->pat->args.capture.name, m->pat->args.capture.namelen);
+        lua_setfield(L, -2, "__tag");
+    }
 
     int capture_num = 1;
     for (int i = 0; m->children && m->children[i]; i++)
