@@ -565,7 +565,22 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
         if (m1->pat->type == BP_CAPTURE && m1->pat->args.capture.name) {
             // Temporarily add a rule that the backref name matches the
             // exact string of the original match (no replacements)
-            pat_t *backref = bp_raw_literal(m1->start, (size_t)(m1->end - m1->start));
+            pat_t *backref;
+            if (m1->children && m1->children[0]->pat->type == BP_CURDENT) {
+                const char *linestart = m1->start;
+                while (linestart > ctx->start && linestart[-1] != '\n') --linestart;
+
+                // Current indentation:
+                char denter = *linestart;
+                size_t dents = 0;
+                if (denter == ' ' || denter == '\t') {
+                    while (linestart[dents] == denter && &linestart[dents] < ctx->end)
+                        ++dents;
+                }
+                backref = bp_raw_literal(linestart, dents);
+            } else {
+                backref = bp_raw_literal(m1->start, (size_t)(m1->end - m1->start));
+            }
             match_ctx_t ctx2 = *ctx;
             ctx2.cache = &(cache_t){0};
             ctx2.parent_ctx = ctx;
@@ -710,6 +725,9 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
             if (&str[i] >= ctx->end || str[i] != denter) return NULL;
 
         return new_match(pat, start, &str[dents], NULL);
+    }
+    case BP_CURDENT: {
+        return new_match(pat, str, str, NULL);
     }
     default: {
         errx(EXIT_FAILURE, "Unknown pattern type: %u", pat->type);

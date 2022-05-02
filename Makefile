@@ -25,13 +25,13 @@ ALL_FLAGS=$(CFLAGS) $(OSFLAGS) -DBP_NAME="\"$(NAME)\"" $(EXTRA) $(CWARN) $(G) $(
 CFILES=pattern.c utils.c match.c files.c printmatch.c json.c utf8.c
 OBJFILES=$(CFILES:.c=.o)
 
+$(NAME): $(OBJFILES) bp.c
+	$(CC) $(ALL_FLAGS) -o $@ $(OBJFILES) bp.c
+
 all: $(NAME) bp.1 lua
 
 %.o: %.c %.h utf8.h
 	$(CC) -c $(ALL_FLAGS) -o $@ $<
-
-$(NAME): $(OBJFILES) bp.c
-	$(CC) $(ALL_FLAGS) -o $@ $(OBJFILES) bp.c
 
 bp.1: bp.1.md
 	pandoc --lua-filter=.pandoc/bold-code.lua -s $< -t man -o $@
@@ -43,7 +43,7 @@ clean:
 	rm -f $(NAME) $(OBJFILES)
 
 lua:
-	cd Lua && make
+	@cd Lua && make
 
 test: $(NAME)
 	./$(NAME) Comment -r '[@0]' >/dev/null

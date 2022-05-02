@@ -320,6 +320,9 @@ static pat_t *_bp_simplepattern(const char *str, const char *end, bool inside_st
             if (*str == 'N') { // \N (nodent)
                 all = either_pat(all, new_pat(BP_NODENT, itemstart, ++str, 1, -1));
                 continue;
+            } else if (*str == 'C') { // \C (current indent)
+                all = either_pat(all, new_pat(BP_CURDENT, itemstart, ++str, 1, -1));
+                continue;
             } else if (*str == 'i') { // \i (identifier char)
                 all = either_pat(all, new_pat(BP_ID_CONTINUE, itemstart, ++str, 1, -1));
                 continue;

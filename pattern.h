@@ -29,14 +29,15 @@ enum pattype_e {
     BP_REPLACE       = 17,
     BP_REF           = 18,
     BP_NODENT        = 19,
-    BP_START_OF_FILE = 20,
-    BP_START_OF_LINE = 21,
-    BP_END_OF_FILE   = 22,
-    BP_END_OF_LINE   = 23,
-    BP_WORD_BOUNDARY = 24,
-    BP_DEFINITIONS   = 25,
-    BP_TAGGED        = 26,
-    BP_LEFTRECURSION = 27,
+    BP_CURDENT       = 20,
+    BP_START_OF_FILE = 21,
+    BP_START_OF_LINE = 22,
+    BP_END_OF_FILE   = 23,
+    BP_END_OF_LINE   = 24,
+    BP_WORD_BOUNDARY = 25,
+    BP_DEFINITIONS   = 26,
+    BP_TAGGED        = 27,
+    BP_LEFTRECURSION = 28,
 };
 
 //
