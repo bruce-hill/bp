@@ -667,7 +667,9 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
             while (1) {
                 const char *prev = m->end;
                 rec_op.args.leftrec.match = m;
+                ctx2.cache = &(cache_t){0};
                 match_t *m2 = match(&ctx2, str, ref);
+                cache_destroy(&ctx2);
                 if (!m2) break;
                 if (m2->end <= prev) {
                     recycle_match(&m2);
