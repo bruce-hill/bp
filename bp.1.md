@@ -169,8 +169,15 @@ can be combined with a comma (e.g. `` `a-z,A-Z ``).
 : Any one of the given escape sequences or ranges *esc1* or *esc2* (e.g. `\r,n,x01-x04`)
 
 `\N`
-: A special case escape that matches a "nodent": one or more newlines followed
-by the same indentation that occurs on the current line.
+: A special escape that matches a "nodent": one or more newlines followed by
+the same indentation that occurs on the current line.
+
+`\C`
+: A special escape that always matches the empty string and replaces it with
+the indentation of the line on which it matched. For example, this pattern
+would match Bash-style heredocs that start with "<<-FOO" and end with a line
+containing only the starting indentation and the string "FOO":
+`"<<-" @end=(\C id) ..%\n (^end$)`
 
 `\i`
 : An identifier character (e.g. alphanumeric characters or underscores).
