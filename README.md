@@ -3,6 +3,8 @@
 BP is a parsing expression grammar (PEG) tool for the command line.
 It's written in pure C with no dependencies.
 
+![Image preview](bp.png)
+
 
 ## Tutorial
 
