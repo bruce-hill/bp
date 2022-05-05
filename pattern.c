@@ -566,6 +566,7 @@ maybe_pat_t bp_stringpattern(const char *str, const char *end)
 //
 static pat_t *bp_simplepattern(const char *str, const char *end)
 {
+    const char *start = str;
     pat_t *pat = _bp_simplepattern(str, end, false);
     if (pat == NULL) return pat;
     str = pat->end;
@@ -584,7 +585,7 @@ static pat_t *bp_simplepattern(const char *str, const char *end)
         if (!second)
             parse_err(str, str, "There should be a valid pattern here");
 
-        pat = new_pat(type, str, second->end, first->min_matchlen, first->max_matchlen);
+        pat = new_pat(type, start, second->end, first->min_matchlen, first->max_matchlen);
         pat->args.multiple.first = first;
         pat->args.multiple.second = second;
         str = pat->end;
