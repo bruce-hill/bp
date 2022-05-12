@@ -74,8 +74,9 @@ Pattern            | Meaning
 `+pat`             | 1 or more occurrences of `pat` (shorthand for `1+pat`)
 `<pat`             | `pat` matches just before the current position (lookbehind)
 `>pat`             | `pat` matches just in front of the current position (lookahead)
-`@pat`             | Capture `pat` (used for text replacement and backreferences)
-`@foo=pat`         | Let `foo` be the text of `pat` (used for text replacement and backreferences)
+`@pat`             | Capture `pat` (used for text replacement)
+`@foo=pat`         | Capture `pat` with the name `foo` attached (used for text replacement)
+`@foo:pat`         | Let `foo` be the text of `pat` (used for backreferences)
 `pat => "replacement"` | Match `pat` and replace it with `replacement`
 `(pat1 @keep=pat2) => "@keep"` | Match `pat1` followed by `pat2` and replace it with the text of `pat2`
 `pat1~pat2`        | `pat1` when `pat2` can be found within the result

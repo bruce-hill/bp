@@ -82,6 +82,7 @@ typedef struct pat_s {
             struct pat_s *capture_pat;
             const char *name;
             size_t namelen;
+            bool backreffable;
         } capture;
         struct {
             struct match_s *match;

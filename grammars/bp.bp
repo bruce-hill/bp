@@ -6,7 +6,7 @@
 # language grammars.
 
 Grammar: __ *(Def [__`;])%__ __ [@error=(+(./\n) => "Could not parse this code: @0")]
-Def: @name=id __ `: __ (
+Def: @name=id __ 1-2`: __ (
       @definition=extended-pat
     / $$ @error=(=>"No definition for rule")
     / @error=(..%\n>(`;/id_`:/$) => "Invalid definition: @0"))
@@ -62,7 +62,7 @@ Repeat: (
 Optional: `[ __ extended-pat (__`] / @error=(=>"Expected closing square bracket here"))
 After: `< __ pat
 Before: `> __ pat
-Capture: `@ [__ @capture-name=(id/`!) __ !"=>" `=] __ (@capture=pat / @error=(=>"Expected pattern to capture"))
+Capture: `@ [__ @capture-name=(id/`!) __ !"=>" `=,:] __ (@capture=pat / @error=(=>"Expected pattern to capture"))
 Replace: (
       @replace-pat=[Chain-noreplace / pat] __ "=>" (__ @replacement=String / @error=(=>"Expected replacement string"))
     )

@@ -6,8 +6,8 @@
 # full parse tree, and having one makes the task considerably more complicated.
 # See the accompanying README.md for more info.
 
-comment: "--" (`[ @eqs=*`= `[ ..%\n (`]eqs`]) / ..$)
-string: `"..%string-escape `" / `' ..%string-escape `' / `[ @eqs=*`= `[ ..%\n (`]eqs`])
+comment: "--" (`[ @eqs:*`= `[ ..%\n (`]eqs`]) / ..$)
+string: `"..%string-escape `" / `' ..%string-escape `' / `[ @eqs:*`= `[ ..%\n (`]eqs`])
 table: `{ ..%(table/string/comment/\n) `}
 keyword: ("and" / "break" / "do" / "else" / "elseif" / "end" / "false" / "for" /
     "function" / "goto" / "if" / "in" / "local" / "nil" / "not" / "or" /

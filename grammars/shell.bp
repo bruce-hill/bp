@@ -7,7 +7,7 @@
 # See the accompanying README.md for more info.
 
 comment: `#..$
-string: `" ..%(string-escape / subcommand / \n) `" / `' ..%\n `' / "<<" _ @delim=id _$ ..%\n (^delim$)
+string: `" ..%(string-escape / subcommand / \n) `" / `' ..%\n `' / "<<" _ @delim:id _$ ..%\n (^delim$)
 string-escape: `\ `",`
 subcommand: `` ..%\n `` / "$" (parens/braces)
 keyword: ("echo" / "read" / "set" / "unset" / "readonly" / "shift" / "export" / "if" / "fi" /

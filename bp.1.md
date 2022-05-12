@@ -252,7 +252,7 @@ against the edges file or line.
 : Matches *pat*, but does not consume any input (lookahead).
 
 `@` *pat*
-: Capture *pat*
+: Capture *pat*. Captured patterns can be used in replacements.
 
 `foo`
 : The named pattern whose name is **"foo"**. Pattern names come from
@@ -260,10 +260,14 @@ definitions in grammar files or from named captures. Pattern names may contain
 dashes (`-`), but not underscores (`_`), since the underscore is used to match
 whitespace. See the **GRAMMAR FILES** section for more info.
 
+`@` *name* `:` *pat*
+: For the rest of the current chain, define *name* to match whatever *pat*
+matches, i.e. a backreference. For example, `` @foo:word `( foo `) `` (matches
+**"asdf(asdf)"** or **"baz(baz)"**, but not **"foo(baz)"**)
+
 `@` *name* `=` *pat*
-: Let *name* equal *pat* (named capture). Named captures can be used as
-backreferences like so: `` @foo=word `( foo `) `` (matches **"asdf(asdf)"** or
-**"baz(baz)"**, but not **"foo(baz)"**)
+: Let *name* equal *pat* (named capture). Named captures can be used in
+text replacements.
 
 *pat* `=>` `"`*replacement*`"`
 : Replace *pat* with *replacement*. Note: *replacement* should be a string

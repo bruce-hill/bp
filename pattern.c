@@ -479,7 +479,13 @@ static pat_t *_bp_simplepattern(const char *str, const char *end, bool inside_st
         size_t namelen = 0;
         const char *a = after_name(str, end);
         const char *eq = a;
-        if (a > str && !matchstr(&eq, "=>", false, end) && matchchar(&eq, '=', false, end)) {
+        bool backreffable = false;
+        if (a > str && matchchar(&eq, ':', false, end)) {
+            name = str;
+            namelen = (size_t)(a-str);
+            str = eq;
+            backreffable = true;
+        } else if (a > str && !matchstr(&eq, "=>", false, end) && matchchar(&eq, '=', false, end)) {
             name = str;
             namelen = (size_t)(a-str);
             str = eq;
@@ -492,6 +498,7 @@ static pat_t *_bp_simplepattern(const char *str, const char *end, bool inside_st
         capture->args.capture.capture_pat = pat;
         capture->args.capture.name = name;
         capture->args.capture.namelen = namelen;
+        capture->args.capture.backreffable = backreffable;
         return capture;
     }
     // Start of file/line

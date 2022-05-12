@@ -562,7 +562,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
 
         match_t *m2;
         // Push backrefs and run matching, then cleanup
-        if (m1->pat->type == BP_CAPTURE && m1->pat->args.capture.name) {
+        if (m1->pat->type == BP_CAPTURE && m1->pat->args.capture.name && m1->pat->args.capture.backreffable) {
             // Temporarily add a rule that the backref name matches the
             // exact string of the original match (no replacements)
             pat_t *backref;

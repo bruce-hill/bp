@@ -305,7 +305,8 @@ against the edges file or line.
 Matches \f[I]pat\f[R], but does not consume any input (lookahead).
 .TP
 \f[B]\[at]\f[R] \f[I]pat\f[R]
-Capture \f[I]pat\f[R]
+Capture \f[I]pat\f[R].
+Captured patterns can be used in replacements.
 .TP
 \f[B]foo\f[R]
 The named pattern whose name is \f[B]\[lq]foo\[rq]\f[R].
@@ -315,11 +316,16 @@ Pattern names may contain dashes (\f[B]-\f[R]), but not underscores
 (\f[B]_\f[R]), since the underscore is used to match whitespace.
 See the \f[B]GRAMMAR FILES\f[R] section for more info.
 .TP
+\f[B]\[at]\f[R] \f[I]name\f[R] \f[B]:\f[R] \f[I]pat\f[R]
+For the rest of the current chain, define \f[I]name\f[R] to match
+whatever \f[I]pat\f[R] matches, i.e.\ a backreference.
+For example, \f[B]\[at]foo:word \[ga]( foo \[ga])\f[R] (matches
+\f[B]\[lq]asdf(asdf)\[rq]\f[R] or \f[B]\[lq]baz(baz)\[rq]\f[R], but not
+\f[B]\[lq]foo(baz)\[rq]\f[R])
+.TP
 \f[B]\[at]\f[R] \f[I]name\f[R] \f[B]=\f[R] \f[I]pat\f[R]
 Let \f[I]name\f[R] equal \f[I]pat\f[R] (named capture).
-Named captures can be used as backreferences like so: \f[B]\[at]foo=word
-\[ga]( foo \[ga])\f[R] (matches \f[B]\[lq]asdf(asdf)\[rq]\f[R] or
-\f[B]\[lq]baz(baz)\[rq]\f[R], but not \f[B]\[lq]foo(baz)\[rq]\f[R])
+Named captures can be used in text replacements.
 .TP
 \f[I]pat\f[R] \f[B]=>\f[R] \f[B]\[dq]\f[R]\f[I]replacement\f[R]\f[B]\[dq]\f[R]
 Replace \f[I]pat\f[R] with \f[I]replacement\f[R].
