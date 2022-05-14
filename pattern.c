@@ -210,7 +210,7 @@ static pat_t *_bp_definition(const char *start, const char *end)
     const char *str = after_name(start, end);
     size_t namelen = (size_t)(str - start);
     if (!matchchar(&str, ':', false, end)) return NULL;
-    bool is_tagged = matchchar(&str, ':', false, end);
+    bool is_tagged = str < end && *str == ':' && matchchar(&str, ':', false, end);
     pat_t *def = bp_pattern_nl(str, end, false);
     if (!def) parse_err(str, end, "Could not parse this definition.");
     str = def->end;
