@@ -5,6 +5,7 @@
 #define PATTERN__H
 
 #include <stdbool.h>
+#include <sys/types.h>
 
 #define UNBOUNDED(pat) ((pat)->max_matchlen == -1)
 

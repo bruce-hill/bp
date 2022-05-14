@@ -22,13 +22,18 @@ G=
 O=-O3
 ALL_FLAGS=$(CFLAGS) $(OSFLAGS) -DBP_NAME="\"$(NAME)\"" $(EXTRA) $(CWARN) $(G) $(O)
 
+LIBFILE=lib$(NAME).so
 CFILES=pattern.c utils.c match.c files.c printmatch.c json.c utf8.c
+HFILES=files.h json.h match.h pattern.h printmatch.h utf8.h utils.h
 OBJFILES=$(CFILES:.c=.o)
 
 $(NAME): $(OBJFILES) bp.c
 	$(CC) $(ALL_FLAGS) -o $@ $(OBJFILES) bp.c
 
-all: $(NAME) bp.1 lua
+$(LIBFILE): $(OBJFILES)
+	$(CC) $^ $(ALL_FLAGS) -Wl,-soname,$(LIBFILE) -shared -o $@
+
+all: $(NAME) $(LIBFILE) bp.1 lua
 
 %.o: %.c %.h utf8.h
 	$(CC) -c $(ALL_FLAGS) -o $@ $<
@@ -76,6 +81,11 @@ install: $(NAME) bp.1
 	rm -f "$(PREFIX)/bin/$(NAME)"
 	cp $(NAME) "$(PREFIX)/bin/"
 
+install-lib: $(LIBFILE) bp.1
+	mkdir -p -m 755 "$(PREFIX)/lib" "$(PREFIX)/include/$(NAME)"
+	cp $(LIBFILE) "$(PREFIX)/lib"
+	cp $(HFILES) "$(PREFIX)/include/$(NAME)"
+
 uninstall:
 	rm -rf "$(PREFIX)/bin/$(NAME)" "$(PREFIX)/man/man1/$(NAME).1" "$(SYSCONFDIR)/$(NAME)"
 	@if [ -d ~/.config/$(NAME) ]; then \
@@ -84,4 +94,4 @@ uninstall:
 	  [ "$$confirm" != n ] && rm -rf ~/.config/$(NAME); \
 	fi
 
-.PHONY: all clean install uninstall leaktest splint test tutorial lua
+.PHONY: all clean install install-lib uninstall leaktest splint test tutorial lua
