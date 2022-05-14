@@ -291,10 +291,12 @@ contain the word **"IGNORE"**)
 *name*`:` *pat*
 : Define *name* to mean *pat* (pattern definition)
 
+`:`*name* *pat*
+: Match *pat* and tag it with the given name as metadata.
+
 *name*`::` *pat*
-: Define *name* to be a special tagged pattern *pat*. This is the same as a
-regular definition, except that a piece of metadata is attached to it
-associating it with the specified name.
+: Syntactic sugar for *name*`::` `:`*name* *pat* (define a pattern that also
+attaches a metadata tag of the same name)
 
 `#` *comment*
 : A line comment

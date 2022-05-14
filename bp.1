@@ -355,10 +355,13 @@ not contain the word \f[B]\[lq]IGNORE\[rq]\f[R])
 \f[I]name\f[R]\f[B]:\f[R] \f[I]pat\f[R]
 Define \f[I]name\f[R] to mean \f[I]pat\f[R] (pattern definition)
 .TP
+\f[B]:\f[R]\f[I]name\f[R] \f[I]pat\f[R]
+Match \f[I]pat\f[R] and tag it with the given name as metadata.
+.TP
 \f[I]name\f[R]\f[B]::\f[R] \f[I]pat\f[R]
-Define \f[I]name\f[R] to be a special tagged pattern \f[I]pat\f[R].
-This is the same as a regular definition, except that a piece of
-metadata is attached to it associating it with the specified name.
+Syntactic sugar for \f[I]name\f[R]\f[B]::\f[R] \f[B]:\f[R]\f[I]name\f[R]
+\f[I]pat\f[R] (define a pattern that also attaches a metadata tag of the
+same name)
 .TP
 \f[B]#\f[R] \f[I]comment\f[R]
 A line comment

@@ -513,6 +513,22 @@ static pat_t *_bp_simplepattern(const char *str, const char *end, bool inside_st
             return new_pat(BP_END_OF_FILE, start, ++str, 0, 0);
         return new_pat(BP_END_OF_LINE, start, str, 0, 0);
     }
+    // Tagged pattern :Tag: pat...
+    case ':': {
+        const char *name = str;
+        str = after_name(name, end);
+        if (str == name)
+            parse_err(start, str, "There should be an identifier after this ':'");
+        size_t namelen = (size_t)(str - name);
+
+        pat_t *p = bp_simplepattern(str, end);
+        if (p) str = p->end;
+        pat_t *tagged = new_pat(BP_TAGGED, start, str, p ? p->min_matchlen : 0, p ? p->max_matchlen : 0);
+        tagged->args.capture.capture_pat = p;
+        tagged->args.capture.name = start;
+        tagged->args.capture.namelen = namelen;
+        return tagged;
+    }
     default: {
         pat_t *def = _bp_definition(start, end);
         if (def) return def;

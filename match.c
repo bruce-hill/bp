@@ -539,6 +539,8 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
         return after ? new_match(pat, str, str, MATCHES(after)) : NULL;
     }
     case BP_CAPTURE: case BP_TAGGED: {
+        if (!pat->args.pat)
+            return new_match(pat, str, str, NULL);
         match_t *p = match(ctx, str, pat->args.pat);
         return p ? new_match(pat, str, p->end, MATCHES(p)) : NULL;
     }
