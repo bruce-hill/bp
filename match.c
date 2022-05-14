@@ -49,12 +49,31 @@ typedef struct match_ctx_s {
 static match_t *unused_matches = NULL;
 static match_t *in_use_matches = NULL;
 
+static void default_error_handler(pat_t *pat, const char *msg) {
+    (void)pat;
+    errx(EXIT_FAILURE, "%s", msg);
+}
+
+static bp_errhand_t error_handler = default_error_handler;
+
 #define MATCHES(...) (match_t*[]){__VA_ARGS__, NULL}
 
 __attribute__((hot, nonnull(1,2,3)))
 static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat);
 __attribute__((returns_nonnull))
 static match_t *new_match(pat_t *pat, const char *start, const char *end, match_t *children[]);
+
+__attribute__((format(printf,2,3)))
+static inline void match_error(pat_t *pat, const char *fmt, ...)
+{
+    va_list args;
+    va_start(args, fmt);
+    char buf[256];
+    vsnprintf(buf, sizeof(buf)-1, fmt, args);
+    va_end(args);
+    if (error_handler)
+        error_handler(pat, buf);
+}
 
 static match_t *clone_match(match_t *m)
 {
@@ -207,7 +226,8 @@ static pat_t *_lookup_def(pat_t *defs, const char *name, size_t namelen)
                 return defs->args.def.meaning;
             defs = defs->args.def.next_def;
         } else {
-            errx(1, "Invalid pattern type in definitions");
+            match_error(defs, "Invalid pattern type in definitions");
+            return NULL;
         }
     }
     return NULL;
@@ -646,8 +666,10 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
             return NULL;
 
         pat_t *ref = lookup_ctx(ctx, pat->args.ref.name, pat->args.ref.len);
-        if (ref == NULL)
-            errx(EXIT_FAILURE, "Unknown identifier: '%.*s'", (int)pat->args.ref.len, pat->args.ref.name);
+        if (ref == NULL) {
+            match_error(pat, "Unknown pattern: '%.*s'", (int)pat->args.ref.len, pat->args.ref.name);
+            return NULL;
+        }
 
         if (ref->type == BP_LEFTRECURSION)
             return match(ctx, str, ref);
@@ -732,7 +754,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
         return new_match(pat, str, str, NULL);
     }
     default: {
-        errx(EXIT_FAILURE, "Unknown pattern type: %u", pat->type);
+        match_error(pat, "Unknown pattern type: %u", pat->type);
         return NULL;
     }
     }
@@ -830,7 +852,10 @@ bool next_match(match_t **m, const char *start, const char *end, pat_t *pat, pat
         pos = start;
     }
 
-    if (!pat) return false;
+    if (!pat) {
+        error_handler = default_error_handler;
+        return false;
+    }
 
     match_ctx_t ctx = {
         .cache = &(cache_t){0},
@@ -842,6 +867,17 @@ bool next_match(match_t **m, const char *start, const char *end, pat_t *pat, pat
     *m = (pos <= end) ? _next_match(&ctx, pos, pat, skip) : NULL;
     cache_destroy(&ctx);
     return *m != NULL;
+}
+
+//
+// Wrapper for next_match() that sets an error handler
+//
+bool next_match_safe(match_t **m, const char *start, const char *end, pat_t *pat, pat_t *defs, pat_t *skip, bool ignorecase, bp_errhand_t errhand)
+{
+    error_handler = errhand;
+    bool ret = next_match(m, start, end, pat, defs, skip, ignorecase);
+    error_handler = default_error_handler;
+    return ret;
 }
 
 //

@@ -31,6 +31,16 @@ static pat_t *builtins;
 
 static void push_match(lua_State *L, match_t *m, const char *start);
 
+lua_State *cur_state = NULL;
+
+static void match_error(pat_t *pat, const char *msg)
+{
+    (void)pat;
+    recycle_all_matches();
+    lua_pushstring(cur_state, msg);
+    lua_error(cur_state);
+}
+
 static inline void raise_parse_error(lua_State *L, maybe_pat_t m)
 {
     size_t err_len = (size_t)(m.value.error.end - m.value.error.start);
@@ -153,7 +163,8 @@ static int Lmatch(lua_State *L)
 
     match_t *m = NULL;
     int ret = 0;
-    if (next_match(&m, text+index-1, &text[textlen], pat, builtins, NULL, false)) {
+    cur_state = L;
+    if (next_match_safe(&m, text+index-1, &text[textlen], pat, builtins, NULL, false, match_error)) {
         push_match(L, m, text);
         stop_matching(&m);
         ret = 1;
@@ -191,7 +202,8 @@ static int Lreplace(lua_State *L)
     int replacements = 0;
     const char *prev = text;
     pat_t *rep_pat = maybe_replacement.value.pat;
-    for (match_t *m = NULL; next_match(&m, text, &text[textlen], rep_pat, builtins, NULL, false); ) {
+    cur_state = L;
+    for (match_t *m = NULL; next_match_safe(&m, text, &text[textlen], rep_pat, builtins, NULL, false, match_error); ) {
         fwrite(prev, sizeof(char), (size_t)(m->start - prev), out);
         fprint_match(out, text, m, NULL);
         prev = m->end;

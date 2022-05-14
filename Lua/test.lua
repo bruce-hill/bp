@@ -54,3 +54,10 @@ print(pat:replace("{@0}", "...baz..."))
 for m in pat:matches("hello world") do
     print(m)
 end
+
+
+local ok, err = pcall(function()
+    bp.match("nonexistent", "xxx")
+end)
+assert(not ok)
+print("(Successfully caught pattern matching error)")
