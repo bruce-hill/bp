@@ -513,13 +513,14 @@ static pat_t *_bp_simplepattern(const char *str, const char *end, bool inside_st
             return new_pat(BP_END_OF_FILE, start, ++str, 0, 0);
         return new_pat(BP_END_OF_LINE, start, str, 0, 0);
     }
-    // Tagged pattern :Tag: pat...
+    // Tagged pattern :Tag:pat...
     case ':': {
         const char *name = str;
         str = after_name(name, end);
         if (str == name)
             parse_err(start, str, "There should be an identifier after this ':'");
         size_t namelen = (size_t)(str - name);
+        (void)matchchar(&str, ':', false, end); // Optional second colon for :Tag:foo instead of :Tag(foo)
 
         pat_t *p = bp_simplepattern(str, end);
         if (p) str = p->end;
