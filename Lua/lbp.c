@@ -80,39 +80,45 @@ static void push_matchstring(lua_State *L, match_t *m)
     fclose(out);
 }
 
-static void set_capture_fields(lua_State *L, match_t *m, int *n, const char *start)
+static match_t *get_first_capture(match_t *m)
 {
     if (m->pat->type == BP_TAGGED) {
-        push_match(L, m, start);
-        lua_seti(L, -2, (*n)++);
-    } else if (m->pat->type == BP_CAPTURE) {
-        if (m->pat->args.capture.namelen > 0) {
-            lua_pushlstring(L, m->pat->args.capture.name, m->pat->args.capture.namelen);
-            push_match(L, m->children[0], start);
-            lua_settable(L, -3);
-        } else {
-            push_match(L, m->children[0], start);
-            lua_seti(L, -2, (*n)++);
-        }
+        return m;
+    } else if (m->pat->type == BP_CAPTURE && !m->pat->args.capture.name) {
+        return m;
     } else if (m->children) {
         for (int i = 0; m->children[i]; i++) {
-            if (m->children[i]->pat->type == BP_TAGGED) {
-                push_match(L, m->children[i], start);
-                lua_seti(L, -2, (*n)++);
-            } else {
-                set_capture_fields(L, m->children[i], n, start);
-            }
+            match_t *cap = get_first_capture(m->children[i]);
+            if (cap) return cap;
         }
+    }
+    return NULL;
+}
+
+static void set_capture_fields(lua_State *L, match_t *m, int *n, const char *start)
+{
+    if (m->pat->type == BP_CAPTURE) {
+        match_t *cap = get_first_capture(m->children[0]);
+        if (!cap) cap = m->children[0];
+        if (m->pat->args.capture.namelen > 0) {
+            lua_pushlstring(L, m->pat->args.capture.name, m->pat->args.capture.namelen);
+            push_match(L, cap, start);
+            lua_settable(L, -3);
+        } else {
+            push_match(L, cap, start);
+            lua_seti(L, -2, (*n)++);
+        }
+    } else if (m->pat->type == BP_TAGGED) {
+        push_match(L, m, start);
+        lua_seti(L, -2, (*n)++);
+    } else if (m->children) {
+        for (int i = 0; m->children[i]; i++)
+            set_capture_fields(L, m->children[i], n, start);
     }
 }
 
 static void push_match(lua_State *L, match_t *m, const char *start)
 {
-    // Given tag::id,
-    // Case 1: (@id _ tag _ @id)  -> {[0]="foo baz qux", 1={[0]="foo", __tag="tag"}, 2={[0]="qux"}}
-    // Case 2: (@id _ @tag _ @id) -> {[0]="foo baz qux", 1={[0]="foo"}, 2={[0]="baz", 1={[0]="baz", __tag="tag"}}, 3={[0]="qux"}}
-    // Case 3: (@id @(_tag_) @id) -> {[0]="foo baz qux", 1={[0]="foo"}, 2={[0]=" baz ", 1={[0]="baz", __tag="tag"}}, 3={[0]="qux"}}
-    // Case 4: (@first=id _ @second=tag _ @third=id) -> {[0]="foo baz qux", first={[0]="foo"}, second={[0]="baz", 1={[0]="baz", __tag="tag"}}, third={[0]="qux"}}
     lua_createtable(L, 1, 2);
     lua_pushlightuserdata(L, (void*)&MATCH_METATABLE);
     lua_gettable(L, LUA_REGISTRYINDEX);

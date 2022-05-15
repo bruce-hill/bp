@@ -43,7 +43,7 @@ const char *after_spaces(const char *str, bool skip_nl, const char *end)
 //
 const char *after_name(const char *str, const char *end)
 {
-    if (str >= end) return NULL;
+    if (str >= end) return end;
     if (*str == '|') return &str[1];
     if (*str == '^' || *str == '_' || *str == '$') {
         return (&str[1] < end && str[1] == *str) ? &str[2] : &str[1];
