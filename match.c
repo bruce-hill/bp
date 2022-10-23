@@ -886,10 +886,13 @@ bool next_match_safe(match_t **m, const char *start, const char *end, pat_t *pat
 __attribute__((nonnull))
 static match_t *_get_numbered_capture(match_t *m, int *n)
 {
-    if (*n == 0) return m;
-    if (m->pat->type == BP_CAPTURE && m->pat->args.capture.namelen == 0) {
+    if (m->pat->type == BP_CAPTURE && m->pat->args.capture.namelen > 0)
+        return NULL;
+
+    if ((m->pat->type == BP_CAPTURE && m->pat->args.capture.namelen == 0) || m->pat->type == BP_TAGGED) {
         if (*n == 1) return m;
-        --(*n);
+        else return NULL;
+        // --(*n);
     }
     if (m->children) {
         for (int i = 0; m->children[i]; i++) {
@@ -905,14 +908,22 @@ static match_t *_get_numbered_capture(match_t *m, int *n)
 //
 match_t *get_numbered_capture(match_t *m, int n)
 {
-    return _get_numbered_capture(m, &n);
+    if (n <= 0) return m;
+    if (m->children) {
+        for (int i = 0; m->children[i]; i++) {
+            match_t *cap = _get_numbered_capture(m->children[i], &n);
+            if (cap) return cap;
+        }
+    }
+    return NULL;
 }
 
 //
 // Get a capture with a specific name.
 //
-match_t *get_named_capture(match_t *m, const char *name, size_t namelen)
+match_t *get_named_capture(match_t *m, const char *name, ssize_t _namelen)
 {
+    size_t namelen = _namelen < 0 ? strlen(name) : (size_t)_namelen;
     if (m->pat->type == BP_CAPTURE && m->pat->args.capture.name
         && m->pat->args.capture.namelen == namelen
         && strncmp(m->pat->args.capture.name, name, m->pat->args.capture.namelen) == 0)

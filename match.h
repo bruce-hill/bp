@@ -37,7 +37,7 @@ bool next_match_safe(match_t **m, const char *start, const char *end, pat_t *pat
 __attribute__((nonnull))
 match_t *get_numbered_capture(match_t *m, int n);
 __attribute__((nonnull, pure))
-match_t *get_named_capture(match_t *m, const char *name, size_t namelen);
+match_t *get_named_capture(match_t *m, const char *name, ssize_t namelen);
 
 #endif
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1,\:0
