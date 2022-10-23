@@ -890,9 +890,12 @@ static match_t *_get_numbered_capture(match_t *m, int *n)
         return NULL;
 
     if ((m->pat->type == BP_CAPTURE && m->pat->args.capture.namelen == 0) || m->pat->type == BP_TAGGED) {
-        if (*n == 1) return m;
-        else return NULL;
-        // --(*n);
+        if (*n == 1) {
+            return m;
+        } else {
+            --(*n);
+            return NULL;
+        }
     }
     if (m->children) {
         for (int i = 0; m->children[i]; i++) {
