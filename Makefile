@@ -94,4 +94,7 @@ uninstall:
 	  [ "$$confirm" != n ] && rm -rf ~/.config/$(NAME); \
 	fi
 
-.PHONY: all clean install install-lib uninstall leaktest splint test tutorial lua
+profile:
+	perf stat -r 20 -e L1-dcache-loads,L1-dcache-load-misses,L1-dcache-stores -e cycles bp -f plain -g bp -p Grammar grammars/bp.bp >/dev/null
+
+.PHONY: all clean install install-lib uninstall leaktest splint test tutorial lua profile
