@@ -94,10 +94,10 @@ uninstall:
 	  [ "$$confirm" != n ] && rm -rf ~/.config/$(NAME); \
 	fi
 
-profile_grammar:
-	perf stat -r 100 -e L1-dcache-loads,L1-dcache-load-misses,L1-dcache-stores -e cycles bp -f plain -g bp -p Grammar grammars/bp.bp >/dev/null
+profile_grammar: bp
+	perf stat -r 100 -e L1-dcache-loads,L1-dcache-load-misses,L1-dcache-stores -e cycles ./bp -f plain -g bp -p Grammar grammars/bp.bp >/dev/null
 
-profile_pattern:
-	perf stat -r 1 -e L1-dcache-loads,L1-dcache-load-misses,L1-dcache-stores -e cycles bp -f plain -p 'id parens' /usr/include/*.h >/dev/null
+profile_pattern: bp
+	perf stat -r 1 -e L1-dcache-loads,L1-dcache-load-misses,L1-dcache-stores -e cycles ./bp -f plain -p 'id parens' /usr/include/*.h >/dev/null
 
 .PHONY: all clean install install-lib uninstall leaktest splint test tutorial lua profile
