@@ -364,11 +364,11 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
         // a special case, but if a pattern invokes itself at a later
         // point, it can be handled with normal recursion.
         // See: left-recursion.md for more details.
-        if (str == pat->args.leftrec.at) {
-            pat->args.leftrec.visited = true;
-            return clone_match(pat->args.leftrec.match);
+        if (str == pat->args.leftrec->at) {
+            pat->args.leftrec->visited = true;
+            return clone_match(pat->args.leftrec->match);
         } else {
-            return match(pat->args.leftrec.ctx, str, pat->args.leftrec.fallback);
+            return match(pat->args.leftrec->ctx, str, pat->args.leftrec->fallback);
         }
     }
     case BP_ANYCHAR: {
@@ -678,7 +678,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
             .type = BP_LEFTRECURSION,
             .start = ref->start, .end = ref->end,
             .min_matchlen = 0, .max_matchlen = -1,
-            .args.leftrec = {
+            .args.leftrec = &(leftrec_info_t){
                 .match = NULL,
                 .visited = false,
                 .at = str,
@@ -702,10 +702,10 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
 
         match_t *m = match(&ctx2, str, ref);
         // If left recursion was involved, keep retrying while forward progress can be made:
-        if (m && rec_op.args.leftrec.visited) {
+        if (m && rec_op.args.leftrec->visited) {
             while (1) {
                 const char *prev = m->end;
-                rec_op.args.leftrec.match = m;
+                rec_op.args.leftrec->match = m;
                 ctx2.cache = &(cache_t){0};
                 match_t *m2 = match(&ctx2, str, ref);
                 cache_destroy(&ctx2);

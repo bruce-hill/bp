@@ -723,7 +723,7 @@ void delete_pat(pat_t **at_pat, bool recursive)
             delete_pat(&pat->args.pat, true);
             break;
         case BP_LEFTRECURSION:
-            delete_pat(&pat->args.leftrec.fallback, true);
+            delete_pat(&pat->args.leftrec->fallback, true);
             break;
         default: break;
         }

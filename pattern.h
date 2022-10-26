@@ -5,6 +5,7 @@
 #define PATTERN__H
 
 #include <stdbool.h>
+#include <stdint.h>
 #include <sys/types.h>
 
 #define UNBOUNDED(pat) ((pat)->max_matchlen == -1)
@@ -47,27 +48,28 @@ enum pattype_e {
 typedef struct pat_s {
     struct pat_s *next, **home;
     enum pattype_e type;
+    uint32_t id;
     const char *start, *end;
     // The bounds of the match length (used for backtracking)
-    size_t min_matchlen;
-    ssize_t max_matchlen; // -1 means unbounded length
+    uint32_t min_matchlen;
+    int32_t max_matchlen; // -1 means unbounded length
     union {
         const char *string;
         struct {
             const char *name;
-            size_t len;
+            uint32_t len;
         } ref;
         struct {
             const char *name;
-            size_t namelen;
+            uint32_t namelen;
             struct pat_s *meaning, *next_def;
         } def;
         struct {
             unsigned char low, high;
         } range;
         struct {
-            size_t min;
-            ssize_t max;
+            uint32_t min;
+            int32_t max;
             struct pat_s *sep, *repeat_pat;
         } repetitions;
         // TODO: use a linked list instead of a binary tree
@@ -77,28 +79,29 @@ typedef struct pat_s {
         struct {
             struct pat_s *pat;
             const char *text;
-            size_t len;
+            uint32_t len;
         } replace;
         struct {
             struct pat_s *capture_pat;
             const char *name;
-            size_t namelen;
+            uint16_t namelen;
             bool backreffable;
         } capture;
-        struct {
-            struct match_s *match;
-            const char *at;
-            struct pat_s *fallback;
-            void *ctx;
-            bool visited;
-        } leftrec;
+        struct leftrec_info_s *leftrec;
         struct {
             const char *start, *end, *msg;
         } error;
         struct pat_s *pat;
     } args;
-    size_t id;
 } pat_t;
+
+typedef struct leftrec_info_s {
+    struct match_s *match;
+    const char *at;
+    struct pat_s *fallback;
+    void *ctx;
+    bool visited;
+} leftrec_info_t;
 
 typedef struct {
     bool success;
