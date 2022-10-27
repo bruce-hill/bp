@@ -33,9 +33,11 @@ static void push_match(lua_State *L, match_t *m, const char *start);
 
 lua_State *cur_state = NULL;
 
-static void match_error(const char *msg)
+static void match_error(char **msg)
 {
-    lua_pushstring(cur_state, msg);
+    lua_pushstring(cur_state, *msg);
+    free(*msg);
+    *msg = NULL;
     lua_error(cur_state);
 }
 

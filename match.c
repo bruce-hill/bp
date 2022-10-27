@@ -51,8 +51,8 @@ typedef struct match_ctx_s {
 static match_t *unused_matches = NULL;
 static match_t *in_use_matches = NULL;
 
-static void default_error_handler(const char *msg) {
-    errx(EXIT_FAILURE, "%s", msg);
+static void default_error_handler(char **msg) {
+    errx(EXIT_FAILURE, "%s", *msg);
 }
 
 static bp_errhand_t error_handler = default_error_handler;
@@ -881,7 +881,7 @@ bool next_match(match_t **m, const char *start, const char *end, pat_t *pat, pat
         cache_destroy(&ctx);
         *m = NULL;
         if (error_handler)
-            error_handler(error_message);
+            error_handler(&error_message);
 
         if (error_message) {
             free(error_message);

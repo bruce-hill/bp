@@ -25,7 +25,7 @@ typedef struct match_s {
     struct match_s *_children[3];
 } match_t;
 
-typedef void (*bp_errhand_t)(const char *err_msg);
+typedef void (*bp_errhand_t)(char **err_msg);
 
 __attribute__((nonnull))
 void recycle_match(match_t **at_m);
