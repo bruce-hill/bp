@@ -36,7 +36,6 @@ lua_State *cur_state = NULL;
 static void match_error(pat_t *pat, const char *msg)
 {
     (void)pat;
-    recycle_all_matches();
     lua_pushstring(cur_state, msg);
     lua_error(cur_state);
 }
