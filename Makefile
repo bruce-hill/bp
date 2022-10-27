@@ -2,7 +2,7 @@ NAME=bp
 CC=cc
 PREFIX=/usr/local
 SYSCONFDIR=/etc
-CFLAGS=-std=c99 -Werror -D_XOPEN_SOURCE=700 -D_POSIX_C_SOURCE=200809L -flto=auto
+CFLAGS=-std=c99 -Werror -D_XOPEN_SOURCE=700 -D_POSIX_C_SOURCE=200809L -flto
 CWARN=-Wall -Wextra
   # -Wpedantic -Wsign-conversion -Wtype-limits -Wunused-result -Wnull-dereference \
 	# -Waggregate-return -Walloc-zero -Walloca -Warith-conversion -Wcast-align -Wcast-align=strict \

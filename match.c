@@ -9,7 +9,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <setjmp.h>
 
 #include "match.h"
 #include "pattern.h"
@@ -50,15 +49,12 @@ typedef struct match_ctx_s {
 static match_t *unused_matches = NULL;
 static match_t *in_use_matches = NULL;
 
-static void default_error_handler(const char *msg) {
+static void default_error_handler(pat_t *pat, const char *msg) {
+    (void)pat;
     errx(EXIT_FAILURE, "%s", msg);
 }
 
-// In case of errors, jump out of everything, clean up memory, and call the error handler.
-// Errors in this case are things like referencing a rule that isn't defined.
-static jmp_buf error_jump;
 static bp_errhand_t error_handler = default_error_handler;
-static char *error_message = NULL;
 
 #define MATCHES(...) (match_t*[]){__VA_ARGS__, NULL}
 
@@ -66,20 +62,17 @@ __attribute__((hot, nonnull(1,2,3)))
 static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat);
 __attribute__((returns_nonnull))
 static match_t *new_match(pat_t *pat, const char *start, const char *end, match_t *children[]);
-__attribute__((nonnull))
-static void recycle_match(match_t **at_m);
-static size_t free_all_matches(void);
-static size_t recycle_all_matches(void);
 
-__attribute__((format(printf,1,2)))
-static inline void match_error(const char *fmt, ...)
+__attribute__((format(printf,2,3)))
+static inline void match_error(pat_t *pat, const char *fmt, ...)
 {
-    if (error_message) free(error_message);
     va_list args;
     va_start(args, fmt);
-    vasprintf(&error_message, fmt, args);
+    char buf[256];
+    vsnprintf(buf, sizeof(buf)-1, fmt, args);
     va_end(args);
-    longjmp(error_jump, 1);
+    if (error_handler)
+        error_handler(pat, buf);
 }
 
 static match_t *clone_match(match_t *m)
@@ -233,8 +226,7 @@ static pat_t *_lookup_def(pat_t *defs, const char *name, size_t namelen)
                 return defs->args.def.meaning;
             defs = defs->args.def.next_def;
         } else {
-            free_all_matches();
-            match_error("Invalid pattern type in definitions");
+            match_error(defs, "Invalid pattern type in definitions");
             return NULL;
         }
     }
@@ -675,8 +667,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
 
         pat_t *ref = lookup_ctx(ctx, pat->args.ref.name, pat->args.ref.len);
         if (ref == NULL) {
-            free_all_matches();
-            match_error("Unknown pattern: '%.*s'", (int)pat->args.ref.len, pat->args.ref.name);
+            match_error(pat, "Unknown pattern: '%.*s'", (int)pat->args.ref.len, pat->args.ref.name);
             return NULL;
         }
 
@@ -763,8 +754,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
         return new_match(pat, str, str, NULL);
     }
     default: {
-        free_all_matches();
-        match_error("Unknown pattern type: %u", pat->type);
+        match_error(pat, "Unknown pattern type: %u", pat->type);
         return NULL;
     }
     }
@@ -849,11 +839,23 @@ size_t free_all_matches(void)
 
 //
 // Iterate over matches.
+// Usage: for (match_t *m = NULL; next_match(&m, ...); ) {...}
 //
-int each_match(bp_match_callback callback, void *userdata, const char *start, const char *end, pat_t *pat, pat_t *defs, pat_t *skip, bool ignorecase)
+bool next_match(match_t **m, const char *start, const char *end, pat_t *pat, pat_t *defs, pat_t *skip, bool ignorecase)
 {
-    if (!callback || !start || !pat) return -1;
-    if (!end) end = start + strlen(start);
+    const char *pos;
+    if (*m) {
+        // Make sure forward progress is occurring, even after zero-width matches:
+        pos = ((*m)->end > (*m)->start) ? (*m)->end : (*m)->end+1;
+        recycle_match(m);
+    } else {
+        pos = start;
+    }
+
+    if (!pat) {
+        error_handler = default_error_handler;
+        return false;
+    }
 
     match_ctx_t ctx = {
         .cache = &(cache_t){0},
@@ -862,55 +864,20 @@ int each_match(bp_match_callback callback, void *userdata, const char *start, co
         .ignorecase = ignorecase,
         .defs = defs,
     };
-
-    int num_matches = 0;
-    pat_t *first = get_prerequisite(&ctx, pat);
-    // Don't bother looping if this can only match at the start/end:
-    if (first->type == BP_START_OF_FILE || first->type == BP_END_OF_FILE) {
-        match_t *m = match(&ctx, first->type == BP_START_OF_FILE ? start : end, pat);
-        if (m) {
-            if ((size_t)callback > 3)
-                (void)callback(m, num_matches, userdata);
-            ++num_matches;
-        }
-        return num_matches;
-    }
-
-    bool hit_error = setjmp(error_jump) != 0;
-    if (!hit_error) {
-        for (const char *str = start; str <= end; ) {
-            match_t *m = _next_match(&ctx, str, pat, skip);
-            if (!m) break;
-            else if (callback == (void*)BP_STOP)
-                break;
-            else if (callback != (void*)BP_CONTINUE && callback(m, num_matches++, userdata) == BP_STOP)
-                break;
-            else if (str == m->start && str == end)
-                break;
-            str = m->end > str ? m->end : next_char(str, end);
-            recycle_all_matches();
-        }
-    }
+    *m = (pos <= end) ? _next_match(&ctx, pos, pat, skip) : NULL;
     cache_destroy(&ctx);
-    free_all_matches();
-
-    if (hit_error && error_handler) {
-        error_handler(error_message ? error_message : "An unknown error occurred");
-    }
-
-    if (error_message) {
-        free(error_message);
-        error_message = NULL;
-    }
-
-    return num_matches;
+    return *m != NULL;
 }
 
-bp_errhand_t set_match_error_handler(bp_errhand_t errhand)
+//
+// Wrapper for next_match() that sets an error handler
+//
+bool next_match_safe(match_t **m, const char *start, const char *end, pat_t *pat, pat_t *defs, pat_t *skip, bool ignorecase, bp_errhand_t errhand)
 {
-    bp_errhand_t old_errhand = errhand;
     error_handler = errhand;
-    return old_errhand;
+    bool ret = next_match(m, start, end, pat, defs, skip, ignorecase);
+    error_handler = default_error_handler;
+    return ret;
 }
 
 //
@@ -945,7 +912,13 @@ static match_t *_get_numbered_capture(match_t *m, int *n)
 match_t *get_numbered_capture(match_t *m, int n)
 {
     if (n <= 0) return m;
-    return _get_numbered_capture(m, &n);
+    if (m->children) {
+        for (int i = 0; m->children[i]; i++) {
+            match_t *cap = _get_numbered_capture(m->children[i], &n);
+            if (cap) return cap;
+        }
+    }
+    return NULL;
 }
 
 //

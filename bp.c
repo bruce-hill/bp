@@ -60,9 +60,6 @@ static const char *usage = (
 #define ALL_CONTEXT -2
 #define NO_CONTEXT -1
 
-#define each_match_file(callback, userdata, f, pat, defs) \
-    each_match(callback, userdata, (f)->start, (f)->end, pat, defs, options.skip, options.ignorecase)
-
 // Flag-configurable options:
 static struct {
     int context_before, context_after;
@@ -91,7 +88,6 @@ const char *LINE_FORMATS[] = {
 // If a file is partly through being modified when the program exits, restore it from backup.
 static FILE *modifying_file = NULL;
 static file_t *backup_file;
-static int files_printed = 0;
 
 //
 // Helper function to reduce code duplication
@@ -211,30 +207,34 @@ static int is_text_file(const char *filename)
 //
 // Print matches in JSON format.
 //
-static bp_match_behavior print_match_as_json(match_t *m, int matchnum, void *data)
+static int print_matches_as_json(file_t *f, pat_t *pattern, pat_t *defs)
 {
-    file_t *f = (file_t*)data;
-    if (++matchnum > 1)
-        printf(",\n");
-    printf("{\"match\":");
-    json_match(f->start, m, options.verbose);
-    printf("}");
-    return BP_CONTINUE;
+    int nmatches = 0;
+    for (match_t *m = NULL; next_match(&m, f->start, f->end, pattern, defs, options.skip, options.ignorecase); ) {
+        if (++nmatches > 1)
+            printf(",\n");
+        printf("{\"filename\":\"%s\",\"match\":", f->filename);
+        json_match(f->start, m, options.verbose);
+        printf("}");
+    }
+    return nmatches;
 }
 
 //
 // Print matches in a visual explanation style
 //
-static bp_match_behavior print_match_explanation(match_t *m, int matchnum, void *data)
+static int explain_matches(file_t *f, pat_t *pattern, pat_t *defs)
 {
-    file_t *f = (file_t*)data;
-    if (matchnum == 0) {
-        if (options.print_filenames)
-            fprint_filename(stdout, f->filename);
-    } else
-        printf("\n\n");
-    explain_match(m);
-    return BP_CONTINUE;
+    int nmatches = 0;
+    for (match_t *m = NULL; next_match(&m, f->start, f->end, pattern, defs, options.skip, options.ignorecase); ) {
+        if (++nmatches == 1) {
+            if (options.print_filenames)
+                fprint_filename(stdout, f->filename);
+        } else
+            printf("\n\n");
+        explain_match(m);
+    }
+    return nmatches;
 }
 
 //
@@ -346,54 +346,40 @@ static void on_nl(FILE *out)
     }
 }
 
-typedef struct {
-    file_t *f;
-    FILE *out;
-    const char *prev;
-    print_options_t print_opts;
-} print_userdata_t;
-
-//
-// Print the text of a single match with the chosen context info
-//
-static bp_match_behavior print_single_match(match_t *m, int matchnum, void *data)
-{
-    print_userdata_t *info = data;
-    if (matchnum == 0 && options.print_filenames) {
-        if (files_printed++ > 0)
-            fprintf(info->out, "\n");
-        fprint_filename(info->out, info->f->filename);
-    }
-    fprint_context(info->out, info->f, info->prev, m->start);
-    if (info->print_opts.normal_color) fprintf(info->out, "%s", info->print_opts.normal_color);
-    fprint_match(info->out, info->f->start, m, &info->print_opts);
-    if (info->print_opts.normal_color) fprintf(info->out, "%s", info->print_opts.normal_color);
-    info->prev = m->end;
-    return BP_CONTINUE;
-}
-
 //
 // Print all the matches in a file.
 //
 static int print_matches(FILE *out, file_t *f, pat_t *pattern, pat_t *defs)
 {
-    print_userdata_t userdata = {.out = out, .f = f, .prev = NULL};
-    userdata.print_opts = (print_options_t){.fprint_between = _fprint_between, .on_nl = on_nl};
+    static int printed_filenames = 0;
+    int matches = 0;
+    const char *prev = NULL;
 
     printing_file = f;
     last_line_num = -1;
 
+    print_options_t print_opts = {.fprint_between = _fprint_between, .on_nl = on_nl};
     if (options.format == FORMAT_FANCY) {
-        userdata.print_opts.match_color = "\033[0;31;1m";
-        userdata.print_opts.replace_color = "\033[0;34;1m";
-        userdata.print_opts.normal_color = "\033[m";
+        print_opts.match_color = "\033[0;31;1m";
+        print_opts.replace_color = "\033[0;34;1m";
+        print_opts.normal_color = "\033[m";
     }
-    int matches = each_match_file(print_single_match, &userdata, f, pattern, defs);
+    for (match_t *m = NULL; next_match(&m, f->start, f->end, pattern, defs, options.skip, options.ignorecase); ) {
+        if (++matches == 1 && options.print_filenames) {
+            if (printed_filenames++ > 0) printf("\n");
+            fprint_filename(out, f->filename);
+        }
+        fprint_context(out, f, prev, m->start);
+        if (print_opts.normal_color) fprintf(out, "%s", print_opts.normal_color);
+        fprint_match(out, f->start, m, &print_opts);
+        if (print_opts.normal_color) fprintf(out, "%s", print_opts.normal_color);
+        prev = m->end;
+    }
     // Print trailing context if needed:
     if (matches > 0) {
-        fprint_context(out, f, userdata.prev, NULL);
+        fprint_context(out, f, prev, NULL);
         if (last_line_num < 0) { // Hacky fix to ensure line number gets printed for `bp -p '$$'`
-            fprint_linenum(out, f, f->nlines, userdata.print_opts.normal_color);
+            fprint_linenum(out, f, f->nlines, print_opts.normal_color);
             fputc('\n', out);
         }
     }
@@ -418,14 +404,21 @@ static int process_file(const char *filename, pat_t *pattern, pat_t *defs)
 
     int matches = 0;
     if (options.mode == MODE_EXPLAIN) {
-        matches += each_match_file(print_match_explanation, f, f, pattern, defs);
+        matches += explain_matches(f, pattern, defs);
     } else if (options.mode == MODE_LISTFILES) {
-        matches += each_match_file((bp_match_callback)(BP_STOP), f, f, pattern, defs);
+        match_t *m = NULL;
+        if (next_match(&m, f->start, f->end, pattern, defs, options.skip, options.ignorecase)) {
+            printf("%s\n", f->filename);
+            matches += 1;
+        }
+        stop_matching(&m);
     } else if (options.mode == MODE_JSON) {
-        matches += each_match_file(print_match_as_json, f, f, pattern, defs);
+        matches += print_matches_as_json(f, pattern, defs);
     } else if (options.mode == MODE_INPLACE) {
-        if (each_match_file((bp_match_callback)(BP_STOP), f, f, pattern, defs) == 0)
-            return 0;
+        match_t *m = NULL;
+        bool found = next_match(&m, f->start, f->end, pattern, defs, options.skip, options.ignorecase);
+        stop_matching(&m);
+        if (!found) return 0;
 
         // Ensure the file is resident in memory:
         if (f->mmapped) {
@@ -448,6 +441,8 @@ static int process_file(const char *filename, pat_t *pattern, pat_t *defs)
     }
     fflush(stdout);
 
+    if (recycle_all_matches() != 0)
+        fprintf(stderr, "\033[33;1mMemory leak: there should no longer be any matches in use at this point.\033[m\n");
     destroy_file(&f);
     (void)fflush(stdout);
     return matches;
@@ -687,6 +682,7 @@ int main(int argc, char *argv[])
     // This code frees up all residual heap-allocated memory. Since the program
     // is about to exit, this step is unnecessary. However, it is useful for
     // tracking down memory leaks.
+    free_all_matches();
     free_all_pats();
     while (loaded_files) {
         file_t *next = loaded_files->next;
