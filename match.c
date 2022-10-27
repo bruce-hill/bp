@@ -923,7 +923,17 @@ static match_t *_get_numbered_capture(match_t *m, int *n)
 match_t *get_numbered_capture(match_t *m, int n)
 {
     if (n <= 0) return m;
-    return _get_numbered_capture(m, &n);
+    if (m->pat->type == BP_TAGGED) {
+        if (m->children) {
+            for (int i = 0; m->children[i]; i++) {
+                match_t *cap = _get_numbered_capture(m->children[i], &n);
+                if (cap) return cap;
+            }
+        }
+        return NULL;
+    } else {
+        return _get_numbered_capture(m, &n);
+    }
 }
 
 //
