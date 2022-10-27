@@ -38,7 +38,7 @@ print("Testing parse errors:")
 local ok, msg = pcall(function()
     bp.match(".;//;;; wtf", "xxx")
 end)
-if not ok then print(("\x1B[41;30mParse error:\x1B[0;1;31m %s\x1B[m\n"):format(msg)) end
+if not ok then print(("Successfully got parse error: \"%s\"\n"):format(msg)) end
 
 print("Testing builtins:")
 print(bp.match("parens", "...(foo())..."))

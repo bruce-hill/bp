@@ -5,6 +5,7 @@
 #include <ctype.h>
 #include <err.h>
 #include <limits.h>
+#include <setjmp.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -37,6 +38,7 @@ typedef struct match_ctx_s {
     pat_t *defs;
     cache_t *cache;
     const char *start, *end;
+    jmp_buf error_jump;
     bool ignorecase;
 } match_ctx_t;
 
@@ -49,12 +51,18 @@ typedef struct match_ctx_s {
 static match_t *unused_matches = NULL;
 static match_t *in_use_matches = NULL;
 
-static void default_error_handler(pat_t *pat, const char *msg) {
-    (void)pat;
+static void default_error_handler(const char *msg) {
     errx(EXIT_FAILURE, "%s", msg);
 }
 
 static bp_errhand_t error_handler = default_error_handler;
+
+bp_errhand_t bp_set_error_handler(bp_errhand_t new_handler)
+{
+    bp_errhand_t old_handler = error_handler;
+    error_handler = new_handler;
+    return old_handler;
+}
 
 #define MATCHES(...) (match_t*[]){__VA_ARGS__, NULL}
 
@@ -63,16 +71,17 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat);
 __attribute__((returns_nonnull))
 static match_t *new_match(pat_t *pat, const char *start, const char *end, match_t *children[]);
 
+char *error_message = NULL;
+
 __attribute__((format(printf,2,3)))
-static inline void match_error(pat_t *pat, const char *fmt, ...)
+static inline void match_error(match_ctx_t *ctx, const char *fmt, ...)
 {
     va_list args;
     va_start(args, fmt);
-    char buf[256];
-    vsnprintf(buf, sizeof(buf)-1, fmt, args);
+    if (error_message) free(error_message);
+    vasprintf(&error_message, fmt, args);
     va_end(args);
-    if (error_handler)
-        error_handler(pat, buf);
+    longjmp(ctx->error_jump, 1);
 }
 
 static match_t *clone_match(match_t *m)
@@ -214,11 +223,11 @@ void cache_destroy(match_ctx_t *ctx)
 // Look up a pattern definition by name from a definition pattern.
 //
 __attribute__((nonnull(2)))
-static pat_t *_lookup_def(pat_t *defs, const char *name, size_t namelen)
+static pat_t *_lookup_def(match_ctx_t *ctx, pat_t *defs, const char *name, size_t namelen)
 {
     while (defs) {
         if (defs->type == BP_CHAIN) {
-            pat_t *second = _lookup_def(defs->args.multiple.second, name, namelen);
+            pat_t *second = _lookup_def(ctx, defs->args.multiple.second, name, namelen);
             if (second) return second;
             defs = defs->args.multiple.first;
         } else if (defs->type == BP_DEFINITIONS) {
@@ -226,7 +235,7 @@ static pat_t *_lookup_def(pat_t *defs, const char *name, size_t namelen)
                 return defs->args.def.meaning;
             defs = defs->args.def.next_def;
         } else {
-            match_error(defs, "Invalid pattern type in definitions");
+            match_error(ctx, "Invalid pattern type in definitions");
             return NULL;
         }
     }
@@ -240,7 +249,7 @@ __attribute__((nonnull))
 pat_t *lookup_ctx(match_ctx_t *ctx, const char *name, size_t namelen)
 {
     for (; ctx; ctx = ctx->parent_ctx) {
-        pat_t *def = _lookup_def(ctx->defs, name, namelen);
+        pat_t *def = _lookup_def(ctx, ctx->defs, name, namelen);
         if (def) return def;
     }
     return NULL;
@@ -667,7 +676,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
 
         pat_t *ref = lookup_ctx(ctx, pat->args.ref.name, pat->args.ref.len);
         if (ref == NULL) {
-            match_error(pat, "Unknown pattern: '%.*s'", (int)pat->args.ref.len, pat->args.ref.name);
+            match_error(ctx, "Unknown pattern: '%.*s'", (int)pat->args.ref.len, pat->args.ref.name);
             return NULL;
         }
 
@@ -754,7 +763,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
         return new_match(pat, str, str, NULL);
     }
     default: {
-        match_error(pat, "Unknown pattern type: %u", pat->type);
+        match_error(ctx, "Unknown pattern type: %u", pat->type);
         return NULL;
     }
     }
@@ -864,20 +873,22 @@ bool next_match(match_t **m, const char *start, const char *end, pat_t *pat, pat
         .ignorecase = ignorecase,
         .defs = defs,
     };
-    *m = (pos <= end) ? _next_match(&ctx, pos, pat, skip) : NULL;
-    cache_destroy(&ctx);
-    return *m != NULL;
-}
+    if (setjmp(ctx.error_jump) == 0) {
+        *m = (pos <= end) ? _next_match(&ctx, pos, pat, skip) : NULL;
+        cache_destroy(&ctx);
+    } else {
+        recycle_all_matches();
+        cache_destroy(&ctx);
+        *m = NULL;
+        if (error_handler)
+            error_handler(error_message);
 
-//
-// Wrapper for next_match() that sets an error handler
-//
-bool next_match_safe(match_t **m, const char *start, const char *end, pat_t *pat, pat_t *defs, pat_t *skip, bool ignorecase, bp_errhand_t errhand)
-{
-    error_handler = errhand;
-    bool ret = next_match(m, start, end, pat, defs, skip, ignorecase);
-    error_handler = default_error_handler;
-    return ret;
+        if (error_message) {
+            free(error_message);
+            error_message = NULL;
+        }
+    }
+    return *m != NULL;
 }
 
 //

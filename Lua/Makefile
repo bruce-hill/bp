@@ -26,9 +26,9 @@ O=-O3
 ALL_FLAGS=$(CFLAGS) $(OSFLAGS) $(INCS) $(EXTRA) $(CWARN) $(G) $(O)
 
 ifeq ($(shell uname -s),Darwin)
-	MAKESO= $(CC) -bundle -undefined dynamic_lookup
+	MAKESO= $(CC) -bundle -undefined dynamic_lookup $(CFLAGS) $(OSFLAGS) $(EXTRA) $(CWARN) $(G) $(O)
 else
-	MAKESO= $(CC) -shared
+	MAKESO= $(CC) -shared $(CFLAGS) $(OSFLAGS) $(EXTRA) $(CWARN) $(G) $(O)
 endif
 
 all: bp.so

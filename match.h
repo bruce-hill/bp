@@ -25,7 +25,7 @@ typedef struct match_s {
     struct match_s *_children[3];
 } match_t;
 
-typedef void (*bp_errhand_t)(pat_t *pat, const char *err_msg);
+typedef void (*bp_errhand_t)(const char *err_msg);
 
 __attribute__((nonnull))
 void recycle_match(match_t **at_m);
@@ -33,7 +33,7 @@ size_t free_all_matches(void);
 size_t recycle_all_matches(void);
 bool next_match(match_t **m, const char *start, const char *end, pat_t *pat, pat_t *defs, pat_t *skip, bool ignorecase);
 #define stop_matching(m) next_match(m, NULL, NULL, NULL, NULL, NULL, 0)
-bool next_match_safe(match_t **m, const char *start, const char *end, pat_t *pat, pat_t *defs, pat_t *skip, bool ignorecase, bp_errhand_t errhand);
+bp_errhand_t bp_set_error_handler(bp_errhand_t handler);
 __attribute__((nonnull))
 match_t *get_numbered_capture(match_t *m, int n);
 __attribute__((nonnull, pure))
