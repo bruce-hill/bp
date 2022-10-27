@@ -74,6 +74,7 @@ static size_t recycle_all_matches(void);
 __attribute__((format(printf,1,2)))
 static inline void match_error(const char *fmt, ...)
 {
+    if (error_message) free(error_message);
     va_list args;
     va_start(args, fmt);
     vasprintf(&error_message, fmt, args);
@@ -875,7 +876,8 @@ int each_match(bp_match_callback callback, void *userdata, const char *start, co
         return num_matches;
     }
 
-    if (setjmp(error_jump) == 0) {
+    bool hit_error = setjmp(error_jump) != 0;
+    if (!hit_error) {
         for (const char *str = start; str <= end; ) {
             match_t *m = _next_match(&ctx, str, pat, skip);
             if (!m) break;
@@ -888,17 +890,18 @@ int each_match(bp_match_callback callback, void *userdata, const char *start, co
             str = m->end > str ? m->end : next_char(str, end);
             recycle_all_matches();
         }
-    } else {
-        if (error_handler)
-            error_handler(error_message ? error_message : "An unknown error occurred");
+    }
+    cache_destroy(&ctx);
+    free_all_matches();
+
+    if (hit_error && error_handler) {
+        error_handler(error_message ? error_message : "An unknown error occurred");
     }
 
     if (error_message) {
         free(error_message);
         error_message = NULL;
     }
-    cache_destroy(&ctx);
-    free_all_matches();
 
     return num_matches;
 }
