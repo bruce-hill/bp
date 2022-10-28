@@ -27,10 +27,13 @@ static int _json_match(const char *text, match_t *m, int comma, bool verbose)
     if (comma) printf(",\n");
     comma = 0;
     printf("{");
-    if (m->pat->type == BP_TAGGED)
+    if (m->pat->type == BP_TAGGED) {
         printf("\"tag\":\"%.*s\"", (int)m->pat->args.capture.namelen, m->pat->args.capture.name);
+        comma = 1;
+    }
     if (verbose) {
-        printf(",\"rule\":\"");
+        if (comma) printf(",");
+        printf("\"rule\":\"");
         for (const char *c = m->pat->start; c < m->pat->end; c++) {
             switch (*c) {
             case '"': printf("\\\""); break;
@@ -42,8 +45,10 @@ static int _json_match(const char *text, match_t *m, int comma, bool verbose)
         }
         printf("\",");
         printf("\"range\":[%ld,%ld]", m->start - text, m->end - text);
+        comma = 1;
     } else {
-        printf(",\"text\":\"");
+        if (comma) printf(",");
+        printf("\"text\":\"");
         for (const char *c = m->start; c < m->end; c++) {
             switch (*c) {
             case '"': printf("\\\""); break;
@@ -54,10 +59,13 @@ static int _json_match(const char *text, match_t *m, int comma, bool verbose)
             }
         }
         printf("\"");
+        comma = 1;
     }
 
     if (m->children) {
-        printf(",\"children\":[");
+        if (comma) printf(",");
+        printf("\"children\":[");
+        comma = 0;
         for (int i = 0; m->children && m->children[i]; i++)
             comma |= _json_match(text, m->children[i], comma, verbose);
         printf("]");
