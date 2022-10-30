@@ -897,9 +897,6 @@ bool next_match(match_t **m, const char *start, const char *end, pat_t *pat, pat
 __attribute__((nonnull))
 static match_t *_get_numbered_capture(match_t *m, int *n)
 {
-    if (m->pat->type == BP_CAPTURE && m->pat->args.capture.namelen > 0)
-        return NULL;
-
     if ((m->pat->type == BP_CAPTURE && m->pat->args.capture.namelen == 0) || m->pat->type == BP_TAGGED) {
         if (*n == 1) {
             return m;
@@ -908,6 +905,10 @@ static match_t *_get_numbered_capture(match_t *m, int *n)
             return NULL;
         }
     }
+
+    if (m->pat->type == BP_CAPTURE || m->pat->type == BP_TAGGED)
+        return NULL;
+
     if (m->children) {
         for (int i = 0; m->children[i]; i++) {
             match_t *cap = _get_numbered_capture(m->children[i], n);
@@ -924,6 +925,7 @@ match_t *get_numbered_capture(match_t *m, int n)
 {
     if (n <= 0) return m;
     if (m->pat->type == BP_TAGGED || m->pat->type == BP_CAPTURE) {
+        if (n == 1) return m;
         if (m->children) {
             for (int i = 0; m->children[i]; i++) {
                 match_t *cap = _get_numbered_capture(m->children[i], &n);
