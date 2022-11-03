@@ -28,6 +28,8 @@ void destroy_file(file_t **f);
 __attribute__((pure, nonnull))
 size_t get_line_number(file_t *f, const char *p);
 __attribute__((pure, nonnull))
+size_t get_line_column(file_t *f, const char *p);
+__attribute__((pure, nonnull))
 const char *get_line(file_t *f, size_t line_number);
 
 #endif

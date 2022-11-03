@@ -198,6 +198,15 @@ size_t get_line_number(file_t *f, const char *p)
 }
 
 //
+// Given a pointer, determine which line column it points to.
+//
+size_t get_line_column(file_t *f, const char *p)
+{
+    size_t line_no = get_line_number(f, p);
+    return 1 + (size_t)(p - f->lines[line_no]);
+}
+
+//
 // Return a pointer to the line with the specified line number.
 //
 const char *get_line(file_t *f, size_t line_number)
