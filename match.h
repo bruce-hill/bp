@@ -1,8 +1,7 @@
 //
 // match.h - Header file for BP virtual machine.
 //
-#ifndef MATCH__H
-#define MATCH__H
+#pragma once
 
 #include <stdbool.h>
 #include <stdio.h>
@@ -39,5 +38,4 @@ match_t *get_numbered_capture(match_t *m, int n);
 __attribute__((nonnull, pure))
 match_t *get_named_capture(match_t *m, const char *name, ssize_t namelen);
 
-#endif
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1,\:0

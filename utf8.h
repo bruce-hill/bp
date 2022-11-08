@@ -1,8 +1,7 @@
 //
 // utf8.h - UTF8 helper functions
 //
-#ifndef UTF8__H
-#define UTF8__H
+#pragma once
 
 #include <stdbool.h>
 
@@ -17,5 +16,4 @@ bool isidstart(const char *str, const char *end);
 __attribute__((nonnull, pure))
 bool isidcontinue(const char *str, const char *end);
 
-#endif
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1,\:0

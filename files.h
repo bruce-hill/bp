@@ -1,8 +1,7 @@
 //
 // files.h - Definitions of an API for loading files.
 //
-#ifndef FILES__H
-#define FILES__H
+#pragma once
 
 #include <stdio.h>
 #include <unistd.h>
@@ -32,5 +31,4 @@ size_t get_line_column(file_t *f, const char *p);
 __attribute__((pure, nonnull))
 const char *get_line(file_t *f, size_t line_number);
 
-#endif
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1,\:0

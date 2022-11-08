@@ -1,8 +1,7 @@
 //
 // utils.h - Some utility and printing functions.
 //
-#ifndef UTILS__H
-#define UTILS__H
+#pragma once
 
 #include <err.h>
 #include <stdarg.h>
@@ -58,5 +57,4 @@ bool matchstr(const char **str, const char *target, bool skip_nl, const char *en
 __attribute__((nonnull))
 void delete(void *p);
 
-#endif
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1,\:0
