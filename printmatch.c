@@ -186,21 +186,23 @@ void explain_match(match_t *m)
     printf("\033[?7h"); // Re-enable line wrapping
 }
 
-static inline void fputc_safe(FILE *out, char c, print_options_t *opts)
+static inline int fputc_safe(FILE *out, char c, print_options_t *opts)
 {
-    (void)fputc(c, out);
+    int printed = fputc(c, out);
     if (c == '\n' && opts && opts->on_nl) {
         opts->on_nl(out);
-        if (opts->replace_color) fprintf(out, "%s", opts->replace_color);
+        if (opts->replace_color) printed += fprintf(out, "%s", opts->replace_color);
     }
+    return printed;
 }
 
-void fprint_match(FILE *out, const char *file_start, match_t *m, print_options_t *opts)
+int fprint_match(FILE *out, const char *file_start, match_t *m, print_options_t *opts)
 {
+    int printed = 0;
     if (m->pat->type == BP_REPLACE) {
         const char *text = m->pat->args.replace.text;
         const char *end = &text[m->pat->args.replace.len];
-        if (opts && opts->replace_color) fprintf(out, "%s", opts->replace_color);
+        if (opts && opts->replace_color) printed += fprintf(out, "%s", opts->replace_color);
 
         // TODO: clean up the line numbering code
         for (const char *r = text; r < end; ) {
@@ -222,8 +224,8 @@ void fprint_match(FILE *out, const char *file_start, match_t *m, print_options_t
                 }
 
                 if (cap != NULL) {
-                    fprint_match(out, file_start, cap, opts);
-                    if (opts && opts->replace_color) fprintf(out, "%s", opts->replace_color);
+                    printed += fprint_match(out, file_start, cap, opts);
+                    if (opts && opts->replace_color) printed += fprintf(out, "%s", opts->replace_color);
                     r = next;
                     continue;
                 }
@@ -238,19 +240,19 @@ void fprint_match(FILE *out, const char *file_start, match_t *m, print_options_t
                     // the replacement text contains newlines, this may get weird.
                     const char *line_start = m->start;
                     while (line_start > file_start && line_start[-1] != '\n') --line_start;
-                    fputc_safe(out, '\n', opts);
+                    printed += fputc_safe(out, '\n', opts);
                     for (const char *p = line_start; p < m->start && (*p == ' ' || *p == '\t'); ++p)
-                        fputc(*p, out);
+                        printed += fputc(*p, out);
                     continue;
                 }
-                fputc_safe(out, unescapechar(r, &r, end), opts);
+                printed += fputc_safe(out, unescapechar(r, &r, end), opts);
             } else {
-                fputc_safe(out, *r, opts);
+                printed += fputc_safe(out, *r, opts);
                 ++r;
             }
         }
     } else {
-        if (opts && opts->match_color) fprintf(out, "%s", opts->match_color);
+        if (opts && opts->match_color) printed += fprintf(out, "%s", opts->match_color);
         const char *prev = m->start;
         for (int i = 0; m->children && m->children[i]; i++) {
             match_t *child = m->children[i];
@@ -259,18 +261,19 @@ void fprint_match(FILE *out, const char *file_start, match_t *m, print_options_t
                   prev <= child->end && child->end <= m->end))
                 continue;
             if (child->start > prev) {
-                if (opts && opts->fprint_between) opts->fprint_between(out, prev, child->start, opts->match_color);
-                else fwrite(prev, sizeof(char), (size_t)(child->start - prev), out);
+                if (opts && opts->fprint_between) printed += opts->fprint_between(out, prev, child->start, opts->match_color);
+                else printed += fwrite(prev, sizeof(char), (size_t)(child->start - prev), out);
             }
-            fprint_match(out, file_start, child, opts);
-            if (opts && opts->match_color) fprintf(out, "%s", opts->match_color);
+            printed += fprint_match(out, file_start, child, opts);
+            if (opts && opts->match_color) printed += fprintf(out, "%s", opts->match_color);
             prev = child->end;
         }
         if (m->end > prev) {
-            if (opts && opts->fprint_between) opts->fprint_between(out, prev, m->end, opts->match_color);
-            else fwrite(prev, sizeof(char), (size_t)(m->end - prev), out);
+            if (opts && opts->fprint_between) printed += opts->fprint_between(out, prev, m->end, opts->match_color);
+            else printed += fwrite(prev, sizeof(char), (size_t)(m->end - prev), out);
         }
     }
+    return printed;
 }
 
 

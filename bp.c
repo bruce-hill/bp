@@ -264,47 +264,52 @@ static void sig_handler(int sig)
     if (kill(0, sig)) _exit(EXIT_FAILURE);
 }
 
-void fprint_linenum(FILE *out, file_t *f, int linenum, const char *normal_color)
+int fprint_linenum(FILE *out, file_t *f, int linenum, const char *normal_color)
 {
+    int printed = 0;
     switch (options.format) {
     case FORMAT_FANCY: case FORMAT_PLAIN: {
         int space = 0;
         for (int i = (int)f->nlines; i > 0; i /= 10) ++space;
         if (options.format == FORMAT_FANCY)
-            fprintf(out, "\033[0;2m%*d\033(0\x78\033(B%s", space, linenum, normal_color ? normal_color : "");
-        else fprintf(out, "%*d|", space, linenum);
+            printed += fprintf(out, "\033[0;2m%*d\033(0\x78\033(B%s", space, linenum, normal_color ? normal_color : "");
+        else
+            printed += fprintf(out, "%*d|", space, linenum);
         break;
     }
     case FORMAT_FILE_LINE: {
-        fprintf(out, "%s:%d:", f->filename, linenum);
+        printed += fprintf(out, "%s:%d:", f->filename, linenum);
         break;
     }
     default: break;
     }
+    return printed;
 }
 
 static file_t *printing_file = NULL;
 static int last_line_num = -1;
-static void _fprint_between(FILE *out, const char *start, const char *end, const char *normal_color)
+static int _fprint_between(FILE *out, const char *start, const char *end, const char *normal_color)
 {
+    int printed = 0;
     do {
         // Cheeky lookbehind to see if line number should be printed
         if (start == printing_file->start || start[-1] == '\n') {
             int linenum = (int)get_line_number(printing_file, start);
             if (last_line_num != linenum) {
-                fprint_linenum(out, printing_file, linenum, normal_color);
+                printed += fprint_linenum(out, printing_file, linenum, normal_color);
                 last_line_num = linenum;
             }
         }
         const char *line_end = memchr(start, '\n', (size_t)(end - start));
         if (line_end && line_end != end) {
-            fwrite(start, sizeof(char), (size_t)(line_end - start + 1), out);
+            printed += fwrite(start, sizeof(char), (size_t)(line_end - start + 1), out);
             start = line_end + 1;
         } else {
-            if (end > start) fwrite(start, sizeof(char), (size_t)(end - start), out);
+            if (end > start) printed += fwrite(start, sizeof(char), (size_t)(end - start), out);
             break;
         }
     } while (start < end);
+    return printed;
 }
 
 static void fprint_context(FILE *out, file_t *f, const char *prev, const char *next)
