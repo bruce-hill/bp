@@ -1,13 +1,14 @@
 # This file defines some web-related patterns
 url: (
     ("https"/"http"/"ftp") "://" [>..`@ +url-char [`: +url-char] `@]
-        (ipv4/ipv6/domain) [`: int] [url-path]
+        (ipv4/ipv6/domain/domain-segment) [`: int] [url-path]
     / "mailto:" email
     / "file://" +(`/ *url-char)
 )
 url-path: +(`/ *url-char) [`? +(+url-char`=+url-char)%`&]
 ipv4: 4 int % `.
 ipv6: 8 (4 Hex) % `:
-domain: +(+(Abc/digit/`-))%`.
+domain-segment: +(Abc/digit/`-)
+domain: 2+domain-segment % `.
 url-char: Abc/digit/`$,-,_,.,+,!,*,',(,),,,%
 email: +(Abc/digit/`.,-,+) `@ domain
