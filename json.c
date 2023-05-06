@@ -28,7 +28,7 @@ static int _json_match(const char *text, match_t *m, int comma, bool verbose)
     comma = 0;
     printf("{");
     if (m->pat->type == BP_TAGGED) {
-        printf("\"tag\":\"%.*s\"", (int)m->pat->args.capture.namelen, m->pat->args.capture.name);
+        printf("\"tag\":\"%.*s\"", (int)Match(m->pat, BP_TAGGED)->namelen, Match(m->pat, BP_TAGGED)->name);
         comma = 1;
     }
     if (verbose) {

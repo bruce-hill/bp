@@ -6,11 +6,19 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <sys/types.h>
+#include <err.h>
+
+#ifndef auto
+#define auto __auto_type
+#endif
 
 #define UNBOUNDED(pat) ((pat)->max_matchlen == -1)
-
+#define Match(x, _tag) ((x)->type == _tag ? &(x)->__tagged._tag : (errx(1, __FILE__ ":%d This was supposed to be a " # _tag "\n", __LINE__), &(x)->__tagged._tag))
+#define Pattern(_tag, _start, _end, _min, _max, ...) allocate_pat((pat_t){.type=_tag, .start=_start, .end=_end, \
+                                                              .min_matchlen=_min, .max_matchlen=_max, .__tagged._tag={__VA_ARGS__}})
 // BP virtual machine pattern types
 enum pattype_e {
+    BP_ERROR         = 0,
     BP_ANYCHAR       = 1,
     BP_ID_START      = 2,
     BP_ID_CONTINUE   = 3,
@@ -53,45 +61,73 @@ typedef struct pat_s {
     uint32_t min_matchlen;
     int32_t max_matchlen; // -1 means unbounded length
     union {
-        const char *string;
         struct {
-            const char *name;
-            uint32_t len;
-        } ref;
-        struct {
-            const char *name;
-            uint32_t namelen;
-            struct pat_s *meaning, *next_def;
-        } def;
-        struct {
-            unsigned char low, high;
-        } range;
+            const char *start, *end, *msg;
+        } BP_ERROR;
+        struct {} BP_ANYCHAR;
+        struct {} BP_ID_START;
+        struct {} BP_ID_CONTINUE;
+        struct {const char *string;} BP_STRING;
+        struct {unsigned char low, high; } BP_RANGE;
+        struct {struct pat_s *pat;} BP_NOT;
+        struct {struct pat_s *target, *skip;} BP_UPTO;
+        struct {struct pat_s *target, *skip;} BP_UPTO_STRICT;
         struct {
             uint32_t min;
             int32_t max;
             struct pat_s *sep, *repeat_pat;
-        } repetitions;
-        // TODO: use a linked list instead of a binary tree
+        } BP_REPEAT;
+        struct {struct pat_s *pat;} BP_BEFORE;
+        struct {struct pat_s *pat;} BP_AFTER;
+        struct {
+            struct pat_s *pat;
+            const char *name;
+            uint16_t namelen;
+            bool backreffable;
+        } BP_CAPTURE;
         struct {
             struct pat_s *first, *second;
-        } multiple;
+        } BP_OTHERWISE;
+        struct {
+            struct pat_s *first, *second;
+        } BP_CHAIN;
+        struct {struct pat_s *pat, *must_match;} BP_MATCH;
+        struct {struct pat_s *pat, *must_not_match;} BP_NOT_MATCH;
         struct {
             struct pat_s *pat;
             const char *text;
             uint32_t len;
-        } replace;
+        } BP_REPLACE;
         struct {
-            struct pat_s *capture_pat;
+            const char *name;
+            uint32_t len;
+        } BP_REF;
+        struct {} BP_NODENT;
+        struct {} BP_CURDENT;
+        struct {} BP_START_OF_FILE;
+        struct {} BP_START_OF_LINE;
+        struct {} BP_END_OF_FILE;
+        struct {} BP_END_OF_LINE;
+        struct {} BP_WORD_BOUNDARY;
+        struct {
+            const char *name;
+            uint32_t namelen;
+            struct pat_s *meaning, *next_def;
+        } BP_DEFINITIONS;
+        struct {
+            struct pat_s *pat;
             const char *name;
             uint16_t namelen;
             bool backreffable;
-        } capture;
-        struct leftrec_info_s *leftrec;
+        } BP_TAGGED;
         struct {
-            const char *start, *end, *msg;
-        } error;
-        struct pat_s *pat;
-    } args;
+            struct match_s *match;
+            const char *at;
+            struct pat_s *fallback;
+            void *ctx;
+            bool visited;
+        } BP_LEFTRECURSION;
+    } __tagged;
 } pat_t;
 
 typedef struct leftrec_info_s {
@@ -112,6 +148,8 @@ typedef struct {
     } value;
 } maybe_pat_t;
 
+__attribute__((returns_nonnull))
+pat_t *allocate_pat(pat_t pat);
 __attribute__((nonnull, returns_nonnull))
 pat_t *bp_raw_literal(const char *str, size_t len);
 __attribute__((nonnull(1)))

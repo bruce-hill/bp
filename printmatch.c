@@ -200,8 +200,9 @@ int fprint_match(FILE *out, const char *file_start, match_t *m, print_options_t 
 {
     int printed = 0;
     if (m->pat->type == BP_REPLACE) {
-        const char *text = m->pat->args.replace.text;
-        const char *end = &text[m->pat->args.replace.len];
+        auto rep = Match(m->pat, BP_REPLACE);
+        const char *text = rep->text;
+        const char *end = &text[rep->len];
         if (opts && opts->replace_color) printed += fprintf(out, "%s", opts->replace_color);
 
         // TODO: clean up the line numbering code
