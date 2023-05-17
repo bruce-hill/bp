@@ -84,7 +84,7 @@ static match_t *get_first_capture(match_t *m)
 {
     if (m->pat->type == BP_TAGGED) {
         return m;
-    } else if (m->pat->type == BP_CAPTURE && !m->pat->args.capture.name) {
+    } else if (m->pat->type == BP_CAPTURE && !Match(m->pat, BP_CAPTURE)->name) {
         return m;
     } else if (m->children) {
         for (int i = 0; m->children[i]; i++) {
@@ -100,8 +100,9 @@ static void set_capture_fields(lua_State *L, match_t *m, int *n, const char *sta
     if (m->pat->type == BP_CAPTURE) {
         match_t *cap = get_first_capture(m->children[0]);
         if (!cap) cap = m->children[0];
-        if (m->pat->args.capture.namelen > 0) {
-            lua_pushlstring(L, m->pat->args.capture.name, m->pat->args.capture.namelen);
+        auto capture = Match(m->pat, BP_CAPTURE);
+        if (capture->namelen > 0) {
+            lua_pushlstring(L, capture->name, capture->namelen);
             push_match(L, cap, start);
             lua_settable(L, -3);
         } else {
@@ -127,7 +128,8 @@ static void push_match(lua_State *L, match_t *m, const char *start)
     lua_seti(L, -2, 0);
 
     if (m->pat->type == BP_TAGGED) {
-        lua_pushlstring(L, m->pat->args.capture.name, m->pat->args.capture.namelen);
+        auto tagged = Match(m->pat, BP_TAGGED);
+        lua_pushlstring(L, tagged->name, tagged->namelen);
         lua_setfield(L, -2, "__tag");
     }
 
