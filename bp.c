@@ -647,7 +647,7 @@ int main(int argc, char *argv[])
     if (options.context_after == USE_DEFAULT_CONTEXT) options.context_after = 0;
 
     if (options.format == FORMAT_AUTO)
-        options.format = isatty(STDOUT_FILENO) ? FORMAT_FANCY : FORMAT_BARE;
+        options.format = isatty(STDOUT_FILENO) ? (getenv("NO_COLOR") ? FORMAT_PLAIN : FORMAT_FANCY) : FORMAT_BARE;
 
     // If any of these signals triggers, and there is a temporary file in use,
     // be sure to clean it up before exiting.
