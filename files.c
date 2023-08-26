@@ -75,8 +75,12 @@ file_t *load_file(file_t **files, const char *filename)
         }
         return NULL;
     }
+
+    filename = checked_strdup(filename);
+    for (const char *slashes = strstr(filename, "//"); slashes; slashes = strstr(slashes, "//"))
+        memmove((char*)slashes, slashes+1, strlen(slashes+1));
     file_t *f = new(file_t);
-    f->filename = checked_strdup(filename);
+    f->filename = filename;
 
     struct stat sb;
     if (fstat(fd, &sb) == -1)
