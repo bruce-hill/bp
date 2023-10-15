@@ -44,7 +44,7 @@ static int _json_match(const char *text, match_t *m, int comma, bool verbose)
             }
         }
         printf("\",");
-        printf("\"range\":[%ld,%ld]", m->start - text, m->end - text);
+        printf("\"range\":[%zd,%zd]", m->start - text, m->end - text);
         comma = 1;
     } else {
         if (comma) printf(",");
