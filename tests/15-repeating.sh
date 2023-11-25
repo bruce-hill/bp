@@ -1,3 +1,3 @@
 # Numbers allow you to specify repetitions of a pattern
-# Example: bp -p '3 "x"' matches "xxx"
-bp -p '`( 4 . `)'
+# Example: bp '{3 "x"}' matches "xxx"
+bp '{`( 4 . `)}'

@@ -17,13 +17,12 @@ syntax.
 
 # OPTIONS
 
-`-p`, `--pattern` *pat*
-: Give a pattern in BP syntax instead of string syntax (equivalent to `bp
-'\(pat)'`
+*pattern*
+: The text to search for. The main argument for `bp` is a string literals which
+  may contain BP syntax patterns. See the **STRING PATTERNS** section below.
 
 `-w`, `--word` *word*
-: Surround a string pattern with word boundaries (equivalent to `bp
-'\|word\|'`)
+: Surround a string pattern with word boundaries (equivalent to `bp '{|}word{|}'`)
 
 `-e`, `--explain`
 : Print a visual explanation of the matches.
@@ -82,10 +81,6 @@ and *auto* (the default) uses *fancy* formatting when the output is a TTY and
 `-h`, `--help`
 : Print the usage and exit.
 
-*pattern*
-: The main pattern for bp to match. By default, this pattern is a string
-pattern (see the **STRING PATTERNS** section below).
-
 *files...*
 : The input files to search. If no input files are provided and data was piped
 in, that data will be used instead. If neither are provided, `bp` will search
@@ -99,9 +94,13 @@ One of the most common use cases for pattern matching tools is matching plain,
 literal strings, or strings that are primarily plain strings, with one or two
 patterns. `bp` is designed around this fact. The default mode for bp patterns
 is "string pattern mode". In string pattern mode, all characters are
-interpreted literally except for the backslash (`\`), which may be followed by
-an escape or a bp pattern (see the **PATTERNS** section below). Optionally, the
-bp pattern may be terminated by a semicolon (`;`).
+interpreted literally except for curly braces `{}`, which mark a region of BP
+syntax patterns (see the **PATTERNS** section below). In other words, when
+passing a search query to `bp`, you do not need to escape periods, quotation
+marks, backslashes, or any other character, as long as it fits inside a shell
+string literal. In order to match a literal `{`, you can either search for the
+character literal: ``` {`{} ```, the string literal: `{"{"}`, or a pair of 
+matching curly braces using the `braces` rule: `{braces}`.
 
 
 # PATTERNS
@@ -122,7 +121,7 @@ should be used for clarity, but it will not affect the meaning of the pattern.
 : A choice: *pat1*, or if it doesn\'t match, then *pat2*
 
 `.`
-: Any character (excluding newline)
+: The period pattern matches single character (excluding newline)
 
 `^`
 : Start of a line
@@ -191,62 +190,64 @@ containing only the starting indentation and the string "FOO":
 `\b`
 : Alias for `|` (word boundary)
 
+`(` *pat* `)`
+: Parentheses can be used to delineate patterns, as in most languages.
+
 `!` *pat*
-: Not *pat*
+: Not *pat* (don't match if *pat* matches here)
 
 `[` *pat* `]`
-: Maybe *pat*
+: Maybe *pat* (match zero or one occurrences of *pat*)
 
 *N* *pat*
 : Exactly *N* repetitions of *pat* (e.g. `5 "x"` matches **"xxxxx"**)
 
 *N* `-` *M* *pat*
 : Between *N* and *M* repetitions of *pat* (e.g. `2-3 "x"` matches **"xx"** or
-**"xxx"**)
+  **"xxx"**)
 
 *N*`+` *pat*
-: At least *N* or more repetitions of *pat* (e.g. `2+ "x"` matches
-**"xx"**, **"xxx"**, **"xxxx"**, etc.)
+: At least *N* or more repetitions of *pat* (e.g. `2+ "x"` matches **"xx"**,
+  **"xxx"**, **"xxxx"**, etc.)
 
 `*` *pat*
 : Any *pat*s (zero or more, e.g. `* "x"` matches **""**, **"x"**, **"xx"**,
-etc.)
+  etc.)
 
 `+` *pat*
-: Some *pat*s (e.g. `+ "x"` matches **"x"**, **"xx"**, **"xxx"**, etc.)
+: Some *pat*s (one or more, e.g. `+ "x"` matches **"x"**, **"xx"**, **"xxx"**,
+  etc.)
 
 *repeating-pat* `%` *sep*
 : *repeating-pat* (see the examples above) separated by *sep* (e.g. `*word %
-","` matches zero or more comma-separated words)
+  ","` matches zero or more comma-separated words)
 
 `..` *pat*
-: Any text (except newlines) up to and including *pat*
+: Any text (except newlines) up to and including *pat*. This is a non-greedy
+  match and does not span newlines.
 
 `.. %` *skip* *pat*
 : Any text (except newlines) up to and including *pat*, skipping over instances
-of *skip* (e.g. `'"' ..%('\' .) '"'` opening quote, up to closing quote,
-skipping over backslash followed by a single character)
+  of *skip* (e.g. `'"' ..%('\' .) '"'` opening quote, up to closing quote,
+  skipping over backslash followed by a single character). A useful application
+  of the `%` operator is to skip over newlines to perform multi-line matches,
+  e.g. `pat1 ..%\n pat2`
 
 `.. =` *only* *pat*
 : Any number of repetitions of the pattern *only* up to and including *pat*
-(e.g. `"f" ..=abc "k"` matches the letter "f" followed by some alphabetic
-characters and then a "k", which would match "fork", but not "free kit") This
-is essentially a "non-greedy" version of `*`, and `.. pat` can be thought of as
-the special case of `..=. pat`
+  (e.g. `"f" ..=abc "k"` matches the letter "f" followed by some alphabetic
+  characters and then a "k", which would match "fork", but not "free kit") This
+  is essentially a "non-greedy" version of `*`, and `.. pat` can be thought of
+  as the special case of `..=. pat`
 
 `<` *pat*
 : Matches at the current position if *pat* matches immediately before the
-current position (lookbehind). Conceptually, you can think of this as creating
-a file containing only the *N* characters immediately before the current
-position and attempting to match *pat* on that file, for all values of *N* from
-the minimum number of characters *pat* can match up to maximum number of
-characters *pat* can match (or the length of the current line upto the current
-position, whichever is smaller). **Note:** For fixed-length lookbehinds, this
-is quite efficient (e.g. `<(100 "x")`), however this could cause performance
-problems with variable-length lookbehinds (e.g. `<("x" 0-100"y")`). Also, it is
-worth noting that `^`, `^^`, `$`, and `$$` all match against the edges of the
-slice, which may give false positives if you were expecting them to match only
-against the edges file or line.
+  current position (lookbehind). **Note:** For fixed-length lookbehinds, this
+  is quite efficient (e.g. `<(100 "x")`), however this can cause performance
+  problems with variable-length lookbehinds (e.g. `<("x" 0-100"y")`). Also,
+  patterns like `^`, `^^`, `$`, and `$$` that match against line/file edges
+  will match against the edge of the lookbehind window, so they should
+  generally be avoided in lookbehinds.
 
 `>` *pat*
 : Matches *pat*, but does not consume any input (lookahead).
@@ -256,50 +257,51 @@ against the edges file or line.
 
 `foo`
 : The named pattern whose name is **"foo"**. Pattern names come from
-definitions in grammar files or from named captures. Pattern names may contain
-dashes (`-`), but not underscores (`_`), since the underscore is used to match
-whitespace. See the **GRAMMAR FILES** section for more info.
+  definitions in grammar files or from named captures. Pattern names may
+  contain dashes (`-`), but not underscores (`_`), since the underscore is used
+  to match whitespace. See the **GRAMMAR FILES** section for more info.
 
 `@` *name* `:` *pat*
 : For the rest of the current chain, define *name* to match whatever *pat*
-matches, i.e. a backreference. For example, `` @foo:word `( foo `) `` (matches
-**"asdf(asdf)"** or **"baz(baz)"**, but not **"foo(baz)"**)
+  matches, i.e. a backreference. For example, `` @my-word:word `( my-word `) ``
+  (matches **"asdf(asdf)"** or **"baz(baz)"**, but not **"foo(baz)"**)
 
 `@` *name* `=` *pat*
-: Let *name* equal *pat* (named capture). Named captures can be used in
-text replacements.
+: Let *name* equal *pat* (named capture). Named captures can be used in text
+  replacements.
 
 *pat* `=>` `"`*replacement*`"`
 : Replace *pat* with *replacement*. Note: *replacement* should be a string
-(single or double quoted), and it may contain escape sequences (e.g. `\n`) or
-references to captured values: `@0` (the whole of *pat*), `@1` (the first
-capture in *pat*), `@`*foo* (the capture named *foo* in *pat*), etc. For
-example, `@word _ @rest=(*word % _) => "@rest:\n\t@1"` matches a word followed
-by whitespace, followed by a series of words and replaces it with the series
-of words, a colon, a newline, a tab, and then the first word.
+  (single or double quoted), and it may contain escape sequences (e.g. `\n`) or
+  references to captured values: `@0` (the whole of *pat*), `@1` (the first
+  capture in *pat*), `@`*foo* (the capture named *foo* in *pat*), etc. For
+  example, `@word _ @rest=(*word % _) => "@rest:\n\t@1"` matches a word
+  followed by whitespace, followed by a series of words and replaces it with
+  the series of words, a colon, a newline, a tab, and then the first word.
 
 *pat1* `~` *pat2*
 : Matches when *pat1* matches and *pat2* can be found within the text of that
-match. (e.g. `comment ~ {TODO}` matches comments that contain the word
-**"TODO"**)
+  match. (e.g. `comment ~ "TODO"` matches comments that contain **"TODO"**)
 
 *pat1* `!~` *pat2*
 : Matches when *pat1* matches, but *pat2* can not be found within the text of
-that match. (e.g. `comment ~ {IGNORE}` matches only comments that do not
-contain the word **"IGNORE"**)
+  that match. (e.g. `comment ~ "IGNORE"` matches only comments that do not
+  contain **"IGNORE"**)
 
-*name*`:` *pat*
-: Define *name* to mean *pat* (pattern definition)
+*name*`:` *pat1*; *pat2*
+: Define *name* to mean *pat1* (pattern definition) inside the pattern *pat2*.
+  For example, a recursive pattern can be defined and used like this:
+  `paren-comment: "(*" ..%paren-comment "*)"; paren-comment`
 
 `@:`*name* `=` *pat*
 : Match *pat* and tag it with the given name as metadata.
 
 *name*`::` *pat*
 : Syntactic sugar for *name*`:` `@:`*name*`=`*pat* (define a pattern that also
-attaches a metadata tag of the same name)
+  attaches a metadata tag of the same name)
 
 `#` *comment*
-: A line comment
+: A line comment, ignored by BP
 
 
 # GRAMMAR FILES
@@ -311,8 +313,22 @@ defines a few useful general-purpose patterns. For example, it defines the
 nested inner parentheses:
 
 ```
-bp -p '"my_func" parens'
+bp 'my_func{parens}'
 ```
+
+BP's builtin grammar file defines a few other commonly used patterns such as:
+
+- `braces` (matching `{}` pairs), `brackets` (matching `[]` pairs),
+  `anglebraces` (matching `<>` pairs)
+- `string`: a single- or double-quote delimited string, including standard
+  escape sequences
+- `id` or `var`: an identifier (full UTF-8 support)
+- `word`: similar to `id`/`var`, but can start with a number
+- `Hex`, `hex`, `HEX`: a mixed-case, lowercase, or uppercase hex digit
+- `digit`: a digit from 0-9
+- `int`: one or more digits
+- `number`: an int or floating point literal
+- `esc`, `tab`, `nl`, `cr`, `crlf`, `lf`: Shorthand for escape sequences
 
 **bp** also comes with a few grammar files for common programming languages,
 which may be loaded on demand. These grammar files are not comprehensive syntax
@@ -322,31 +338,31 @@ block comments. Thus, you can find all comments with the word "TODO" with the
 following command:
 
 ```
-bp -g c++ -p 'comment ~ {TODO}' *.cpp
+bp -g c++ '{comment ~ "TODO"}' *.cpp
 ```
 
 
 # EXAMPLES
 
-Find files containing the string "foo" (a string pattern):
+Find files containing the literal string "foo.baz" (a string pattern):
 ```
-ls | bp foo
+ls | bp foo.baz
 ```
 
 Find files ending with ".c" and print the name with the ".c" replaced with ".h":
 ```
-ls | bp '.c\$' -r '.h'
+ls | bp '.c{$}' -r '.h'
 ```
 
 Find the word "foobar", followed by a pair of matching parentheses in the file
 *my_file.py*:
 ```
-bp -p '{foobar} parens' my_file.py
+bp 'foobar{parens}' my_file.py
 ```
 
 Using the *html* grammar, find all *element*s matching the tag *a* in the file
 *foo.html*:
 ```
-bp -g html -p 'element ~ (^^"<a ")' foo.html
+bp -g html '{element ~ (^^"<a ")}' foo.html
 ```
 

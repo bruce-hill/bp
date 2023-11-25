@@ -13,8 +13,14 @@ Run `make tutorial` to run through the tutorial. It walks through some basic pat
 
 ## Usage
 
-`bp [flags] <pattern> [<input files>...]`
+```
+bp [flags] <pattern> [<input files>...]
+```
 
+BP is optimized for matching literal strings, so the main pattern argument is
+interpreted as a string literal. BP pattern syntax is inserted using curly
+brace interpolations like `bp 'foo{..}baz'` (match the string literal "foo" up
+to and including the next occurrence of "baz" on the same line).
 
 ### Flags
 
@@ -25,7 +31,6 @@ Run `make tutorial` to run through the tutorial. It walks through some basic pat
 * `-e` `--explain` print an explanation of the matches
 * `-j` `--json` print matches as JSON objects
 * `-l` `--list-files` print only filenames containing matches
-* `-p` `--pattern <pat>` provide a pattern (equivalent to `bp '\(<pat>)'`)
 * `-r` `--replace <replacement>` replace the input pattern with the given replacement
 * `-s` `--skip <skip pattern>` skip over the given pattern when looking for matches
 * `-B` `--context-before <N>` change how many lines of context are printed before each match

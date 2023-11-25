@@ -97,8 +97,8 @@ static pat_t *expand_replacements(pat_t *replace_pat, const char *end, bool allo
         const char *repstr;
         size_t replen;
         if (matchchar(&str, '"', allow_nl, end) || matchchar(&str, '\'', allow_nl, end)
-            || matchchar(&str, '{', allow_nl, end) || matchchar(&str, '\002', allow_nl, end)) {
-            char closequote = str[-1] == '{' ? '}' : (str[-1] == '\002' ? '\003' : str[-1]);
+            || matchchar(&str, '}', allow_nl, end) || matchchar(&str, '\002', allow_nl, end)) {
+            char closequote = str[-1] == '}' ? '{' : (str[-1] == '\002' ? '\003' : str[-1]);
             repstr = str;
             for (; str < end && *str != closequote; str = next_char(str, end)) {
                 if (*str == '\\') {
@@ -235,8 +235,7 @@ static pat_t *_bp_simplepattern(const char *str, const char *end, bool inside_st
             }
             pat_t *target;
             if (inside_stringpattern) {
-                maybe_pat_t maybe_target = bp_stringpattern(str, end);
-                target = maybe_target.success ? maybe_target.value.pat : NULL;
+                target = NULL;
             } else {
                 target = bp_simplepattern(str, end);
             }
@@ -332,8 +331,8 @@ static pat_t *_bp_simplepattern(const char *str, const char *end, bool inside_st
         return Pattern(BP_WORD_BOUNDARY, start, str, 0, 0);
     }
     // String literal
-    case '"': case '\'': case '\002': case '{': {
-        char endquote = c == '\002' ? '\003' : (c == '{' ? '}' : c);
+    case '"': case '\'': case '\002': case '}': {
+        char endquote = c == '\002' ? '\003' : (c == '}' ? '{' : c);
         char *litstart = (char*)str;
         while (str < end && *str != endquote)
             str = next_char(str, end);
@@ -494,42 +493,26 @@ static pat_t *_bp_simplepattern(const char *str, const char *end, bool inside_st
 }
 
 //
-// Similar to bp_simplepattern, except that the pattern begins with an implicit, unclosable quote.
+// Similar to bp_simplepattern, except that the pattern begins with an implicit
+// '}' open quote that can be closed with '{'
 //
 maybe_pat_t bp_stringpattern(const char *str, const char *end)
 {
     __TRY_PATTERN__
     if (!end) end = str + strlen(str);
-    pat_t *ret = NULL;
-    while (str < end) {
-        char *start = (char*)str;
-        pat_t *interp = NULL;
-        for (; str < end; str = next_char(str, end)) {
-            if (*str == '\\' && str+1 < end) {
-                if (str[1] == '\\' || isalnum(str[1]))
-                    interp = _bp_simplepattern(str, end, true);
-                else
-                    interp = _bp_simplepattern(str+1, end, true);
-                if (interp) break;
-                // If there is no interpolated value, this is just a plain ol' regular backslash
-            }
-        }
-        // End of string
-        size_t len = (size_t)(str - start);
-        if (len > 0) {
-            pat_t *str_chunk = Pattern(BP_STRING, start, str, len, (ssize_t)len, .string=start);
-            ret = chain_together(ret, str_chunk);
-        }
-        if (interp) {
-            ret = chain_together(ret, interp);
-            str = interp->end;
-            // allow terminating seq
-            (void)matchchar(&str, ';', false, end);
-        }
+    char *start = (char*)str;
+    while (str < end && *str != '{')
+        str = next_char(str, end);
+    size_t len = (size_t)(str - start);
+    pat_t *pat = Pattern(BP_STRING, start, str, len, (ssize_t)len, .string=start);
+    str += 1;
+    if (str < end) {
+        pat_t *interp = bp_pattern_nl(str, end, true);
+        if (interp)
+            pat = chain_together(pat, interp);
     }
-    if (!ret) ret = Pattern(BP_STRING, str, str, 0, 0);
     __END_TRY_PATTERN__
-    return (maybe_pat_t){.success = true, .value.pat = ret};
+    return (maybe_pat_t){.success = true, .value.pat = pat};
 }
 
 //

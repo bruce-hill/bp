@@ -43,7 +43,6 @@ static const char *usage = (
     " -i --ignore-case                 preform matching case-insensitively\n"
     " -I --inplace                     modify a file in-place\n"
     " -l --list-files                  list filenames only\n"
-    " -p --pattern <pat>               provide a pattern (equivalent to bp '\\(<pat>)')\n"
     " -w --word <string-pat>           find words matching the given string pattern\n"
     " -r --replace <replacement>       replace the input pattern with the given replacement\n"
     " -s --skip <skip-pattern>         skip over the given pattern when looking for matches\n"
@@ -383,7 +382,7 @@ static int print_matches(FILE *out, file_t *f, pat_t *pattern, pat_t *defs)
     // Print trailing context if needed:
     if (matches > 0) {
         fprint_context(out, f, prev, NULL);
-        if (last_line_num < 0) { // Hacky fix to ensure line number gets printed for `bp -p '$$'`
+        if (last_line_num < 0) { // Hacky fix to ensure line number gets printed for `bp '{$$}'`
             fprint_linenum(out, f, f->nlines, print_opts.normal_color);
             fputc('\n', out);
         }
@@ -599,9 +598,6 @@ int main(int argc, char *argv[])
             if (f == NULL)
                 errx(EXIT_FAILURE, "Couldn't find grammar: %s", flag);
             defs = load_grammar(defs, f); // Keep in memory for debug output
-        } else if (FLAG("-p")     || FLAG("--pattern")) {
-            pat_t *p = assert_pat(flag, NULL, bp_pattern(flag, flag+strlen(flag)));
-            pattern = chain_together(pattern, p);
         } else if (FLAG("-w")     || FLAG("--word")) {
             require(asprintf(&flag, "\\|%s\\|", flag), "Could not allocate memory");
             file_t *arg_file = spoof_file(&loaded_files, "<word pattern>", flag, -1);
