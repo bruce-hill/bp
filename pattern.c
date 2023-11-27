@@ -504,7 +504,7 @@ maybe_pat_t bp_stringpattern(const char *str, const char *end)
     while (str < end && *str != '{')
         str = next_char(str, end);
     size_t len = (size_t)(str - start);
-    pat_t *pat = Pattern(BP_STRING, start, str, len, (ssize_t)len, .string=start);
+    pat_t *pat = len > 0 ? Pattern(BP_STRING, start, str, len, (ssize_t)len, .string=start) : NULL;
     str += 1;
     if (str < end) {
         pat_t *interp = bp_pattern_nl(str, end, true);

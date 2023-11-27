@@ -295,7 +295,7 @@ static pat_t *get_prerequisite(match_ctx_t *ctx, pat_t *pat)
         case BP_CHAIN: {
             auto chain = Match(p, BP_CHAIN);
             // If pattern is something like (|"foo"|), then use "foo" as the first thing to scan for
-            p = (chain->first->type == BP_WORD_BOUNDARY || chain->first->type == BP_START_OF_LINE) ? chain->second : chain->first;
+            p = chain->first->max_matchlen == 0 ? chain->second : chain->first;
             break;
         }
         case BP_MATCH:

@@ -599,7 +599,7 @@ int main(int argc, char *argv[])
                 errx(EXIT_FAILURE, "Couldn't find grammar: %s", flag);
             defs = load_grammar(defs, f); // Keep in memory for debug output
         } else if (FLAG("-w")     || FLAG("--word")) {
-            require(asprintf(&flag, "\\|%s\\|", flag), "Could not allocate memory");
+            require(asprintf(&flag, "{|}%s{|}", flag), "Could not allocate memory");
             file_t *arg_file = spoof_file(&loaded_files, "<word pattern>", flag, -1);
             delete(&flag);
             pat_t *p = assert_pat(arg_file->start, arg_file->end, bp_stringpattern(arg_file->start, arg_file->end));
