@@ -34,6 +34,9 @@ syntax.
 : Print only the names of files containing matches instead of the matches
 themselves.
 
+`-c`, `--case`
+: Perform pattern matching with case-sensitivity (the default is smart casing, i.e. case-insensitive, unless there are any uppercase letters present).
+
 `-i`, `--ignore-case`
 : Perform pattern matching case-insensitively.
 

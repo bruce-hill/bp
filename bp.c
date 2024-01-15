@@ -40,6 +40,7 @@ static const char *usage = (
     " -v --verbose                     print verbose debugging info\n"
     " -e --explain                     explain the matches\n"
     " -j --json                        print matches as a list of JSON objects\n"
+    " -c --case                        use case sensitivity\n"
     " -i --ignore-case                 preform matching case-insensitively\n"
     " -I --inplace                     modify a file in-place\n"
     " -l --list-files                  list filenames only\n"
@@ -538,6 +539,18 @@ static int context_from_flag(const char *flag)
     return (int)strtol(flag, NULL, 10);
 }
 
+//
+// Check if any letters are uppercase
+//
+static bool any_uppercase(const char *str)
+{
+    for (; *str; ++str) {
+        if (isupper(*str))
+            return true;
+    }
+    return false;
+}
+
 #define FLAG(f) (flag = get_flag(argv, f, &argv))
 #define BOOLFLAG(f) get_boolflag(argv, f, &argv)
 
@@ -554,6 +567,8 @@ int main(int argc, char *argv[])
     if (builtins_file) defs = load_grammar(defs, builtins_file);
     file_t *local_file = load_filef(&loaded_files, "%s/.config/"BP_NAME"/builtins.bp", getenv("HOME"));
     if (local_file) defs = load_grammar(defs, local_file);
+
+    bool explicit_case_sensitivity = false;
 
     ++argv; // skip program name
     while (argv[0]) {
@@ -577,6 +592,10 @@ int main(int argc, char *argv[])
             options.git_mode = true;
         } else if (BOOLFLAG("-i") || BOOLFLAG("--ignore-case")) {
             options.ignorecase = true;
+            explicit_case_sensitivity = true;
+        } else if (BOOLFLAG("-c") || BOOLFLAG("--case")) {
+            options.ignorecase = false;
+            explicit_case_sensitivity = true;
         } else if (BOOLFLAG("-l") || BOOLFLAG("--list-files")) {
             options.mode = MODE_LISTFILES;
         } else if (FLAG("-r")     || FLAG("--replace")) {
@@ -601,6 +620,8 @@ int main(int argc, char *argv[])
         } else if (FLAG("-w")     || FLAG("--word")) {
             require(asprintf(&flag, "{|}%s{|}", flag), "Could not allocate memory");
             file_t *arg_file = spoof_file(&loaded_files, "<word pattern>", flag, -1);
+            if (!explicit_case_sensitivity)
+                options.ignorecase = !any_uppercase(flag);
             delete(&flag);
             pat_t *p = assert_pat(arg_file->start, arg_file->end, bp_stringpattern(arg_file->start, arg_file->end));
             pattern = chain_together(pattern, p);
@@ -627,6 +648,8 @@ int main(int argc, char *argv[])
         } else if (argv[0][0] != '-') {
             if (pattern != NULL) break;
             pat_t *p = assert_pat(argv[0], NULL, bp_stringpattern(argv[0], argv[0]+strlen(argv[0])));
+            if (!explicit_case_sensitivity)
+                options.ignorecase = !any_uppercase(argv[0]);
             pattern = chain_together(pattern, p);
             ++argv;
         } else {
