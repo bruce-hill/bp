@@ -337,8 +337,10 @@ static match_t *_next_match(match_ctx_t *ctx, const char *str, pat_t *pat, pat_t
     // Performance optimization: if the pattern starts with a string literal,
     // we can just rely on the highly optimized memmem() implementation to skip
     // past areas where we know we won't find a match.
-    if (!skip && first->type == BP_STRING && first->min_matchlen > 0 && !ctx->ignorecase) {
-        char *found = memmem(str, (size_t)(ctx->end - str), Match(first, BP_STRING)->string, first->min_matchlen);
+    if (!skip && first->type == BP_STRING && first->min_matchlen > 0) {
+        char *found = ctx->ignorecase ?
+            strcasestr(str, Match(first, BP_STRING)->string)
+            : memmem(str, (size_t)(ctx->end - str), Match(first, BP_STRING)->string, first->min_matchlen);
         str = found ? found : ctx->end;
     } else if (!skip && str > ctx->start && (first->type == BP_START_OF_LINE || first->type == BP_END_OF_LINE)) {
         char *found = memchr(str, '\n', (size_t)(ctx->end - str));
