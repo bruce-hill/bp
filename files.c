@@ -78,7 +78,7 @@ file_t *load_file(file_t **files, const char *filename)
 
     filename = checked_strdup(filename);
     for (const char *slashes = strstr(filename, "//"); slashes; slashes = strstr(slashes, "//"))
-        memmove((char*)slashes, slashes+1, strlen(slashes+1));
+        memmove((char*)slashes, slashes+1, strlen(slashes+1)+1);
     file_t *f = new(file_t);
     f->filename = filename;
 
