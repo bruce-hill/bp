@@ -3,8 +3,10 @@
 //
 #pragma once
 
+#include <printf.h>
 #include <stdbool.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <sys/types.h>
 #include <err.h>
 
@@ -67,7 +69,7 @@ typedef struct pat_s {
         struct {} BP_ANYCHAR;
         struct {} BP_ID_START;
         struct {} BP_ID_CONTINUE;
-        struct {const char *string;} BP_STRING;
+        struct {const char *string; size_t len; } BP_STRING;
         struct {unsigned char low, high; } BP_RANGE;
         struct {struct pat_s *pat;} BP_NOT;
         struct {struct pat_s *target, *skip;} BP_UPTO;
@@ -163,5 +165,6 @@ maybe_pat_t bp_pattern(const char *str, const char *end);
 void free_all_pats(void);
 __attribute__((nonnull))
 void delete_pat(pat_t **at_pat, bool recursive);
+int set_pattern_printf_specifier(char specifier);
 
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1,\:0

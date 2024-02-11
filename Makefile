@@ -3,7 +3,7 @@ CC=cc
 PREFIX=/usr/local
 SYSCONFDIR=/etc
 CFLAGS=-std=c99 -Werror -D_XOPEN_SOURCE=700 -D_POSIX_C_SOURCE=200809L -flto=auto
-CWARN=-Wall -Wextra
+CWARN=-Wall -Wextra -Wno-format
   # -Wpedantic -Wsign-conversion -Wtype-limits -Wunused-result -Wnull-dereference \
 	# -Waggregate-return -Walloc-zero -Walloca -Warith-conversion -Wcast-align -Wcast-align=strict \
 	# -Wdangling-else -Wdate-time -Wdisabled-optimization -Wdouble-promotion -Wduplicated-branches \

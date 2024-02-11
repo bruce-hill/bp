@@ -277,5 +277,4 @@ int fprint_match(FILE *out, const char *file_start, match_t *m, print_options_t 
     return printed;
 }
 
-
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1,\:0

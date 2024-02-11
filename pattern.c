@@ -3,9 +3,11 @@
 //
 #include <ctype.h>
 #include <err.h>
+#include <printf.h>
 #include <setjmp.h>
 #include <stdbool.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -272,7 +274,7 @@ static pat_t *_bp_simplepattern(const char *str, const char *end, bool inside_st
                 all = either_pat(all, pat);
             } else {
                 size_t len = (size_t)(str - c1_loc);
-                pat_t *pat = Pattern(BP_STRING, start, str, len, (ssize_t)len, .string=c1_loc);
+                pat_t *pat = Pattern(BP_STRING, start, str, len, (ssize_t)len, .string=strndup(c1_loc, len));
                 all = either_pat(all, pat);
             }
         } while (*str++ == ',');
@@ -338,7 +340,7 @@ static pat_t *_bp_simplepattern(const char *str, const char *end, bool inside_st
             str = next_char(str, end);
         size_t len = (size_t)(str - litstart);
         str = next_char(str, end);
-        return Pattern(BP_STRING, start, str, len, (ssize_t)len, .string=litstart);
+        return Pattern(BP_STRING, start, str, len, (ssize_t)len, .string=strndup(litstart, len));
     }
     // Not <pat>
     case '!': {
@@ -504,7 +506,7 @@ maybe_pat_t bp_stringpattern(const char *str, const char *end)
     while (str < end && *str != '{')
         str = next_char(str, end);
     size_t len = (size_t)(str - start);
-    pat_t *pat = len > 0 ? Pattern(BP_STRING, start, str, len, (ssize_t)len, .string=start) : NULL;
+    pat_t *pat = len > 0 ? Pattern(BP_STRING, start, str, len, (ssize_t)len, .string=strndup(start, len)) : NULL;
     str += 1;
     if (str < end) {
         pat_t *interp = bp_pattern_nl(str, end, true);
@@ -588,7 +590,7 @@ static pat_t *bp_pattern_nl(const char *str, const char *end, bool allow_nl)
 //
 pat_t *bp_raw_literal(const char *str, size_t len)
 {
-    return Pattern(BP_STRING, str, &str[len], len, (ssize_t)len, .string=str);
+    return Pattern(BP_STRING, str, &str[len], len, (ssize_t)len, .string=strndup(str, len));
 }
 
 //
@@ -642,6 +644,7 @@ void delete_pat(pat_t **at_pat, bool recursive)
         T(BP_AFTER, F(pat))
         T(BP_BEFORE, F(pat))
         T(BP_LEFTRECURSION, F(fallback))
+        T(BP_STRING, if (_data->string) { free((char*)_data->string); _data->string = NULL; })
         default: break;
         }
     }
@@ -651,6 +654,61 @@ void delete_pat(pat_t **at_pat, bool recursive)
     if (pat->home) *(pat->home) = pat->next;
     if (pat->next) pat->next->home = pat->home;
     delete(at_pat);
+}
+
+static int printf_pattern_size(const struct printf_info *info, size_t n, int argtypes[n], int sizes[n])
+{
+    if (n < 1) return -1;
+    (void)info;
+    argtypes[0] = PA_POINTER;
+    sizes[0] = sizeof(void*);
+    return 1;
+}
+
+static int printf_pattern(FILE *stream, const struct printf_info *info, const void *const args[])
+{
+    (void)info;
+    pat_t *pat = *(pat_t**)args[0];
+    if (!pat) return fputs("(null)", stream);
+
+    switch (pat->type) {
+#define P(name, ...) case BP_ ## name: { __auto_type data = pat->__tagged.BP_##name; (void)data; return fprintf(stream, #name __VA_ARGS__); }
+        P(ERROR)
+        P(ANYCHAR)
+        P(ID_START)
+        P(ID_CONTINUE)
+        P(STRING, "(\"%s\")", data.string)
+        P(RANGE, "('%c'-'%c')", data.low, data.high)
+        P(NOT, "(%P)", data.pat)
+        P(UPTO, "(%P, skip=%P)", data.target, data.skip)
+        P(UPTO_STRICT, "(%P, skip=%P)", data.target, data.skip)
+        P(REPEAT, "(%u-%d, %P, sep=%P)", data.min, data.max, data.repeat_pat, data.sep)
+        P(BEFORE, "(%P)", data.pat)
+        P(AFTER, "(%P)", data.pat)
+        P(CAPTURE, "(%P, name=%.*s, backref=%s)", data.pat, data.namelen, data.name, data.backreffable ? "yes" : "no")
+        P(OTHERWISE, "(%P, %P)", data.first, data.second);
+        P(CHAIN, "(%P, %P)", data.first, data.second);
+        P(MATCH, "(%P, matches=%P)", data.pat, data.must_match);
+        P(NOT_MATCH, "(%P, not_matches=%P)", data.pat, data.must_not_match);
+        P(REPLACE, "(%P, \"%.*s\")", data.pat, data.len, data.text);
+        P(REF, "(%.*s)", data.len, data.name);
+        P(NODENT)
+        P(CURDENT)
+        P(START_OF_FILE)
+        P(START_OF_LINE)
+        P(END_OF_FILE)
+        P(END_OF_LINE)
+        P(WORD_BOUNDARY)
+        P(DEFINITIONS, "(%.*s=%P); %P", data.namelen, data.name, data.meaning, data.next_def)
+        P(TAGGED, "(%.*s=%P, backref=%s)", data.namelen, data.name, data.pat, data.backreffable ? "yes" : "no")
+#undef P
+    default: return fputs("???", stream);
+    }
+}
+
+int set_pattern_printf_specifier(char specifier)
+{
+    return register_printf_specifier(specifier, printf_pattern, printf_pattern_size);
 }
 
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1,\:0

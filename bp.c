@@ -10,6 +10,7 @@
 #include <fcntl.h>
 #include <glob.h>
 #include <limits.h>
+#include <printf.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -558,6 +559,9 @@ int main(int argc, char *argv[])
 {
     char *flag = NULL;
 
+    if (set_pattern_printf_specifier('P'))
+        errx(1, "Couldn't set printf specifier");
+
     pat_t *defs = NULL;
     file_t *loaded_files = NULL;
     pat_t *pattern = NULL;
@@ -677,6 +681,9 @@ int main(int argc, char *argv[])
 
     // Handle exit() calls gracefully:
     require(atexit(&cleanup), "Failed to set cleanup handler at exit");
+
+    if (options.verbose)
+        printf("Matching pattern: %P\n", pattern);
 
     int found = 0;
     if (options.mode == MODE_JSON) printf("[");
