@@ -97,7 +97,7 @@ static match_t *clone_match(match_t *m)
         for (int i = 0; m->children[i]; i++) {
             if (nchildren+1 >= child_cap) {
                 ret->children = grow(ret->children, child_cap += 5);
-                for (size_t i = nchildren; i < child_cap; i++) ret->children[i] = NULL;
+                for (size_t j = nchildren; j < child_cap; j++) ret->children[j] = NULL;
             }
             ret->children[nchildren++] = clone_match(m->children[i]);
         }
