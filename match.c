@@ -227,12 +227,12 @@ static pat_t *_lookup_def(match_ctx_t *ctx, pat_t *defs, const char *name, size_
 {
     while (defs) {
         if (defs->type == BP_CHAIN) {
-            auto chain = Match(defs, BP_CHAIN);
+            auto chain = When(defs, BP_CHAIN);
             pat_t *second = _lookup_def(ctx, chain->second, name, namelen);
             if (second) return second;
             defs = chain->first;
         } else if (defs->type == BP_DEFINITIONS) {
-            auto def = Match(defs, BP_DEFINITIONS);
+            auto def = When(defs, BP_DEFINITIONS);
             if (namelen == def->namelen && strncmp(def->name, name, namelen) == 0)
                 return def->meaning;
             defs = def->next_def;
@@ -265,7 +265,7 @@ __attribute__((nonnull(1)))
 static inline pat_t *deref(match_ctx_t *ctx, pat_t *pat)
 {
     if (pat && pat->type == BP_REF) {
-        auto ref = Match(pat, BP_REF);
+        auto ref = When(pat, BP_REF);
         pat_t *def = lookup_ctx(ctx, ref->name, ref->len);
         if (def) return def;
     }
@@ -283,27 +283,27 @@ static pat_t *get_prerequisite(match_ctx_t *ctx, pat_t *pat)
     for (pat_t *p = pat; p; ) {
         switch (p->type) {
         case BP_BEFORE:
-            p = Match(p, BP_BEFORE)->pat; break;
+            p = When(p, BP_BEFORE)->pat; break;
         case BP_REPEAT:
-            if (Match(p, BP_REPEAT)->min == 0)
+            if (When(p, BP_REPEAT)->min == 0)
                 return p;
-            p = Match(p, BP_REPEAT)->repeat_pat; break;
+            p = When(p, BP_REPEAT)->repeat_pat; break;
         case BP_CAPTURE:
-            p = Match(p, BP_CAPTURE)->pat; break;
+            p = When(p, BP_CAPTURE)->pat; break;
         case BP_TAGGED:
-            p = Match(p, BP_TAGGED)->pat; break;
+            p = When(p, BP_TAGGED)->pat; break;
         case BP_CHAIN: {
-            auto chain = Match(p, BP_CHAIN);
+            auto chain = When(p, BP_CHAIN);
             // If pattern is something like (|"foo"|), then use "foo" as the first thing to scan for
             p = chain->first->max_matchlen == 0 ? chain->second : chain->first;
             break;
         }
         case BP_MATCH:
-            p = Match(p, BP_MATCH)->pat; break;
+            p = When(p, BP_MATCH)->pat; break;
         case BP_NOT_MATCH:
-            p = Match(p, BP_NOT_MATCH)->pat; break;
+            p = When(p, BP_NOT_MATCH)->pat; break;
         case BP_REPLACE:
-            p = Match(p, BP_REPLACE)->pat; break;
+            p = When(p, BP_REPLACE)->pat; break;
         case BP_REF: {
             if (++derefs > 10) return p; // In case of left recursion
             pat_t *p2 = deref(ctx, p);
@@ -339,8 +339,8 @@ static match_t *_next_match(match_ctx_t *ctx, const char *str, pat_t *pat, pat_t
     // past areas where we know we won't find a match.
     if (!skip && first->type == BP_STRING && first->min_matchlen > 0) {
         char *found = ctx->ignorecase ?
-            strcasestr(str, Match(first, BP_STRING)->string)
-            : memmem(str, (size_t)(ctx->end - str), Match(first, BP_STRING)->string, first->min_matchlen);
+            strcasestr(str, When(first, BP_STRING)->string)
+            : memmem(str, (size_t)(ctx->end - str), When(first, BP_STRING)->string, first->min_matchlen);
         str = found ? found : ctx->end;
     } else if (!skip && str > ctx->start && (first->type == BP_START_OF_LINE || first->type == BP_END_OF_LINE)) {
         char *found = memchr(str, '\n', (size_t)(ctx->end - str));
@@ -372,7 +372,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
         ctx2.cache = &(cache_t){0};
         ctx2.parent_ctx = ctx;
         ctx2.defs = pat;
-        match_t *m = match(&ctx2, str, Match(pat, BP_DEFINITIONS)->meaning);
+        match_t *m = match(&ctx2, str, When(pat, BP_DEFINITIONS)->meaning);
         cache_destroy(&ctx2);
         return m;
     }
@@ -382,7 +382,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
         // a special case, but if a pattern invokes itself at a later
         // point, it can be handled with normal recursion.
         // See: left-recursion.md for more details.
-        auto leftrec = Match(pat, BP_LEFTRECURSION);
+        auto leftrec = When(pat, BP_LEFTRECURSION);
         if (str == leftrec->at) {
             leftrec->visited = true;
             return clone_match(leftrec->match);
@@ -417,19 +417,19 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
     }
     case BP_STRING: {
         if (&str[pat->min_matchlen] > ctx->end) return NULL;
-        if (pat->min_matchlen > 0 && (ctx->ignorecase ? strncasecmp : strncmp)(str, Match(pat, BP_STRING)->string, pat->min_matchlen) != 0)
+        if (pat->min_matchlen > 0 && (ctx->ignorecase ? strncasecmp : strncmp)(str, When(pat, BP_STRING)->string, pat->min_matchlen) != 0)
             return NULL;
         return new_match(pat, str, str + pat->min_matchlen, NULL);
     }
     case BP_RANGE: {
         if (str >= ctx->end) return NULL;
-        auto range = Match(pat, BP_RANGE);
+        auto range = When(pat, BP_RANGE);
         if ((unsigned char)*str < range->low || (unsigned char)*str > range->high)
             return NULL;
         return new_match(pat, str, str+1, NULL);
     }
     case BP_NOT: {
-        match_t *m = match(ctx, str, Match(pat, BP_NOT)->pat);
+        match_t *m = match(ctx, str, When(pat, BP_NOT)->pat);
         if (m != NULL) {
             recycle_match(&m);
             return NULL;
@@ -438,8 +438,8 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
     }
     case BP_UPTO: case BP_UPTO_STRICT: {
         match_t *m = new_match(pat, str, str, NULL);
-        pat_t *target = deref(ctx, pat->type == BP_UPTO ? Match(pat, BP_UPTO)->target : Match(pat, BP_UPTO_STRICT)->target),
-              *skip = deref(ctx, pat->type == BP_UPTO ? Match(pat, BP_UPTO)->skip : Match(pat, BP_UPTO_STRICT)->skip);
+        pat_t *target = deref(ctx, pat->type == BP_UPTO ? When(pat, BP_UPTO)->target : When(pat, BP_UPTO_STRICT)->target),
+              *skip = deref(ctx, pat->type == BP_UPTO ? When(pat, BP_UPTO)->skip : When(pat, BP_UPTO_STRICT)->skip);
         if (!target && !skip) {
             while (str < ctx->end && *str != '\n') ++str;
             m->end = str;
@@ -484,7 +484,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
     case BP_REPEAT: {
         match_t *m = new_match(pat, str, str, NULL);
         size_t reps = 0;
-        auto repeat = Match(pat, BP_REPEAT);
+        auto repeat = When(pat, BP_REPEAT);
         pat_t *repeating = deref(ctx, repeat->repeat_pat);
         pat_t *sep = deref(ctx, repeat->sep);
         size_t child_cap = 0, nchildren = 0;
@@ -542,7 +542,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
         return m;
     }
     case BP_AFTER: {
-        pat_t *back = deref(ctx, Match(pat, BP_AFTER)->pat);
+        pat_t *back = deref(ctx, When(pat, BP_AFTER)->pat);
         if (!back) return NULL;
 
         // We only care about the region from the backtrack pos up to the
@@ -575,22 +575,22 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
         return NULL;
     }
     case BP_BEFORE: {
-        match_t *after = match(ctx, str, Match(pat, BP_BEFORE)->pat);
+        match_t *after = match(ctx, str, When(pat, BP_BEFORE)->pat);
         return after ? new_match(pat, str, str, MATCHES(after)) : NULL;
     }
     case BP_CAPTURE: case BP_TAGGED: {
-        pat_t *to_match = pat->type == BP_CAPTURE ? Match(pat, BP_CAPTURE)->pat : Match(pat, BP_TAGGED)->pat;
+        pat_t *to_match = pat->type == BP_CAPTURE ? When(pat, BP_CAPTURE)->pat : When(pat, BP_TAGGED)->pat;
         if (!to_match)
             return new_match(pat, str, str, NULL);
         match_t *p = match(ctx, str, to_match);
         return p ? new_match(pat, str, p->end, MATCHES(p)) : NULL;
     }
     case BP_OTHERWISE: {
-        match_t *m = match(ctx, str, Match(pat, BP_OTHERWISE)->first);
-        return m ? m : match(ctx, str, Match(pat, BP_OTHERWISE)->second);
+        match_t *m = match(ctx, str, When(pat, BP_OTHERWISE)->first);
+        return m ? m : match(ctx, str, When(pat, BP_OTHERWISE)->second);
     }
     case BP_CHAIN: {
-        auto chain = Match(pat, BP_CHAIN);
+        auto chain = When(pat, BP_CHAIN);
         if (chain->first->type == BP_DEFINITIONS) {
             match_ctx_t ctx2 = *ctx;
             ctx2.cache = &(cache_t){0};
@@ -606,7 +606,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
 
         match_t *m2;
         // Push backrefs and run matching, then cleanup
-        if (m1->pat->type == BP_CAPTURE && Match(m1->pat, BP_CAPTURE)->name && Match(m1->pat, BP_CAPTURE)->backreffable) {
+        if (m1->pat->type == BP_CAPTURE && When(m1->pat, BP_CAPTURE)->name && When(m1->pat, BP_CAPTURE)->backreffable) {
             // Temporarily add a rule that the backref name matches the
             // exact string of the original match (no replacements)
             pat_t *backref;
@@ -632,8 +632,8 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
                 .type = BP_DEFINITIONS,
                 .start = m1->pat->start, .end = m1->pat->end,
                 .__tagged.BP_DEFINITIONS = {
-                    .name = Match(m1->pat, BP_CAPTURE)->name,
-                    .namelen = Match(m1->pat, BP_CAPTURE)->namelen,
+                    .name = When(m1->pat, BP_CAPTURE)->name,
+                    .namelen = When(m1->pat, BP_CAPTURE)->namelen,
                     .meaning = backref,
                 },
             };
@@ -653,7 +653,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
         return new_match(pat, str, m2->end, MATCHES(m1, m2));
     }
     case BP_MATCH: case BP_NOT_MATCH: {
-        pat_t *target = pat->type == BP_MATCH ? Match(pat, BP_MATCH)->pat : Match(pat, BP_NOT_MATCH)->pat;
+        pat_t *target = pat->type == BP_MATCH ? When(pat, BP_MATCH)->pat : When(pat, BP_NOT_MATCH)->pat;
         match_t *m1 = match(ctx, str, target);
         if (m1 == NULL) return NULL;
 
@@ -665,10 +665,10 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
         slice_ctx.end = m1->end;
         match_t *ret = NULL, *m2 = NULL;
         if (pat->type == BP_MATCH) {
-            m2 = _next_match(&slice_ctx, slice_ctx.start, Match(pat, BP_MATCH)->must_match, NULL);
+            m2 = _next_match(&slice_ctx, slice_ctx.start, When(pat, BP_MATCH)->must_match, NULL);
             if (m2) ret = new_match(pat, m1->start, m1->end, MATCHES(m1, m2));
         } else {
-            m2 = _next_match(&slice_ctx, slice_ctx.start, Match(pat, BP_NOT_MATCH)->must_not_match, NULL);
+            m2 = _next_match(&slice_ctx, slice_ctx.start, When(pat, BP_NOT_MATCH)->must_not_match, NULL);
             if (!m2) ret = new_match(pat, m1->start, m1->end, MATCHES(m1));
         }
         cache_destroy(&slice_ctx);
@@ -680,7 +680,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
     }
     case BP_REPLACE: {
         match_t *p = NULL;
-        auto replace = Match(pat, BP_REPLACE);
+        auto replace = When(pat, BP_REPLACE);
         if (replace->pat) {
             p = match(ctx, str, replace->pat);
             if (p == NULL) return NULL;
@@ -691,7 +691,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
         if (has_cached_failure(ctx, str, pat))
             return NULL;
 
-        auto ref_pat = Match(pat, BP_REF);
+        auto ref_pat = When(pat, BP_REF);
         pat_t *ref = lookup_ctx(ctx, ref_pat->name, ref_pat->len);
         if (ref == NULL) {
             match_error(ctx, "Unknown pattern: '%.*s'", (int)ref_pat->len, ref_pat->name);
@@ -913,7 +913,7 @@ public bool next_match(match_t **m, const char *start, const char *end, pat_t *p
 __attribute__((nonnull))
 static match_t *_get_numbered_capture(match_t *m, int *n)
 {
-    if ((m->pat->type == BP_CAPTURE && Match(m->pat, BP_CAPTURE)->namelen == 0) || m->pat->type == BP_TAGGED) {
+    if ((m->pat->type == BP_CAPTURE && When(m->pat, BP_CAPTURE)->namelen == 0) || m->pat->type == BP_TAGGED) {
         if (*n == 1) {
             return m;
         } else {
@@ -941,7 +941,7 @@ public match_t *get_numbered_capture(match_t *m, int n)
 {
     if (n <= 0) return m;
     if (m->pat->type == BP_TAGGED || m->pat->type == BP_CAPTURE) {
-        if (n == 1 && m->pat->type == BP_CAPTURE && Match(m->pat, BP_CAPTURE)->namelen == 0) return m;
+        if (n == 1 && m->pat->type == BP_CAPTURE && When(m->pat, BP_CAPTURE)->namelen == 0) return m;
         if (m->children) {
             for (int i = 0; m->children[i]; i++) {
                 match_t *cap = _get_numbered_capture(m->children[i], &n);
@@ -959,9 +959,9 @@ public match_t *get_numbered_capture(match_t *m, int n)
 //
 match_t *_get_named_capture(match_t *m, const char *name, size_t namelen)
 {
-    if (m->pat->type == BP_CAPTURE && Match(m->pat, BP_CAPTURE)->name
-        && Match(m->pat, BP_CAPTURE)->namelen == namelen
-        && strncmp(Match(m->pat, BP_CAPTURE)->name, name, Match(m->pat, BP_CAPTURE)->namelen) == 0)
+    if (m->pat->type == BP_CAPTURE && When(m->pat, BP_CAPTURE)->name
+        && When(m->pat, BP_CAPTURE)->namelen == namelen
+        && strncmp(When(m->pat, BP_CAPTURE)->name, name, When(m->pat, BP_CAPTURE)->namelen) == 0)
         return m;
 
     if (m->pat->type == BP_TAGGED || m->pat->type == BP_CAPTURE)

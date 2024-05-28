@@ -15,6 +15,9 @@
 #include "utils.h"
 #include "utf8.h"
 
+#define Pattern(_tag, _start, _end, _min, _max, ...) allocate_pat((pat_t){.type=_tag, .start=_start, .end=_end, \
+                                                              .min_matchlen=_min, .max_matchlen=_max, .__tagged._tag={__VA_ARGS__}})
+
 static pat_t *allocated_pats = NULL;
 
 __attribute__((nonnull))
@@ -625,7 +628,7 @@ public void delete_pat(pat_t **at_pat, bool recursive)
     pat_t *pat = *at_pat;
     if (!pat) return;
 
-#define T(tag, ...) case tag: { auto _data = Match(pat, tag); __VA_ARGS__; break; }
+#define T(tag, ...) case tag: { auto _data = When(pat, tag); __VA_ARGS__; break; }
 #define F(field) delete_pat(&_data->field, true)
     if (recursive) {
         switch (pat->type) {

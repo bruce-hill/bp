@@ -15,9 +15,7 @@
 #endif
 
 #define UNBOUNDED(pat) ((pat)->max_matchlen == -1)
-#define Match(x, _tag) ((x)->type == _tag ? &(x)->__tagged._tag : (errx(1, __FILE__ ":%d This was supposed to be a " # _tag "\n", __LINE__), &(x)->__tagged._tag))
-#define Pattern(_tag, _start, _end, _min, _max, ...) allocate_pat((pat_t){.type=_tag, .start=_start, .end=_end, \
-                                                              .min_matchlen=_min, .max_matchlen=_max, .__tagged._tag={__VA_ARGS__}})
+
 // BP virtual machine pattern types
 enum pattype_e {
     BP_ERROR         = 0,

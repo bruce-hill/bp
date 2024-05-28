@@ -20,6 +20,8 @@
     __expr; \
 })
 
+#define When(x, _tag) ((x)->type == _tag ? &(x)->__tagged._tag : (errx(1, __FILE__ ":%d This was supposed to be a " # _tag "\n", __LINE__), &(x)->__tagged._tag))
+
 #ifndef public
 #define public __attribute__ ((visibility ("default")))
 #endif
