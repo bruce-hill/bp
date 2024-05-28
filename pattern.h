@@ -14,8 +14,6 @@
 #define auto __auto_type
 #endif
 
-#define UNBOUNDED(pat) ((pat)->max_matchlen == -1)
-
 // BP virtual machine pattern types
 enum pattype_e {
     BP_ERROR         = 0,

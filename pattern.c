@@ -17,6 +17,7 @@
 
 #define Pattern(_tag, _start, _end, _min, _max, ...) allocate_pat((pat_t){.type=_tag, .start=_start, .end=_end, \
                                                               .min_matchlen=_min, .max_matchlen=_max, .__tagged._tag={__VA_ARGS__}})
+#define UNBOUNDED(pat) ((pat)->max_matchlen == -1)
 
 static pat_t *allocated_pats = NULL;
 
