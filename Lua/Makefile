@@ -7,7 +7,7 @@ LUA=lua
 INCS=-I$(LUA_INC)
 CFLAGS=-std=c11 -Werror -D_XOPEN_SOURCE=700 -D_POSIX_C_SOURCE=200809L -fPIC -flto=auto -fvisibility=hidden \
 			 -fsanitize=signed-integer-overflow -fno-sanitize-recover
-CWARN=-Wall -Wextra
+CWARN=-Wall -Wextra -Wshadow
   # -Wpedantic -Wsign-conversion -Wtype-limits -Wunused-result -Wnull-dereference \
 	# -Waggregate-return -Walloc-zero -Walloca -Warith-conversion -Wcast-align -Wcast-align=strict \
 	# -Wdangling-else -Wdate-time -Wdisabled-optimization -Wdouble-promotion -Wduplicated-branches \
