@@ -15,7 +15,7 @@
 // Helper function to skip past all spaces (and comments)
 // Returns a pointer to the first non-space character.
 //
-const char *after_spaces(const char *str, bool skip_nl, const char *end)
+public const char *after_spaces(const char *str, bool skip_nl, const char *end)
 {
     // Skip whitespace and comments:
   skip_whitespace:
@@ -41,7 +41,7 @@ const char *after_spaces(const char *str, bool skip_nl, const char *end)
 // Return the first character after a valid BP name, or NULL if none is
 // found.
 //
-const char *after_name(const char *str, const char *end)
+public const char *after_name(const char *str, const char *end)
 {
     if (str >= end) return end;
     if (*str == '|') return &str[1];
@@ -59,7 +59,7 @@ const char *after_name(const char *str, const char *end)
 //
 // Check if a character is found and if so, move past it.
 //
-bool matchchar(const char **str, char c, bool skip_nl, const char *end)
+public bool matchchar(const char **str, char c, bool skip_nl, const char *end)
 {
     const char *next = after_spaces(*str, skip_nl, end);
     if (next >= end) return false;
@@ -73,7 +73,7 @@ bool matchchar(const char **str, char c, bool skip_nl, const char *end)
 //
 // Check if a string is found and if so, move past it.
 //
-bool matchstr(const char **str, const char *target, bool skip_nl, const char *end)
+public bool matchstr(const char **str, const char *target, bool skip_nl, const char *end)
 {
     const char *next = after_spaces(*str, skip_nl, end);
     if (next + strlen(target) > end) return false;
@@ -89,7 +89,7 @@ bool matchstr(const char **str, const char *target, bool skip_nl, const char *en
 // character that was escaped.
 // Set *end = the first character past the end of the escape sequence.
 //
-char unescapechar(const char *escaped, const char **after, const char *end)
+public char unescapechar(const char *escaped, const char **after, const char *end)
 {
     size_t len = 0;
     unsigned char ret = '\\';
@@ -144,7 +144,7 @@ char unescapechar(const char *escaped, const char **after, const char *end)
 //
 // Free memory, but also set the pointer to NULL for safety
 //
-void delete(void *p)
+public void delete(void *p)
 {
     if (*(void**)p == NULL)
         errx(EXIT_FAILURE, "attempt to free(NULL)");

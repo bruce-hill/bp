@@ -5,6 +5,7 @@
 #include <stdio.h>
 
 #include "json.h"
+#include "utils.h"
 
 __attribute__((nonnull))
 static int _json_match(const char *text, match_t *m, int comma, bool verbose);
@@ -77,7 +78,7 @@ static int _json_match(const char *text, match_t *m, int comma, bool verbose)
 //
 // Print a match object as a JSON object.
 //
-void json_match(const char *text, match_t *m, bool verbose)
+public void json_match(const char *text, match_t *m, bool verbose)
 {
     (void)_json_match(text, m, 0, verbose);
 }

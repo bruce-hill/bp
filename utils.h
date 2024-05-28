@@ -20,6 +20,10 @@
     __expr; \
 })
 
+#ifndef public
+#define public __attribute__ ((visibility ("default")))
+#endif
+
 #define new(t) require(calloc(1, sizeof(t)), "`new(" #t ")` allocation failure")
 #define checked_strdup(s) require(strdup(s), "`checked_strdup(" #s ")` allocation failure")
 #define grow(arr,n) require(realloc(arr,sizeof(arr[0])*(n)), "`grow(" #arr ", " #n ")` allocation failure")

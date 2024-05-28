@@ -57,7 +57,7 @@ static void default_error_handler(char **msg) {
 
 static bp_errhand_t error_handler = default_error_handler;
 
-bp_errhand_t bp_set_error_handler(bp_errhand_t new_handler)
+public bp_errhand_t bp_set_error_handler(bp_errhand_t new_handler)
 {
     bp_errhand_t old_handler = error_handler;
     error_handler = new_handler;
@@ -817,7 +817,7 @@ match_t *new_match(pat_t *pat, const char *start, const char *end, match_t *chil
 // If the given match is not currently a child member of another match (or
 // otherwise reserved) then put it back in the pool of unused match objects.
 //
-void recycle_match(match_t **at_m)
+public void recycle_match(match_t **at_m)
 {
     match_t *m = *at_m;
     if (m->children) {
@@ -836,7 +836,7 @@ void recycle_match(match_t **at_m)
 //
 // Force all match objects into the pool of unused match objects.
 //
-size_t recycle_all_matches(void)
+public size_t recycle_all_matches(void)
 {
     size_t count = 0;
     for (match_t *m; (m = in_use_matches); ++count) {
@@ -851,7 +851,7 @@ size_t recycle_all_matches(void)
 //
 // Free all match objects in memory.
 //
-size_t free_all_matches(void)
+public size_t free_all_matches(void)
 {
     size_t count = 0;
     recycle_all_matches();
@@ -866,7 +866,7 @@ size_t free_all_matches(void)
 // Iterate over matches.
 // Usage: for (match_t *m = NULL; next_match(&m, ...); ) {...}
 //
-bool next_match(match_t **m, const char *start, const char *end, pat_t *pat, pat_t *defs, pat_t *skip, bool ignorecase)
+public bool next_match(match_t **m, const char *start, const char *end, pat_t *pat, pat_t *defs, pat_t *skip, bool ignorecase)
 {
     const char *pos;
     if (*m) {
@@ -937,7 +937,7 @@ static match_t *_get_numbered_capture(match_t *m, int *n)
 //
 // Get a specific numbered pattern capture.
 //
-match_t *get_numbered_capture(match_t *m, int n)
+public match_t *get_numbered_capture(match_t *m, int n)
 {
     if (n <= 0) return m;
     if (m->pat->type == BP_TAGGED || m->pat->type == BP_CAPTURE) {
@@ -979,7 +979,7 @@ match_t *_get_named_capture(match_t *m, const char *name, size_t namelen)
 //
 // Get a capture with a specific name.
 //
-match_t *get_named_capture(match_t *m, const char *name, ssize_t _namelen)
+public match_t *get_named_capture(match_t *m, const char *name, ssize_t _namelen)
 {
     size_t namelen = _namelen < 0 ? strlen(name) : (size_t)_namelen;
     if (m->pat->type == BP_TAGGED) {// || (m->pat->type == BP_CAPTURE && m->pat->args.capture.namelen > 0)) {

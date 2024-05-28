@@ -48,7 +48,7 @@ static inline void parse_err(const char *start, const char *end, const char *msg
 // Allocate a new pattern for this file (ensuring it will be automatically
 // freed when the file is freed)
 //
-pat_t *allocate_pat(pat_t pat)
+public pat_t *allocate_pat(pat_t pat)
 {
     static size_t next_pat_id = 1;
     pat_t *allocated = new(pat_t);
@@ -151,7 +151,7 @@ static pat_t *expand_choices(pat_t *first, const char *end, bool allow_nl)
 // Given two patterns, return a new pattern for the first pattern followed by
 // the second. If either pattern is NULL, return the other.
 //
-pat_t *chain_together(pat_t *first, pat_t *second)
+public pat_t *chain_together(pat_t *first, pat_t *second)
 {
     if (first == NULL) return second;
     if (second == NULL) return first;
@@ -169,7 +169,7 @@ pat_t *chain_together(pat_t *first, pat_t *second)
 // Given two patterns, return a new pattern for matching either the first
 // pattern or the second. If either pattern is NULL, return the other.
 //
-pat_t *either_pat(pat_t *first, pat_t *second)
+public pat_t *either_pat(pat_t *first, pat_t *second)
 {
     if (first == NULL) return second;
     if (second == NULL) return first;
@@ -498,7 +498,7 @@ static pat_t *_bp_simplepattern(const char *str, const char *end, bool inside_st
 // Similar to bp_simplepattern, except that the pattern begins with an implicit
 // '}' open quote that can be closed with '{'
 //
-maybe_pat_t bp_stringpattern(const char *str, const char *end)
+public maybe_pat_t bp_stringpattern(const char *str, const char *end)
 {
     __TRY_PATTERN__
     if (!end) end = str + strlen(str);
@@ -554,7 +554,7 @@ static pat_t *bp_simplepattern(const char *str, const char *end)
 // Given a pattern and a replacement string, compile the two into a BP
 // replace pattern.
 //
-maybe_pat_t bp_replacement(pat_t *replacepat, const char *replacement, const char *end)
+public maybe_pat_t bp_replacement(pat_t *replacepat, const char *replacement, const char *end)
 {
     const char *p = replacement;
     if (!end) end = replacement + strlen(replacement);
@@ -588,7 +588,7 @@ static pat_t *bp_pattern_nl(const char *str, const char *end, bool allow_nl)
 //
 // Return a new back reference to an existing match.
 //
-pat_t *bp_raw_literal(const char *str, size_t len)
+public pat_t *bp_raw_literal(const char *str, size_t len)
 {
     return Pattern(BP_STRING, str, &str[len], len, (ssize_t)len, .string=strndup(str, len));
 }
@@ -596,7 +596,7 @@ pat_t *bp_raw_literal(const char *str, size_t len)
 //
 // Compile a string representing a BP pattern into a pattern object.
 //
-maybe_pat_t bp_pattern(const char *str, const char *end)
+public maybe_pat_t bp_pattern(const char *str, const char *end)
 {
     str = after_spaces(str, true, end);
     if (!end) end = str + strlen(str);
@@ -611,7 +611,7 @@ maybe_pat_t bp_pattern(const char *str, const char *end)
         return (maybe_pat_t){.success = false, .value.error.start = str, .value.error.end = end, .value.error.msg = "Failed to parse this pattern"};
 }
 
-void free_all_pats(void)
+public void free_all_pats(void)
 {
     while (allocated_pats) {
         pat_t *tofree = allocated_pats;
@@ -620,7 +620,7 @@ void free_all_pats(void)
     }
 }
 
-void delete_pat(pat_t **at_pat, bool recursive)
+public void delete_pat(pat_t **at_pat, bool recursive)
 {
     pat_t *pat = *at_pat;
     if (!pat) return;
@@ -706,7 +706,7 @@ static int printf_pattern(FILE *stream, const struct printf_info *info, const vo
     }
 }
 
-int set_pattern_printf_specifier(char specifier)
+public int set_pattern_printf_specifier(char specifier)
 {
     return register_printf_specifier(specifier, printf_pattern, printf_pattern_size);
 }

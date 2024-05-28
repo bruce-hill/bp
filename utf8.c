@@ -7,6 +7,7 @@
 #include <unistd.h>
 
 #include "utf8.h"
+#include "utils.h"
 
 #define ARRAY_LEN(a) (sizeof(a)/sizeof((a)[0]))
 #define likely(x) __builtin_expect((x), 1)
@@ -182,7 +183,7 @@ static const uint32_t XID_Continue_only[][2] = {
 // Return the location of the next character or UTF8 codepoint.
 // (i.e. skip forward one codepoint at a time, not one byte at a time)
 //
-const char *next_char(const char *str, const char *end)
+public const char *next_char(const char *str, const char *end)
 {
     if (likely(str+1 <= end) && likely((str[0] & 0x80) == 0x0))
         return str+1;
@@ -199,7 +200,7 @@ const char *next_char(const char *str, const char *end)
 // Return the location of the previous character or UTF8 codepoint.
 // (i.e. skip backwards one codepoint at a time, not one byte at a time)
 //
-const char *prev_char(const char *start, const char *str)
+public const char *prev_char(const char *start, const char *str)
 {
     if (likely(str-1 >= start) && likely((str[-1] & 0x80) == 0x0))
         return str-1;
@@ -260,7 +261,7 @@ static bool find_in_ranges(uint32_t codepoint, const uint32_t ranges[][2], size_
     return false;
 }
 
-bool isidstart(const char *str, const char *end)
+public bool isidstart(const char *str, const char *end)
 {
     if (unlikely(str >= end)) return false;
     else if (isalpha(*str) || *str == '_') return true;
@@ -270,7 +271,7 @@ bool isidstart(const char *str, const char *end)
         && find_in_ranges(codepoint, XID_Start, ARRAY_LEN(XID_Start));
 }
 
-bool isidcontinue(const char *str, const char *end)
+public bool isidcontinue(const char *str, const char *end)
 {
     if (unlikely(str >= end)) return false;
     else if (isalnum(*str) || *str == '_') return true;

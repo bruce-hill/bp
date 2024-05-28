@@ -178,7 +178,7 @@ static void _explain_matches(match_node_t *firstmatch, int depth, const char *te
 //
 // Print a visualization of a match object.
 //
-void explain_match(match_t *m)
+public void explain_match(match_t *m)
 {
     printf("\033[?7l"); // Disable line wrapping
     match_node_t first = {.m = m};
@@ -196,7 +196,7 @@ static inline int fputc_safe(FILE *out, char c, print_options_t *opts)
     return printed;
 }
 
-int fprint_match(FILE *out, const char *file_start, match_t *m, print_options_t *opts)
+public int fprint_match(FILE *out, const char *file_start, match_t *m, print_options_t *opts)
 {
     int printed = 0;
     if (m->pat->type == BP_REPLACE) {
