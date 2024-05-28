@@ -50,6 +50,9 @@ clean:
 lua:
 	@cd Lua && make
 
+luatest:
+	@cd Lua && make test
+
 test: $(NAME)
 	./$(NAME) Comment -r '[@0]' >/dev/null
 	./$(NAME) -g ./grammars/bp.bp '{Grammar}' ./grammars/bp.bp >/dev/null
@@ -100,4 +103,4 @@ profile_grammar: bp
 profile_pattern: bp
 	perf stat -r 1 -e L1-dcache-loads,L1-dcache-load-misses,L1-dcache-stores -e cycles ./bp -f plain -p 'id parens' /usr/include/*.h >/dev/null
 
-.PHONY: all clean install install-lib uninstall leaktest splint test tutorial lua profile
+.PHONY: all clean install install-lib uninstall leaktest splint test tutorial lua profile luatest
