@@ -30,7 +30,7 @@ OBJFILES=$(CFILES:.c=.o)
 $(NAME): $(OBJFILES) bp.c
 	$(CC) $(ALL_FLAGS) -o $@ $(OBJFILES) bp.c
 
-$(LIBFILE): $(OBJFILES)
+$(LIBFILE): pattern.o utils.o match.o utf8.o
 	$(CC) $^ $(ALL_FLAGS) -Wl,-soname,$(LIBFILE) -shared -o $@
 
 all: $(NAME) $(LIBFILE) bp.1 lua
@@ -87,7 +87,7 @@ install: $(NAME) bp.1
 install-lib: $(LIBFILE) bp.1
 	mkdir -p -m 755 "$(PREFIX)/lib" "$(PREFIX)/include/$(NAME)"
 	cp $(LIBFILE) "$(PREFIX)/lib"
-	cp $(HFILES) "$(PREFIX)/include/$(NAME)"
+	cp pattern.h match.h utils.h utf8.h "$(PREFIX)/include/$(NAME)"
 
 uninstall:
 	rm -rf "$(PREFIX)/bin/$(NAME)" "$(PREFIX)/man/man1/$(NAME).1" "$(SYSCONFDIR)/$(NAME)"
