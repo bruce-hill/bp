@@ -22,6 +22,7 @@
 #include "../pattern.h"
 #include "../match.h"
 #include "../printmatch.h"
+#include "../utils.h"
 
 static const char *builtins_source = (
 #include "builtins.h"
@@ -369,7 +370,7 @@ static const luaL_Reg bp_methods[] = {
     {NULL, NULL}
 };
 
-LUALIB_API int luaopen_bp(lua_State *L)
+public LUALIB_API int luaopen_bp(lua_State *L)
 {
     maybe_pat_t maybe_pat = bp_pattern(builtins_source, builtins_source+strlen(builtins_source));
     if (!maybe_pat.success) {
