@@ -89,7 +89,7 @@ install: $(NAME) bp.1
 install-lib: $(LIBFILE) bp.1
 	mkdir -p -m 755 "$(PREFIX)/lib" "$(PREFIX)/include/$(NAME)"
 	cp $(LIBFILE) "$(PREFIX)/lib"
-	cp pattern.h match.h utils.h utf8.h "$(PREFIX)/include/$(NAME)"
+	cp pattern.h match.h "$(PREFIX)/include/$(NAME)"
 
 uninstall:
 	rm -rf "$(PREFIX)/bin/$(NAME)" "$(PREFIX)/man/man1/$(NAME).1" "$(SYSCONFDIR)/$(NAME)"
