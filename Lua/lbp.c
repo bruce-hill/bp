@@ -30,7 +30,7 @@ static const char *builtins_source = (
 static int MATCH_METATABLE = 0, PAT_METATABLE = 0;
 static bp_pat_t *builtins;
 
-static void push_match(lua_State *L, match_t *m, const char *start);
+static void push_match(lua_State *L, bp_match_t *m, const char *start);
 
 lua_State *cur_state = NULL;
 
@@ -70,7 +70,7 @@ static int Lcompile(lua_State *L)
     return 1;
 }
 
-static void push_matchstring(lua_State *L, match_t *m)
+static void push_matchstring(lua_State *L, bp_match_t *m)
 {
     char *buf = NULL;
     size_t size = 0;
@@ -81,7 +81,7 @@ static void push_matchstring(lua_State *L, match_t *m)
     fclose(out);
 }
 
-static match_t *get_first_capture(match_t *m)
+static bp_match_t *get_first_capture(bp_match_t *m)
 {
     if (m->pat->type == BP_TAGGED) {
         return m;
@@ -89,17 +89,17 @@ static match_t *get_first_capture(match_t *m)
         return m;
     } else if (m->children) {
         for (int i = 0; m->children[i]; i++) {
-            match_t *cap = get_first_capture(m->children[i]);
+            bp_match_t *cap = get_first_capture(m->children[i]);
             if (cap) return cap;
         }
     }
     return NULL;
 }
 
-static void set_capture_fields(lua_State *L, match_t *m, int *n, const char *start)
+static void set_capture_fields(lua_State *L, bp_match_t *m, int *n, const char *start)
 {
     if (m->pat->type == BP_CAPTURE) {
-        match_t *cap = get_first_capture(m->children[0]);
+        bp_match_t *cap = get_first_capture(m->children[0]);
         if (!cap) cap = m->children[0];
         auto capture = When(m->pat, BP_CAPTURE);
         if (capture->namelen > 0) {
@@ -119,7 +119,7 @@ static void set_capture_fields(lua_State *L, match_t *m, int *n, const char *sta
     }
 }
 
-static void push_match(lua_State *L, match_t *m, const char *start)
+static void push_match(lua_State *L, bp_match_t *m, const char *start)
 {
     lua_createtable(L, 1, 2);
     lua_pushlightuserdata(L, (void*)&MATCH_METATABLE);
@@ -170,7 +170,7 @@ static int Lmatch(lua_State *L)
     if (index > (lua_Integer)strlen(text)+1)
         return 0;
 
-    match_t *m = NULL;
+    bp_match_t *m = NULL;
     int ret = 0;
     cur_state = L;
     bp_errhand_t old = bp_set_error_handler(match_error);
@@ -215,7 +215,7 @@ static int Lreplace(lua_State *L)
     bp_pat_t *rep_pat = maybe_replacement.value.pat;
     cur_state = L;
     bp_errhand_t old = bp_set_error_handler(match_error);
-    for (match_t *m = NULL; next_match(&m, text, &text[textlen], rep_pat, builtins, NULL, false); ) {
+    for (bp_match_t *m = NULL; next_match(&m, text, &text[textlen], rep_pat, builtins, NULL, false); ) {
         fwrite(prev, sizeof(char), (size_t)(m->start - prev), out);
         fprint_match(out, text, m, NULL);
         prev = m->end;

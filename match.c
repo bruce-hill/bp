@@ -48,8 +48,8 @@ typedef struct match_ctx_s {
 // the `unused_matches` linked list so it can be reused without the need for
 // additional calls to malloc/free. Thus, it is an invariant that every match
 // object is in one of these two lists:
-static match_t *unused_matches = NULL;
-static match_t *in_use_matches = NULL;
+static bp_match_t *unused_matches = NULL;
+static bp_match_t *in_use_matches = NULL;
 
 static void default_error_handler(char **msg) {
     errx(EXIT_FAILURE, "%s", *msg);
@@ -64,12 +64,12 @@ public bp_errhand_t bp_set_error_handler(bp_errhand_t new_handler)
     return old_handler;
 }
 
-#define MATCHES(...) (match_t*[]){__VA_ARGS__, NULL}
+#define MATCHES(...) (bp_match_t*[]){__VA_ARGS__, NULL}
 
 __attribute__((hot, nonnull(1,2,3)))
-static match_t *match(match_ctx_t *ctx, const char *str, bp_pat_t *pat);
+static bp_match_t *match(match_ctx_t *ctx, const char *str, bp_pat_t *pat);
 __attribute__((returns_nonnull))
-static match_t *new_match(bp_pat_t *pat, const char *start, const char *end, match_t *children[]);
+static bp_match_t *new_match(bp_pat_t *pat, const char *start, const char *end, bp_match_t *children[]);
 
 char *error_message = NULL;
 
@@ -84,10 +84,10 @@ static inline void match_error(match_ctx_t *ctx, const char *fmt, ...)
     longjmp(ctx->error_jump, 1);
 }
 
-static match_t *clone_match(match_t *m)
+static bp_match_t *clone_match(bp_match_t *m)
 {
     if (!m) return NULL;
-    match_t *ret = new_match(m->pat, m->start, m->end, NULL);
+    bp_match_t *ret = new_match(m->pat, m->start, m->end, NULL);
     if (m->children) {
         size_t child_cap = 0, nchildren = 0;
         if (!m->children[0] || !m->children[1] || !m->children[2]) {
@@ -106,7 +106,7 @@ static match_t *clone_match(match_t *m)
 }
 
 // Prepend to a doubly linked list
-static inline void gc_list_prepend(match_t **head, match_t *m)
+static inline void gc_list_prepend(bp_match_t **head, bp_match_t *m)
 {
     if (m->gc.home)
         errx(1, "Node already has a home");
@@ -117,7 +117,7 @@ static inline void gc_list_prepend(match_t **head, match_t *m)
 }
 
 // Remove from a doubly linked list
-static inline void gc_list_remove(match_t *m)
+static inline void gc_list_remove(bp_match_t *m)
 {
     if (!m->gc.home)
         errx(1, "Attempt to remove something that isn't in a list");
@@ -321,7 +321,7 @@ static bp_pat_t *get_prerequisite(match_ctx_t *ctx, bp_pat_t *pat)
 // Find the next match after prev (or the first match if prev is NULL)
 //
 __attribute__((nonnull(1,2,3)))
-static match_t *_next_match(match_ctx_t *ctx, const char *str, bp_pat_t *pat, bp_pat_t *skip)
+static bp_match_t *_next_match(match_ctx_t *ctx, const char *str, bp_pat_t *pat, bp_pat_t *skip)
 {
     // Clear the cache so it's not full of old cache values from different parts of the file:
     cache_destroy(ctx);
@@ -348,9 +348,9 @@ static match_t *_next_match(match_ctx_t *ctx, const char *str, bp_pat_t *pat, bp
     }
 
     do {
-        match_t *m = match(ctx, str, pat);
+        bp_match_t *m = match(ctx, str, pat);
         if (m) return m;
-        match_t *skipped = skip ? match(ctx, str, skip) : NULL;
+        bp_match_t *skipped = skip ? match(ctx, str, skip) : NULL;
         if (skipped) {
             str = skipped->end > str ? skipped->end : str + 1;
             recycle_match(&skipped);
@@ -364,7 +364,7 @@ static match_t *_next_match(match_ctx_t *ctx, const char *str, bp_pat_t *pat, bp
 // match object, or NULL if no match is found.
 // The returned value should be free()'d to avoid memory leaking.
 //
-static match_t *match(match_ctx_t *ctx, const char *str, bp_pat_t *pat)
+static bp_match_t *match(match_ctx_t *ctx, const char *str, bp_pat_t *pat)
 {
     switch (pat->type) {
     case BP_DEFINITIONS: {
@@ -372,7 +372,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, bp_pat_t *pat)
         ctx2.cache = &(cache_t){0};
         ctx2.parent_ctx = ctx;
         ctx2.defs = pat;
-        match_t *m = match(&ctx2, str, When(pat, BP_DEFINITIONS)->meaning);
+        bp_match_t *m = match(&ctx2, str, When(pat, BP_DEFINITIONS)->meaning);
         cache_destroy(&ctx2);
         return m;
     }
@@ -429,7 +429,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, bp_pat_t *pat)
         return new_match(pat, str, str+1, NULL);
     }
     case BP_NOT: {
-        match_t *m = match(ctx, str, When(pat, BP_NOT)->pat);
+        bp_match_t *m = match(ctx, str, When(pat, BP_NOT)->pat);
         if (m != NULL) {
             recycle_match(&m);
             return NULL;
@@ -437,7 +437,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, bp_pat_t *pat)
         return new_match(pat, str, str, NULL);
     }
     case BP_UPTO: case BP_UPTO_STRICT: {
-        match_t *m = new_match(pat, str, str, NULL);
+        bp_match_t *m = new_match(pat, str, str, NULL);
         bp_pat_t *target = deref(ctx, pat->type == BP_UPTO ? When(pat, BP_UPTO)->target : When(pat, BP_UPTO_STRICT)->target),
               *skip = deref(ctx, pat->type == BP_UPTO ? When(pat, BP_UPTO)->skip : When(pat, BP_UPTO_STRICT)->skip);
         if (!target && !skip) {
@@ -450,7 +450,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, bp_pat_t *pat)
         for (const char *prev = NULL; prev < str; ) {
             prev = str;
             if (target) {
-                match_t *p = match(ctx, str, target);
+                bp_match_t *p = match(ctx, str, target);
                 if (p != NULL) {
                     recycle_match(&p);
                     m->end = str;
@@ -461,7 +461,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, bp_pat_t *pat)
                 return m;
             }
             if (skip) {
-                match_t *s = match(ctx, str, skip);
+                bp_match_t *s = match(ctx, str, skip);
                 if (s != NULL) {
                     str = s->end;
                     if (nchildren+2 >= child_cap) {
@@ -482,7 +482,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, bp_pat_t *pat)
         return NULL;
     }
     case BP_REPEAT: {
-        match_t *m = new_match(pat, str, str, NULL);
+        bp_match_t *m = new_match(pat, str, str, NULL);
         size_t reps = 0;
         auto repeat = When(pat, BP_REPEAT);
         bp_pat_t *repeating = deref(ctx, repeat->repeat_pat);
@@ -491,13 +491,13 @@ static match_t *match(match_ctx_t *ctx, const char *str, bp_pat_t *pat)
         for (reps = 0; repeat->max == -1 || reps < (size_t)repeat->max; ++reps) {
             const char *start = str;
             // Separator
-            match_t *msep = NULL;
+            bp_match_t *msep = NULL;
             if (sep != NULL && reps > 0) {
                 msep = match(ctx, str, sep);
                 if (msep == NULL) break;
                 str = msep->end;
             }
-            match_t *mp = match(ctx, str, repeating);
+            bp_match_t *mp = match(ctx, str, repeating);
             if (mp == NULL) {
                 str = start;
                 if (msep) recycle_match(&msep);
@@ -558,7 +558,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, bp_pat_t *pat)
              pos = prev_char(ctx->start, pos)) {
             cache_destroy(&slice_ctx);
             slice_ctx.start = (char*)pos;
-            match_t *m = match(&slice_ctx, pos, back);
+            bp_match_t *m = match(&slice_ctx, pos, back);
             // Match should not go past str (i.e. (<"AB" "B") should match "ABB", but not "AB")
             if (m && m->end != str)
                 recycle_match(&m);
@@ -575,18 +575,18 @@ static match_t *match(match_ctx_t *ctx, const char *str, bp_pat_t *pat)
         return NULL;
     }
     case BP_BEFORE: {
-        match_t *after = match(ctx, str, When(pat, BP_BEFORE)->pat);
+        bp_match_t *after = match(ctx, str, When(pat, BP_BEFORE)->pat);
         return after ? new_match(pat, str, str, MATCHES(after)) : NULL;
     }
     case BP_CAPTURE: case BP_TAGGED: {
         bp_pat_t *to_match = pat->type == BP_CAPTURE ? When(pat, BP_CAPTURE)->pat : When(pat, BP_TAGGED)->pat;
         if (!to_match)
             return new_match(pat, str, str, NULL);
-        match_t *p = match(ctx, str, to_match);
+        bp_match_t *p = match(ctx, str, to_match);
         return p ? new_match(pat, str, p->end, MATCHES(p)) : NULL;
     }
     case BP_OTHERWISE: {
-        match_t *m = match(ctx, str, When(pat, BP_OTHERWISE)->first);
+        bp_match_t *m = match(ctx, str, When(pat, BP_OTHERWISE)->first);
         return m ? m : match(ctx, str, When(pat, BP_OTHERWISE)->second);
     }
     case BP_CHAIN: {
@@ -596,15 +596,15 @@ static match_t *match(match_ctx_t *ctx, const char *str, bp_pat_t *pat)
             ctx2.cache = &(cache_t){0};
             ctx2.parent_ctx = ctx;
             ctx2.defs = chain->first;
-            match_t *m = match(&ctx2, str, chain->second);
+            bp_match_t *m = match(&ctx2, str, chain->second);
             cache_destroy(&ctx2);
             return m;
         }
 
-        match_t *m1 = match(ctx, str, chain->first);
+        bp_match_t *m1 = match(ctx, str, chain->first);
         if (m1 == NULL) return NULL;
 
-        match_t *m2;
+        bp_match_t *m2;
         // Push backrefs and run matching, then cleanup
         if (m1->pat->type == BP_CAPTURE && When(m1->pat, BP_CAPTURE)->name && When(m1->pat, BP_CAPTURE)->backreffable) {
             // Temporarily add a rule that the backref name matches the
@@ -654,7 +654,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, bp_pat_t *pat)
     }
     case BP_MATCH: case BP_NOT_MATCH: {
         bp_pat_t *target = pat->type == BP_MATCH ? When(pat, BP_MATCH)->pat : When(pat, BP_NOT_MATCH)->pat;
-        match_t *m1 = match(ctx, str, target);
+        bp_match_t *m1 = match(ctx, str, target);
         if (m1 == NULL) return NULL;
 
         // <p1>~<p2> matches iff the text of <p1> matches <p2>
@@ -663,7 +663,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, bp_pat_t *pat)
         slice_ctx.cache = &(cache_t){0};
         slice_ctx.start = m1->start;
         slice_ctx.end = m1->end;
-        match_t *ret = NULL, *m2 = NULL;
+        bp_match_t *ret = NULL, *m2 = NULL;
         if (pat->type == BP_MATCH) {
             m2 = _next_match(&slice_ctx, slice_ctx.start, When(pat, BP_MATCH)->must_match, NULL);
             if (m2) ret = new_match(pat, m1->start, m1->end, MATCHES(m1, m2));
@@ -679,7 +679,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, bp_pat_t *pat)
         return ret;
     }
     case BP_REPLACE: {
-        match_t *p = NULL;
+        bp_match_t *p = NULL;
         auto replace = When(pat, BP_REPLACE);
         if (replace->pat) {
             p = match(ctx, str, replace->pat);
@@ -725,14 +725,14 @@ static match_t *match(match_ctx_t *ctx, const char *str, bp_pat_t *pat)
                 },
         };
 
-        match_t *m = match(&ctx2, str, ref);
+        bp_match_t *m = match(&ctx2, str, ref);
         // If left recursion was involved, keep retrying while forward progress can be made:
         if (m && rec_op.__tagged.BP_LEFTRECURSION.visited) {
             while (1) {
                 const char *prev = m->end;
                 rec_op.__tagged.BP_LEFTRECURSION.match = m;
                 ctx2.cache = &(cache_t){0};
-                match_t *m2 = match(&ctx2, str, ref);
+                bp_match_t *m2 = match(&ctx2, str, ref);
                 cache_destroy(&ctx2);
                 if (!m2) break;
                 if (m2->end <= prev) {
@@ -788,15 +788,15 @@ static match_t *match(match_ctx_t *ctx, const char *str, bp_pat_t *pat)
 //
 // Return a match object which can be used (may be allocated or recycled).
 //
-match_t *new_match(bp_pat_t *pat, const char *start, const char *end, match_t *children[])
+bp_match_t *new_match(bp_pat_t *pat, const char *start, const char *end, bp_match_t *children[])
 {
-    match_t *m;
+    bp_match_t *m;
     if (unused_matches) {
         m = unused_matches;
         gc_list_remove(m);
-        memset(m, 0, sizeof(match_t));
+        memset(m, 0, sizeof(bp_match_t));
     } else {
-        m = new(match_t);
+        m = new(bp_match_t);
     }
     // Keep track of the object:
     gc_list_prepend(&in_use_matches, m);
@@ -817,9 +817,9 @@ match_t *new_match(bp_pat_t *pat, const char *start, const char *end, match_t *c
 // If the given match is not currently a child member of another match (or
 // otherwise reserved) then put it back in the pool of unused match objects.
 //
-public void recycle_match(match_t **at_m)
+public void recycle_match(bp_match_t **at_m)
 {
-    match_t *m = *at_m;
+    bp_match_t *m = *at_m;
     if (m->children) {
         for (int i = 0; m->children[i]; i++)
             recycle_match(&m->children[i]);
@@ -828,7 +828,7 @@ public void recycle_match(match_t **at_m)
     }
 
     gc_list_remove(m);
-    (void)memset(m, 0, sizeof(match_t));
+    (void)memset(m, 0, sizeof(bp_match_t));
     gc_list_prepend(&unused_matches, m);
     *at_m = NULL;
 }
@@ -839,7 +839,7 @@ public void recycle_match(match_t **at_m)
 public size_t recycle_all_matches(void)
 {
     size_t count = 0;
-    for (match_t *m; (m = in_use_matches); ++count) {
+    for (bp_match_t *m; (m = in_use_matches); ++count) {
         gc_list_remove(m);
         if (m->children && m->children != m->_children)
             delete(&m->children);
@@ -855,7 +855,7 @@ public size_t free_all_matches(void)
 {
     size_t count = 0;
     recycle_all_matches();
-    for (match_t *m; (m = unused_matches); ++count) {
+    for (bp_match_t *m; (m = unused_matches); ++count) {
         gc_list_remove(m);
         delete(&m);
     }
@@ -864,9 +864,9 @@ public size_t free_all_matches(void)
 
 //
 // Iterate over matches.
-// Usage: for (match_t *m = NULL; next_match(&m, ...); ) {...}
+// Usage: for (bp_match_t *m = NULL; next_match(&m, ...); ) {...}
 //
-public bool next_match(match_t **m, const char *start, const char *end, bp_pat_t *pat, bp_pat_t *defs, bp_pat_t *skip, bool ignorecase)
+public bool next_match(bp_match_t **m, const char *start, const char *end, bp_pat_t *pat, bp_pat_t *defs, bp_pat_t *skip, bool ignorecase)
 {
     const char *pos;
     if (*m) {
@@ -911,7 +911,7 @@ public bool next_match(match_t **m, const char *start, const char *end, bp_pat_t
 // Helper function to track state while doing a depth-first search.
 //
 __attribute__((nonnull))
-static match_t *_get_numbered_capture(match_t *m, int *n)
+static bp_match_t *_get_numbered_capture(bp_match_t *m, int *n)
 {
     if ((m->pat->type == BP_CAPTURE && When(m->pat, BP_CAPTURE)->namelen == 0) || m->pat->type == BP_TAGGED) {
         if (*n == 1) {
@@ -927,7 +927,7 @@ static match_t *_get_numbered_capture(match_t *m, int *n)
 
     if (m->children) {
         for (int i = 0; m->children[i]; i++) {
-            match_t *cap = _get_numbered_capture(m->children[i], n);
+            bp_match_t *cap = _get_numbered_capture(m->children[i], n);
             if (cap) return cap;
         }
     }
@@ -937,14 +937,14 @@ static match_t *_get_numbered_capture(match_t *m, int *n)
 //
 // Get a specific numbered pattern capture.
 //
-public match_t *get_numbered_capture(match_t *m, int n)
+public bp_match_t *get_numbered_capture(bp_match_t *m, int n)
 {
     if (n <= 0) return m;
     if (m->pat->type == BP_TAGGED || m->pat->type == BP_CAPTURE) {
         if (n == 1 && m->pat->type == BP_CAPTURE && When(m->pat, BP_CAPTURE)->namelen == 0) return m;
         if (m->children) {
             for (int i = 0; m->children[i]; i++) {
-                match_t *cap = _get_numbered_capture(m->children[i], &n);
+                bp_match_t *cap = _get_numbered_capture(m->children[i], &n);
                 if (cap) return cap;
             }
         }
@@ -957,7 +957,7 @@ public match_t *get_numbered_capture(match_t *m, int n)
 //
 // Helper function for get_named_capture()
 //
-match_t *_get_named_capture(match_t *m, const char *name, size_t namelen)
+bp_match_t *_get_named_capture(bp_match_t *m, const char *name, size_t namelen)
 {
     if (m->pat->type == BP_CAPTURE && When(m->pat, BP_CAPTURE)->name
         && When(m->pat, BP_CAPTURE)->namelen == namelen
@@ -969,7 +969,7 @@ match_t *_get_named_capture(match_t *m, const char *name, size_t namelen)
 
     if (m->children) {
         for (int i = 0; m->children[i]; i++) {
-            match_t *cap = _get_named_capture(m->children[i], name, namelen);
+            bp_match_t *cap = _get_named_capture(m->children[i], name, namelen);
             if (cap) return cap;
         }
     }
@@ -979,13 +979,13 @@ match_t *_get_named_capture(match_t *m, const char *name, size_t namelen)
 //
 // Get a capture with a specific name.
 //
-public match_t *get_named_capture(match_t *m, const char *name, ssize_t _namelen)
+public bp_match_t *get_named_capture(bp_match_t *m, const char *name, ssize_t _namelen)
 {
     size_t namelen = _namelen < 0 ? strlen(name) : (size_t)_namelen;
     if (m->pat->type == BP_TAGGED) {// || (m->pat->type == BP_CAPTURE && m->pat->args.capture.namelen > 0)) {
         if (m->children) {
             for (int i = 0; m->children[i]; i++) {
-                match_t *cap = _get_named_capture(m->children[i], name, namelen);
+                bp_match_t *cap = _get_named_capture(m->children[i], name, namelen);
                 if (cap) return cap;
             }
         }

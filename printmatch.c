@@ -11,12 +11,12 @@
 #include "utils.h"
 
 typedef struct match_node_s {
-    match_t *m;
+    bp_match_t *m;
     struct match_node_s *next;
 } match_node_t;
 
 __attribute__((nonnull, pure))
-static int height_of_match(match_t *m);
+static int height_of_match(bp_match_t *m);
 __attribute__((nonnull))
 static void _explain_matches(match_node_t *firstmatch, int depth, const char *text, size_t textlen);
 
@@ -24,11 +24,11 @@ static void _explain_matches(match_node_t *firstmatch, int depth, const char *te
 // Return the height of a match object (i.e. the number of descendents of the
 // structure).
 //
-static int height_of_match(match_t *m)
+static int height_of_match(bp_match_t *m)
 {
     int height = 0;
     for (int i = 0; m->children && m->children[i]; i++) {
-        match_t *child = m->children[i];
+        bp_match_t *child = m->children[i];
         int childheight = height_of_match(child);
         if (childheight > height) height = childheight;
     }
@@ -44,7 +44,7 @@ static void _explain_matches(match_node_t *firstmatch, int depth, const char *te
     const char *H = "─"; // Horizontal bar
     const char *color = (depth % 2 == 0) ? "34" : "33";
 
-    match_t *viz = firstmatch->m;
+    bp_match_t *viz = firstmatch->m;
     // This is a heuristic: print matches first if they have more submatches.
     // In general, this helps reduce the height of the final output by allowing
     // for more rows that show the same rule matching in multiple places.
@@ -87,7 +87,7 @@ static void _explain_matches(match_node_t *firstmatch, int depth, const char *te
         if (RIGHT_TYPE(m)) {
             // Instead of printing each subchain on its own line, flatten them all out at once:
             if (m->m->pat->type == BP_CHAIN) {
-                match_t *tmp = m->m;
+                bp_match_t *tmp = m->m;
                 while (tmp->pat->type == BP_CHAIN) {
                     *nextchild = new(match_node_t);
                     (*nextchild)->m = tmp->children[0];
@@ -178,7 +178,7 @@ static void _explain_matches(match_node_t *firstmatch, int depth, const char *te
 //
 // Print a visualization of a match object.
 //
-public void explain_match(match_t *m)
+public void explain_match(bp_match_t *m)
 {
     printf("\033[?7l"); // Disable line wrapping
     match_node_t first = {.m = m};
@@ -196,7 +196,7 @@ static inline int fputc_safe(FILE *out, char c, print_options_t *opts)
     return printed;
 }
 
-public int fprint_match(FILE *out, const char *file_start, match_t *m, print_options_t *opts)
+public int fprint_match(FILE *out, const char *file_start, bp_match_t *m, print_options_t *opts)
 {
     int printed = 0;
     if (m->pat->type == BP_REPLACE) {
@@ -211,7 +211,7 @@ public int fprint_match(FILE *out, const char *file_start, match_t *m, print_opt
             if (*r == '@' && r+1 < end && r[1] != '@') {
                 const char *next = r+1;
                 // Retrieve the capture value:
-                match_t *cap = NULL;
+                bp_match_t *cap = NULL;
                 if (isdigit(*next)) {
                     int n = (int)strtol(next, (char**)&next, 10);
                     cap = get_numbered_capture(m->children[0], n);
@@ -256,7 +256,7 @@ public int fprint_match(FILE *out, const char *file_start, match_t *m, print_opt
         if (opts && opts->match_color) printed += fprintf(out, "%s", opts->match_color);
         const char *prev = m->start;
         for (int i = 0; m->children && m->children[i]; i++) {
-            match_t *child = m->children[i];
+            bp_match_t *child = m->children[i];
             // Skip children from e.g. zero-width matches like >@foo
             if (!(prev <= child->start && child->start <= m->end &&
                   prev <= child->end && child->end <= m->end))

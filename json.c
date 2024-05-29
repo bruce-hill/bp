@@ -8,14 +8,14 @@
 #include "utils.h"
 
 __attribute__((nonnull))
-static int _json_match(const char *text, match_t *m, int comma, bool verbose);
+static int _json_match(const char *text, bp_match_t *m, int comma, bool verbose);
 
 //
 // Helper function for json_match().
 // `comma` is used to track whether a comma will need to be printed before the
 // next object or not.
 //
-static int _json_match(const char *text, match_t *m, int comma, bool verbose)
+static int _json_match(const char *text, bp_match_t *m, int comma, bool verbose)
 {
     if (!verbose && m->pat->type != BP_TAGGED) {
         if (m->children) {
@@ -78,7 +78,7 @@ static int _json_match(const char *text, match_t *m, int comma, bool verbose)
 //
 // Print a match object as a JSON object.
 //
-public void json_match(const char *text, match_t *m, bool verbose)
+public void json_match(const char *text, bp_match_t *m, bool verbose)
 {
     (void)_json_match(text, m, 0, verbose);
 }

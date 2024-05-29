@@ -116,7 +116,7 @@ struct bp_pat_s {
             bool backreffable;
         } BP_TAGGED;
         struct {
-            struct match_s *match;
+            struct bp_match_s *match;
             const char *at;
             bp_pat_t *fallback;
             void *ctx;
@@ -126,7 +126,7 @@ struct bp_pat_s {
 };
 
 typedef struct leftrec_info_s {
-    struct match_s *match;
+    struct bp_match_s *match;
     const char *at;
     bp_pat_t *fallback;
     void *ctx;

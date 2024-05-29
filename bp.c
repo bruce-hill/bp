@@ -211,7 +211,7 @@ static int is_text_file(const char *filename)
 static int print_matches_as_json(file_t *f, bp_pat_t *pattern, bp_pat_t *defs)
 {
     int nmatches = 0;
-    for (match_t *m = NULL; next_match(&m, f->start, f->end, pattern, defs, options.skip, options.ignorecase); ) {
+    for (bp_match_t *m = NULL; next_match(&m, f->start, f->end, pattern, defs, options.skip, options.ignorecase); ) {
         if (++nmatches > 1)
             printf(",\n");
         printf("{\"filename\":\"%s\",\"match\":", f->filename);
@@ -227,7 +227,7 @@ static int print_matches_as_json(file_t *f, bp_pat_t *pattern, bp_pat_t *defs)
 static int explain_matches(file_t *f, bp_pat_t *pattern, bp_pat_t *defs)
 {
     int nmatches = 0;
-    for (match_t *m = NULL; next_match(&m, f->start, f->end, pattern, defs, options.skip, options.ignorecase); ) {
+    for (bp_match_t *m = NULL; next_match(&m, f->start, f->end, pattern, defs, options.skip, options.ignorecase); ) {
         if (++nmatches == 1) {
             if (options.print_filenames)
                 fprint_filename(stdout, f->filename);
@@ -370,7 +370,7 @@ static int print_matches(FILE *out, file_t *f, bp_pat_t *pattern, bp_pat_t *defs
         print_opts.replace_color = "\033[0;34;1m";
         print_opts.normal_color = "\033[m";
     }
-    for (match_t *m = NULL; next_match(&m, f->start, f->end, pattern, defs, options.skip, options.ignorecase); ) {
+    for (bp_match_t *m = NULL; next_match(&m, f->start, f->end, pattern, defs, options.skip, options.ignorecase); ) {
         if (++matches == 1 && options.print_filenames) {
             if (printed_filenames++ > 0) printf("\n");
             fprint_filename(out, f->filename);
@@ -412,7 +412,7 @@ static int process_file(const char *filename, bp_pat_t *pattern, bp_pat_t *defs)
     if (options.mode == MODE_EXPLAIN) {
         matches += explain_matches(f, pattern, defs);
     } else if (options.mode == MODE_LISTFILES) {
-        match_t *m = NULL;
+        bp_match_t *m = NULL;
         if (next_match(&m, f->start, f->end, pattern, defs, options.skip, options.ignorecase)) {
             printf("%s\n", f->filename);
             matches += 1;
@@ -421,7 +421,7 @@ static int process_file(const char *filename, bp_pat_t *pattern, bp_pat_t *defs)
     } else if (options.mode == MODE_JSON) {
         matches += print_matches_as_json(f, pattern, defs);
     } else if (options.mode == MODE_INPLACE) {
-        match_t *m = NULL;
+        bp_match_t *m = NULL;
         bool found = next_match(&m, f->start, f->end, pattern, defs, options.skip, options.ignorecase);
         stop_matching(&m);
         if (!found) return 0;
