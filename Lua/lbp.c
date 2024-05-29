@@ -28,7 +28,7 @@ static const char *builtins_source = (
 #include "builtins.h"
 );
 static int MATCH_METATABLE = 0, PAT_METATABLE = 0;
-static pat_t *builtins;
+static bp_pat_t *builtins;
 
 static void push_match(lua_State *L, match_t *m, const char *start);
 
@@ -60,7 +60,7 @@ static int Lcompile(lua_State *L)
         raise_parse_error(L, maybe_pat);
         return 0;
     }
-    pat_t **pat_storage = (pat_t**)lua_newuserdatauv(L, sizeof(pat_t*), 1);
+    bp_pat_t **pat_storage = (bp_pat_t**)lua_newuserdatauv(L, sizeof(bp_pat_t*), 1);
     *pat_storage = maybe_pat.value.pat;
     lua_pushvalue(L, 1);
     lua_setiuservalue(L, -2, 1);
@@ -85,7 +85,7 @@ static match_t *get_first_capture(match_t *m)
 {
     if (m->pat->type == BP_TAGGED) {
         return m;
-    } else if (m->pat->type == BP_CAPTURE && !Match(m->pat, BP_CAPTURE)->name) {
+    } else if (m->pat->type == BP_CAPTURE && !When(m->pat, BP_CAPTURE)->name) {
         return m;
     } else if (m->children) {
         for (int i = 0; m->children[i]; i++) {
@@ -101,7 +101,7 @@ static void set_capture_fields(lua_State *L, match_t *m, int *n, const char *sta
     if (m->pat->type == BP_CAPTURE) {
         match_t *cap = get_first_capture(m->children[0]);
         if (!cap) cap = m->children[0];
-        auto capture = Match(m->pat, BP_CAPTURE);
+        auto capture = When(m->pat, BP_CAPTURE);
         if (capture->namelen > 0) {
             lua_pushlstring(L, capture->name, capture->namelen);
             push_match(L, cap, start);
@@ -129,7 +129,7 @@ static void push_match(lua_State *L, match_t *m, const char *start)
     lua_seti(L, -2, 0);
 
     if (m->pat->type == BP_TAGGED) {
-        auto tagged = Match(m->pat, BP_TAGGED);
+        auto tagged = When(m->pat, BP_TAGGED);
         lua_pushlstring(L, tagged->name, tagged->namelen);
         lua_setfield(L, -2, "__tag");
     }
@@ -151,8 +151,8 @@ static int Lmatch(lua_State *L)
             return 0;
         lua_replace(L, 1);
     }
-    pat_t **at_pat = lua_touserdata(L, 1);
-    pat_t *pat = at_pat ? *at_pat : NULL;
+    bp_pat_t **at_pat = lua_touserdata(L, 1);
+    bp_pat_t *pat = at_pat ? *at_pat : NULL;
     if (!pat) luaL_error(L, "Not a valid pattern");
 
     size_t textlen;
@@ -190,8 +190,8 @@ static int Lreplace(lua_State *L)
             return 0;
         lua_replace(L, 1);
     }
-    pat_t **at_pat = lua_touserdata(L, 1);
-    pat_t *pat = at_pat ? *at_pat : NULL;
+    bp_pat_t **at_pat = lua_touserdata(L, 1);
+    bp_pat_t *pat = at_pat ? *at_pat : NULL;
     if (!pat) luaL_error(L, "Not a valid pattern");
 
     size_t replen, textlen;
@@ -212,7 +212,7 @@ static int Lreplace(lua_State *L)
     FILE *out = open_memstream(&buf, &size);
     int replacements = 0;
     const char *prev = text;
-    pat_t *rep_pat = maybe_replacement.value.pat;
+    bp_pat_t *rep_pat = maybe_replacement.value.pat;
     cur_state = L;
     bp_errhand_t old = bp_set_error_handler(match_error);
     for (match_t *m = NULL; next_match(&m, text, &text[textlen], rep_pat, builtins, NULL, false); ) {
@@ -289,8 +289,8 @@ static int Lpat_tostring(lua_State *L)
 static int Lpat_gc(lua_State *L)
 {
     (void)L;
-    pat_t **at_pat = lua_touserdata(L, 1);
-    pat_t *pat = *at_pat;
+    bp_pat_t **at_pat = lua_touserdata(L, 1);
+    bp_pat_t *pat = *at_pat;
     if (pat) delete_pat(at_pat, true);
     (void)pat;
     return 0;

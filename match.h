@@ -15,7 +15,7 @@
 typedef struct match_s {
     // Where the match starts and ends (end is after the last character)
     const char *start, *end;
-    pat_t *pat;
+    bp_pat_t *pat;
     // Intrusive linked list node for garbage collection:
     struct {
         struct match_s **home, *next;
@@ -30,7 +30,7 @@ __attribute__((nonnull))
 void recycle_match(match_t **at_m);
 size_t free_all_matches(void);
 size_t recycle_all_matches(void);
-bool next_match(match_t **m, const char *start, const char *end, pat_t *pat, pat_t *defs, pat_t *skip, bool ignorecase);
+bool next_match(match_t **m, const char *start, const char *end, bp_pat_t *pat, bp_pat_t *defs, bp_pat_t *skip, bool ignorecase);
 #define stop_matching(m) next_match(m, NULL, NULL, NULL, NULL, NULL, 0)
 bp_errhand_t bp_set_error_handler(bp_errhand_t handler);
 __attribute__((nonnull))

@@ -20,7 +20,7 @@
 
 // Cache entries for results of matching a pattern at a string position
 typedef struct cache_entry_s {
-    pat_t *pat;
+    bp_pat_t *pat;
     const char *start;
     // Cache entries use a chained scatter approach modeled after Lua's tables
     struct cache_entry_s *next_probe;
@@ -35,7 +35,7 @@ typedef struct {
 // Data structure for holding ambient state values during matching
 typedef struct match_ctx_s {
     struct match_ctx_s *parent_ctx;
-    pat_t *defs;
+    bp_pat_t *defs;
     cache_t *cache;
     const char *start, *end;
     jmp_buf error_jump;
@@ -67,9 +67,9 @@ public bp_errhand_t bp_set_error_handler(bp_errhand_t new_handler)
 #define MATCHES(...) (match_t*[]){__VA_ARGS__, NULL}
 
 __attribute__((hot, nonnull(1,2,3)))
-static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat);
+static match_t *match(match_ctx_t *ctx, const char *str, bp_pat_t *pat);
 __attribute__((returns_nonnull))
-static match_t *new_match(pat_t *pat, const char *start, const char *end, match_t *children[]);
+static match_t *new_match(bp_pat_t *pat, const char *start, const char *end, match_t *children[]);
 
 char *error_message = NULL;
 
@@ -138,7 +138,7 @@ static inline size_t hash(const char *str, size_t pat_id)
 //
 // Check if we have cached a failure to match a given pattern at the given position.
 //
-static bool has_cached_failure(match_ctx_t *ctx, const char *str, pat_t *pat)
+static bool has_cached_failure(match_ctx_t *ctx, const char *str, bp_pat_t *pat)
 {
     if (!ctx->cache->fails) return false;
     for (cache_entry_t *fail = &ctx->cache->fails[hash(str, pat->id) & (ctx->cache->size-1)]; fail; fail = fail->next_probe) {
@@ -151,7 +151,7 @@ static bool has_cached_failure(match_ctx_t *ctx, const char *str, pat_t *pat)
 //
 // Insert into the hash table using a chained scatter table approach.
 //
-static void _hash_insert(cache_t *cache, const char *str, pat_t *pat)
+static void _hash_insert(cache_t *cache, const char *str, bp_pat_t *pat)
 {
     size_t h = hash(str, pat->id) & (cache->size-1);
     if (cache->fails[h].pat == NULL) { // No collision
@@ -187,7 +187,7 @@ static void _hash_insert(cache_t *cache, const char *str, pat_t *pat)
 //
 // Save a match in the cache.
 //
-static void cache_failure(match_ctx_t *ctx, const char *str, pat_t *pat)
+static void cache_failure(match_ctx_t *ctx, const char *str, bp_pat_t *pat)
 {
     cache_t *cache = ctx->cache;
     // Grow the hash if needed (>99% utilization):
@@ -223,12 +223,12 @@ void cache_destroy(match_ctx_t *ctx)
 // Look up a pattern definition by name from a definition pattern.
 //
 __attribute__((nonnull(2)))
-static pat_t *_lookup_def(match_ctx_t *ctx, pat_t *defs, const char *name, size_t namelen)
+static bp_pat_t *_lookup_def(match_ctx_t *ctx, bp_pat_t *defs, const char *name, size_t namelen)
 {
     while (defs) {
         if (defs->type == BP_CHAIN) {
             auto chain = When(defs, BP_CHAIN);
-            pat_t *second = _lookup_def(ctx, chain->second, name, namelen);
+            bp_pat_t *second = _lookup_def(ctx, chain->second, name, namelen);
             if (second) return second;
             defs = chain->first;
         } else if (defs->type == BP_DEFINITIONS) {
@@ -248,10 +248,10 @@ static pat_t *_lookup_def(match_ctx_t *ctx, pat_t *defs, const char *name, size_
 // Look up a pattern definition by name from a context.
 //
 __attribute__((nonnull))
-pat_t *lookup_ctx(match_ctx_t *ctx, const char *name, size_t namelen)
+bp_pat_t *lookup_ctx(match_ctx_t *ctx, const char *name, size_t namelen)
 {
     for (; ctx; ctx = ctx->parent_ctx) {
-        pat_t *def = _lookup_def(ctx, ctx->defs, name, namelen);
+        bp_pat_t *def = _lookup_def(ctx, ctx->defs, name, namelen);
         if (def) return def;
     }
     return NULL;
@@ -262,11 +262,11 @@ pat_t *lookup_ctx(match_ctx_t *ctx, const char *name, size_t namelen)
 // pattern. This is used for an optimization to avoid repeated lookups.
 //
 __attribute__((nonnull(1)))
-static inline pat_t *deref(match_ctx_t *ctx, pat_t *pat)
+static inline bp_pat_t *deref(match_ctx_t *ctx, bp_pat_t *pat)
 {
     if (pat && pat->type == BP_REF) {
         auto ref = When(pat, BP_REF);
-        pat_t *def = lookup_ctx(ctx, ref->name, ref->len);
+        bp_pat_t *def = lookup_ctx(ctx, ref->name, ref->len);
         if (def) return def;
     }
     return pat;
@@ -277,10 +277,10 @@ static inline pat_t *deref(match_ctx_t *ctx, pat_t *pat)
 // match for the whole pattern to match (if any). Ideally, this would be a
 // string literal that can be quickly scanned for.
 //
-static pat_t *get_prerequisite(match_ctx_t *ctx, pat_t *pat)
+static bp_pat_t *get_prerequisite(match_ctx_t *ctx, bp_pat_t *pat)
 {
     int derefs = 0;
-    for (pat_t *p = pat; p; ) {
+    for (bp_pat_t *p = pat; p; ) {
         switch (p->type) {
         case BP_BEFORE:
             p = When(p, BP_BEFORE)->pat; break;
@@ -306,7 +306,7 @@ static pat_t *get_prerequisite(match_ctx_t *ctx, pat_t *pat)
             p = When(p, BP_REPLACE)->pat; break;
         case BP_REF: {
             if (++derefs > 10) return p; // In case of left recursion
-            pat_t *p2 = deref(ctx, p);
+            bp_pat_t *p2 = deref(ctx, p);
             if (p2 == p) return p2;
             p = p2;
             break;
@@ -321,12 +321,12 @@ static pat_t *get_prerequisite(match_ctx_t *ctx, pat_t *pat)
 // Find the next match after prev (or the first match if prev is NULL)
 //
 __attribute__((nonnull(1,2,3)))
-static match_t *_next_match(match_ctx_t *ctx, const char *str, pat_t *pat, pat_t *skip)
+static match_t *_next_match(match_ctx_t *ctx, const char *str, bp_pat_t *pat, bp_pat_t *skip)
 {
     // Clear the cache so it's not full of old cache values from different parts of the file:
     cache_destroy(ctx);
 
-    pat_t *first = get_prerequisite(ctx, pat);
+    bp_pat_t *first = get_prerequisite(ctx, pat);
 
     // Don't bother looping if this can only match at the start/end:
     if (first->type == BP_START_OF_FILE)
@@ -364,7 +364,7 @@ static match_t *_next_match(match_ctx_t *ctx, const char *str, pat_t *pat, pat_t
 // match object, or NULL if no match is found.
 // The returned value should be free()'d to avoid memory leaking.
 //
-static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
+static match_t *match(match_ctx_t *ctx, const char *str, bp_pat_t *pat)
 {
     switch (pat->type) {
     case BP_DEFINITIONS: {
@@ -438,7 +438,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
     }
     case BP_UPTO: case BP_UPTO_STRICT: {
         match_t *m = new_match(pat, str, str, NULL);
-        pat_t *target = deref(ctx, pat->type == BP_UPTO ? When(pat, BP_UPTO)->target : When(pat, BP_UPTO_STRICT)->target),
+        bp_pat_t *target = deref(ctx, pat->type == BP_UPTO ? When(pat, BP_UPTO)->target : When(pat, BP_UPTO_STRICT)->target),
               *skip = deref(ctx, pat->type == BP_UPTO ? When(pat, BP_UPTO)->skip : When(pat, BP_UPTO_STRICT)->skip);
         if (!target && !skip) {
             while (str < ctx->end && *str != '\n') ++str;
@@ -485,8 +485,8 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
         match_t *m = new_match(pat, str, str, NULL);
         size_t reps = 0;
         auto repeat = When(pat, BP_REPEAT);
-        pat_t *repeating = deref(ctx, repeat->repeat_pat);
-        pat_t *sep = deref(ctx, repeat->sep);
+        bp_pat_t *repeating = deref(ctx, repeat->repeat_pat);
+        bp_pat_t *sep = deref(ctx, repeat->sep);
         size_t child_cap = 0, nchildren = 0;
         for (reps = 0; repeat->max == -1 || reps < (size_t)repeat->max; ++reps) {
             const char *start = str;
@@ -542,7 +542,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
         return m;
     }
     case BP_AFTER: {
-        pat_t *back = deref(ctx, When(pat, BP_AFTER)->pat);
+        bp_pat_t *back = deref(ctx, When(pat, BP_AFTER)->pat);
         if (!back) return NULL;
 
         // We only care about the region from the backtrack pos up to the
@@ -579,7 +579,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
         return after ? new_match(pat, str, str, MATCHES(after)) : NULL;
     }
     case BP_CAPTURE: case BP_TAGGED: {
-        pat_t *to_match = pat->type == BP_CAPTURE ? When(pat, BP_CAPTURE)->pat : When(pat, BP_TAGGED)->pat;
+        bp_pat_t *to_match = pat->type == BP_CAPTURE ? When(pat, BP_CAPTURE)->pat : When(pat, BP_TAGGED)->pat;
         if (!to_match)
             return new_match(pat, str, str, NULL);
         match_t *p = match(ctx, str, to_match);
@@ -609,7 +609,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
         if (m1->pat->type == BP_CAPTURE && When(m1->pat, BP_CAPTURE)->name && When(m1->pat, BP_CAPTURE)->backreffable) {
             // Temporarily add a rule that the backref name matches the
             // exact string of the original match (no replacements)
-            pat_t *backref;
+            bp_pat_t *backref;
             if (m1->children && m1->children[0]->pat->type == BP_CURDENT) {
                 const char *linestart = m1->start;
                 while (linestart > ctx->start && linestart[-1] != '\n') --linestart;
@@ -628,7 +628,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
             match_ctx_t ctx2 = *ctx;
             ctx2.cache = &(cache_t){0};
             ctx2.parent_ctx = ctx;
-            ctx2.defs = &(pat_t){
+            ctx2.defs = &(bp_pat_t){
                 .type = BP_DEFINITIONS,
                 .start = m1->pat->start, .end = m1->pat->end,
                 .__tagged.BP_DEFINITIONS = {
@@ -653,7 +653,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
         return new_match(pat, str, m2->end, MATCHES(m1, m2));
     }
     case BP_MATCH: case BP_NOT_MATCH: {
-        pat_t *target = pat->type == BP_MATCH ? When(pat, BP_MATCH)->pat : When(pat, BP_NOT_MATCH)->pat;
+        bp_pat_t *target = pat->type == BP_MATCH ? When(pat, BP_MATCH)->pat : When(pat, BP_NOT_MATCH)->pat;
         match_t *m1 = match(ctx, str, target);
         if (m1 == NULL) return NULL;
 
@@ -692,7 +692,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
             return NULL;
 
         auto ref_pat = When(pat, BP_REF);
-        pat_t *ref = lookup_ctx(ctx, ref_pat->name, ref_pat->len);
+        bp_pat_t *ref = lookup_ctx(ctx, ref_pat->name, ref_pat->len);
         if (ref == NULL) {
             match_error(ctx, "Unknown pattern: '%.*s'", (int)ref_pat->len, ref_pat->name);
             return NULL;
@@ -701,7 +701,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
         if (ref->type == BP_LEFTRECURSION)
             return match(ctx, str, ref);
 
-        pat_t rec_op = {
+        bp_pat_t rec_op = {
             .type = BP_LEFTRECURSION,
             .start = ref->start, .end = ref->end,
             .min_matchlen = 0, .max_matchlen = -1,
@@ -715,7 +715,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
         };
         match_ctx_t ctx2 = *ctx;
         ctx2.parent_ctx = ctx;
-        ctx2.defs = &(pat_t){
+        ctx2.defs = &(bp_pat_t){
             .type = BP_DEFINITIONS,
                 .start = pat->start, .end = pat->end,
                 .__tagged.BP_DEFINITIONS = {
@@ -788,7 +788,7 @@ static match_t *match(match_ctx_t *ctx, const char *str, pat_t *pat)
 //
 // Return a match object which can be used (may be allocated or recycled).
 //
-match_t *new_match(pat_t *pat, const char *start, const char *end, match_t *children[])
+match_t *new_match(bp_pat_t *pat, const char *start, const char *end, match_t *children[])
 {
     match_t *m;
     if (unused_matches) {
@@ -866,7 +866,7 @@ public size_t free_all_matches(void)
 // Iterate over matches.
 // Usage: for (match_t *m = NULL; next_match(&m, ...); ) {...}
 //
-public bool next_match(match_t **m, const char *start, const char *end, pat_t *pat, pat_t *defs, pat_t *skip, bool ignorecase)
+public bool next_match(match_t **m, const char *start, const char *end, bp_pat_t *pat, bp_pat_t *defs, bp_pat_t *skip, bool ignorecase)
 {
     const char *pos;
     if (*m) {

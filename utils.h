@@ -11,6 +11,10 @@
 #include <string.h>
 #include <unistd.h>
 
+#ifndef auto
+#define auto __auto_type
+#endif
+
 #define S1(x) #x
 #define S2(x) S1(x)
 

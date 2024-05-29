@@ -67,7 +67,7 @@ static struct {
     bool ignorecase, verbose, git_mode, print_filenames;
     enum { MODE_NORMAL, MODE_LISTFILES, MODE_INPLACE, MODE_JSON, MODE_EXPLAIN } mode;
     enum { FORMAT_AUTO, FORMAT_FANCY, FORMAT_PLAIN, FORMAT_BARE, FORMAT_FILE_LINE } format;
-    pat_t *skip;
+    bp_pat_t *skip;
 } options = {
     .context_before = USE_DEFAULT_CONTEXT,
     .context_after = USE_DEFAULT_CONTEXT,
@@ -103,7 +103,7 @@ static inline void fprint_filename(FILE *out, const char *filename)
 //
 // If there was a parse error while building a pattern, print an error message and exit.
 //
-static inline pat_t *assert_pat(const char *start, const char *end, maybe_pat_t maybe_pat)
+static inline bp_pat_t *assert_pat(const char *start, const char *end, maybe_pat_t maybe_pat)
 {
     if (!end) end = start + strlen(start);
     if (!maybe_pat.success) {
@@ -208,7 +208,7 @@ static int is_text_file(const char *filename)
 //
 // Print matches in JSON format.
 //
-static int print_matches_as_json(file_t *f, pat_t *pattern, pat_t *defs)
+static int print_matches_as_json(file_t *f, bp_pat_t *pattern, bp_pat_t *defs)
 {
     int nmatches = 0;
     for (match_t *m = NULL; next_match(&m, f->start, f->end, pattern, defs, options.skip, options.ignorecase); ) {
@@ -224,7 +224,7 @@ static int print_matches_as_json(file_t *f, pat_t *pattern, pat_t *defs)
 //
 // Print matches in a visual explanation style
 //
-static int explain_matches(file_t *f, pat_t *pattern, pat_t *defs)
+static int explain_matches(file_t *f, bp_pat_t *pattern, bp_pat_t *defs)
 {
     int nmatches = 0;
     for (match_t *m = NULL; next_match(&m, f->start, f->end, pattern, defs, options.skip, options.ignorecase); ) {
@@ -355,7 +355,7 @@ static void on_nl(FILE *out)
 //
 // Print all the matches in a file.
 //
-static int print_matches(FILE *out, file_t *f, pat_t *pattern, pat_t *defs)
+static int print_matches(FILE *out, file_t *f, bp_pat_t *pattern, bp_pat_t *defs)
 {
     static int printed_filenames = 0;
     int matches = 0;
@@ -400,7 +400,7 @@ static int print_matches(FILE *out, file_t *f, pat_t *pattern, pat_t *defs)
 // against it, printing any results according to the flags.
 //
 __attribute__((nonnull))
-static int process_file(const char *filename, pat_t *pattern, pat_t *defs)
+static int process_file(const char *filename, bp_pat_t *pattern, bp_pat_t *defs)
 {
     file_t *f = load_file(NULL, filename);
     if (f == NULL) {
@@ -458,7 +458,7 @@ static int process_file(const char *filename, pat_t *pattern, pat_t *defs)
 // Recursively process all non-dotfile files in the given directory.
 //
 __attribute__((nonnull))
-static int process_dir(const char *dirname, pat_t *pattern, pat_t *defs)
+static int process_dir(const char *dirname, bp_pat_t *pattern, bp_pat_t *defs)
 {
     int matches = 0;
     glob_t globbuf;
@@ -488,7 +488,7 @@ static int process_dir(const char *dirname, pat_t *pattern, pat_t *defs)
 // Process git files using `git ls-files ...`
 //
 __attribute__((nonnull(1)))
-static int process_git_files(pat_t *pattern, pat_t *defs, int argc, char *argv[])
+static int process_git_files(bp_pat_t *pattern, bp_pat_t *defs, int argc, char *argv[])
 {
     int fds[2];
     require(pipe(fds), "Failed to create pipe");
@@ -525,7 +525,7 @@ static int process_git_files(pat_t *pattern, pat_t *defs, int argc, char *argv[]
 // Load the given grammar (semicolon-separated definitions)
 // and return the first rule defined.
 //
-static pat_t *load_grammar(pat_t *defs, file_t *f)
+static bp_pat_t *load_grammar(bp_pat_t *defs, file_t *f)
 {
     return chain_together(defs, assert_pat(f->start, f->end, bp_pattern(f->start, f->end)));
 }
@@ -562,9 +562,9 @@ int main(int argc, char *argv[])
     if (set_pattern_printf_specifier('P'))
         errx(1, "Couldn't set printf specifier");
 
-    pat_t *defs = NULL;
+    bp_pat_t *defs = NULL;
     file_t *loaded_files = NULL;
-    pat_t *pattern = NULL;
+    bp_pat_t *pattern = NULL;
 
     // Load builtins:
     file_t *builtins_file = load_file(&loaded_files, "/etc/"BP_NAME"/builtins.bp");
@@ -627,10 +627,10 @@ int main(int argc, char *argv[])
             if (!explicit_case_sensitivity)
                 options.ignorecase = !any_uppercase(flag);
             delete(&flag);
-            pat_t *p = assert_pat(arg_file->start, arg_file->end, bp_stringpattern(arg_file->start, arg_file->end));
+            bp_pat_t *p = assert_pat(arg_file->start, arg_file->end, bp_stringpattern(arg_file->start, arg_file->end));
             pattern = chain_together(pattern, p);
         } else if (FLAG("-s")     || FLAG("--skip")) {
-            pat_t *s = assert_pat(flag, NULL, bp_pattern(flag, flag+strlen(flag)));
+            bp_pat_t *s = assert_pat(flag, NULL, bp_pattern(flag, flag+strlen(flag)));
             options.skip = either_pat(options.skip, s);
         } else if (FLAG("-C")     || FLAG("--context")) {
             options.context_before = options.context_after = context_from_flag(flag);
@@ -651,7 +651,7 @@ int main(int argc, char *argv[])
             errx(EXIT_FAILURE, "Unrecognized flag: -%c\n\n%s", argv[0][1], usage);
         } else if (argv[0][0] != '-') {
             if (pattern != NULL) break;
-            pat_t *p = assert_pat(argv[0], NULL, bp_stringpattern(argv[0], argv[0]+strlen(argv[0])));
+            bp_pat_t *p = assert_pat(argv[0], NULL, bp_stringpattern(argv[0], argv[0]+strlen(argv[0])));
             if (!explicit_case_sensitivity)
                 options.ignorecase = !any_uppercase(argv[0]);
             pattern = chain_together(pattern, p);

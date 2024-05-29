@@ -10,12 +10,8 @@
 #include <sys/types.h>
 #include <err.h>
 
-#ifndef auto
-#define auto __auto_type
-#endif
-
 // BP virtual machine pattern types
-enum pattype_e {
+enum bp_pattype_e {
     BP_ERROR         = 0,
     BP_ANYCHAR       = 1,
     BP_ID_START      = 2,
@@ -50,9 +46,10 @@ enum pattype_e {
 //
 // A struct reperesenting a BP virtual machine operation
 //
-typedef struct pat_s {
-    struct pat_s *next, **home;
-    enum pattype_e type;
+typedef struct bp_pat_s bp_pat_t;
+struct bp_pat_s {
+    bp_pat_t *next, **home;
+    enum bp_pattype_e type;
     uint32_t id;
     const char *start, *end;
     // The bounds of the match length (used for backtracking)
@@ -67,32 +64,32 @@ typedef struct pat_s {
         struct {} BP_ID_CONTINUE;
         struct {const char *string; size_t len; } BP_STRING;
         struct {unsigned char low, high; } BP_RANGE;
-        struct {struct pat_s *pat;} BP_NOT;
-        struct {struct pat_s *target, *skip;} BP_UPTO;
-        struct {struct pat_s *target, *skip;} BP_UPTO_STRICT;
+        struct {bp_pat_t *pat;} BP_NOT;
+        struct {bp_pat_t *target, *skip;} BP_UPTO;
+        struct {bp_pat_t *target, *skip;} BP_UPTO_STRICT;
         struct {
             uint32_t min;
             int32_t max;
-            struct pat_s *sep, *repeat_pat;
+            bp_pat_t *sep, *repeat_pat;
         } BP_REPEAT;
-        struct {struct pat_s *pat;} BP_BEFORE;
-        struct {struct pat_s *pat;} BP_AFTER;
+        struct {bp_pat_t *pat;} BP_BEFORE;
+        struct {bp_pat_t *pat;} BP_AFTER;
         struct {
-            struct pat_s *pat;
+            bp_pat_t *pat;
             const char *name;
             uint16_t namelen;
             bool backreffable;
         } BP_CAPTURE;
         struct {
-            struct pat_s *first, *second;
+            bp_pat_t *first, *second;
         } BP_OTHERWISE;
         struct {
-            struct pat_s *first, *second;
+            bp_pat_t *first, *second;
         } BP_CHAIN;
-        struct {struct pat_s *pat, *must_match;} BP_MATCH;
-        struct {struct pat_s *pat, *must_not_match;} BP_NOT_MATCH;
+        struct {bp_pat_t *pat, *must_match;} BP_MATCH;
+        struct {bp_pat_t *pat, *must_not_match;} BP_NOT_MATCH;
         struct {
-            struct pat_s *pat;
+            bp_pat_t *pat;
             const char *text;
             uint32_t len;
         } BP_REPLACE;
@@ -110,10 +107,10 @@ typedef struct pat_s {
         struct {
             const char *name;
             uint32_t namelen;
-            struct pat_s *meaning, *next_def;
+            bp_pat_t *meaning, *next_def;
         } BP_DEFINITIONS;
         struct {
-            struct pat_s *pat;
+            bp_pat_t *pat;
             const char *name;
             uint16_t namelen;
             bool backreffable;
@@ -121,17 +118,17 @@ typedef struct pat_s {
         struct {
             struct match_s *match;
             const char *at;
-            struct pat_s *fallback;
+            bp_pat_t *fallback;
             void *ctx;
             bool visited;
         } BP_LEFTRECURSION;
     } __tagged;
-} pat_t;
+};
 
 typedef struct leftrec_info_s {
     struct match_s *match;
     const char *at;
-    struct pat_s *fallback;
+    bp_pat_t *fallback;
     void *ctx;
     bool visited;
 } leftrec_info_t;
@@ -139,7 +136,7 @@ typedef struct leftrec_info_s {
 typedef struct {
     bool success;
     union {
-        pat_t *pat;
+        bp_pat_t *pat;
         struct {
             const char *start, *end, *msg;
         } error;
@@ -147,20 +144,20 @@ typedef struct {
 } maybe_pat_t;
 
 __attribute__((returns_nonnull))
-pat_t *allocate_pat(pat_t pat);
+bp_pat_t *allocate_pat(bp_pat_t pat);
 __attribute__((nonnull, returns_nonnull))
-pat_t *bp_raw_literal(const char *str, size_t len);
+bp_pat_t *bp_raw_literal(const char *str, size_t len);
 __attribute__((nonnull(1)))
 maybe_pat_t bp_stringpattern(const char *str, const char *end);
 __attribute__((nonnull(1,2)))
-maybe_pat_t bp_replacement(pat_t *replacepat, const char *replacement, const char *end);
-pat_t *chain_together(pat_t *first, pat_t *second);
-pat_t *either_pat(pat_t *first, pat_t *second);
+maybe_pat_t bp_replacement(bp_pat_t *replacepat, const char *replacement, const char *end);
+bp_pat_t *chain_together(bp_pat_t *first, bp_pat_t *second);
+bp_pat_t *either_pat(bp_pat_t *first, bp_pat_t *second);
 __attribute__((nonnull(1)))
 maybe_pat_t bp_pattern(const char *str, const char *end);
 void free_all_pats(void);
 __attribute__((nonnull))
-void delete_pat(pat_t **at_pat, bool recursive);
+void delete_pat(bp_pat_t **at_pat, bool recursive);
 int set_pattern_printf_specifier(char specifier);
 
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1,\:0
