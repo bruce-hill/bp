@@ -232,6 +232,16 @@ public int fprint_match(FILE *out, const char *file_start, bp_match_t *m, print_
                 }
             }
 
+            // Bugfix: if pattern matches at the start of a line and first printed character is from
+            // the replacement string, we need to be sure that the line number gets printed.
+            // Regression test: `seq 3 | bp '{..$}' -r '#@0'` (should not print "#" before line numbers)
+            if (r == text) {
+                if (opts && opts->fprint_between) {
+                    printed += opts->fprint_between(out, m->start, m->start, opts->match_color);
+                    if (opts->replace_color) printed += fprintf(out, "%s", opts->replace_color);
+                }
+            }
+
             if (*r == '\\') {
                 ++r;
                 if (*r == 'N') { // \N (nodent)
