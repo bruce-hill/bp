@@ -160,6 +160,9 @@ public bp_pat_t *chain_together(bp_pat_t *first, bp_pat_t *second)
     if (first == NULL) return second;
     if (second == NULL) return first;
 
+    if (first->type == BP_STRING && first->max_matchlen == 0) return second;
+    if (second->type == BP_STRING && second->max_matchlen == 0) return first;
+
     if (first->type == BP_DEFINITIONS && second->type == BP_DEFINITIONS) {
         return Pattern(BP_CHAIN, first->start, second->end, second->min_matchlen, second->max_matchlen, .first=first, .second=second);
     }
@@ -244,6 +247,10 @@ static bp_pat_t *_bp_simplepattern(const char *str, const char *end, bool inside
                 target = NULL;
             } else {
                 target = bp_simplepattern(str, end);
+                // Bugfix: `echo "foo@" | bp '{..}{"@"}'` should be parsed as `.."@"`
+                // not '(.."") "@"'
+                while (target && target->type == BP_STRING && target->max_matchlen == 0)
+                    target = bp_simplepattern(target->end, end);
             }
             return type == BP_UPTO ?
                 Pattern(BP_UPTO, start, str, 0, -1, .target=target, .skip=extra_arg)
