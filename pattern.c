@@ -224,7 +224,11 @@ static bp_pat_t *_bp_simplepattern(const char *str, const char *end, bool inside
     switch (c) {
     // Any char (dot)
     case '.': {
-        if (*str == '.') { // ".."
+        // As a special case, 3+ dots is parsed as a series of "any char" followed by a single "upto"
+        // In other words, `...foo` parses as `(.)(..foo)` instead of `(..(.)) (foo)`
+        // This is so that `...` can mean "at least one character upto" instead of "upto any character",
+        // which is tautologically the same as matching any single character.
+        if (*str == '.' && (str+1 >= end || str[1] != '.')) { // ".."
             str = next_char(str, end);
             enum bp_pattype_e type = BP_UPTO;
             bp_pat_t *extra_arg = NULL;
