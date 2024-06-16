@@ -446,22 +446,6 @@ static bp_match_t *match(match_ctx_t *ctx, const char *str, bp_pat_t *pat)
             return m;
         }
 
-        // Optimization: for simple cases like `.."foo"` we can speed things up
-        // by skipping ahead to strstr(str, "foo")
-        if (!skip) {
-            bp_pat_t *prereq = get_prerequisite(ctx, target);
-            if (prereq->type == BP_STRING && prereq->min_matchlen > 0) {
-                char *found = ctx->ignorecase ?
-                    strcasestr(str, When(prereq, BP_STRING)->string)
-                    : memmem(str, (size_t)(ctx->end - str), When(prereq, BP_STRING)->string, prereq->min_matchlen);
-                str = found ? found : ctx->end;
-            } else if (prereq->type == BP_END_OF_FILE) {
-                str = ctx->end;
-            } else if (prereq->type == BP_END_OF_LINE) {
-                str += strcspn(str, "\n\r");
-            }
-        }
-
         size_t child_cap = 0, nchildren = 0;
         for (const char *prev = NULL; prev < str; ) {
             prev = str;
