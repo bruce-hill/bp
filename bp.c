@@ -647,9 +647,9 @@ int main(int argc, char *argv[])
                 options.print_filenames = 0;
             } else if (!streq(flag, "auto"))
                 errx(EXIT_FAILURE, "Unknown --format option: %s", flag);
-        } else if (argv[0][0] == '-' && argv[0][1] && argv[0][1] != '-') { // single-char flags
-            errx(EXIT_FAILURE, "Unrecognized flag: -%c\n\n%s", argv[0][1], usage);
-        } else if (argv[0][0] != '-') {
+        } else if (argv[0][0] != '-' || strncmp(argv[0], "->", 2) == 0) {
+            // As a special case, support `bp '->foo'` as a way to search for
+            // pointer field accesses without needing to escape anything.
             if (pattern != NULL) break;
             bp_pat_t *p = assert_pat(argv[0], NULL, bp_stringpattern(argv[0], argv[0]+strlen(argv[0])));
             if (!explicit_case_sensitivity)
