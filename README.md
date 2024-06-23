@@ -29,7 +29,6 @@ to and including the next occurrence of "baz" on the same line).
 * `-i` `--ignore-case` perform a case-insensitive match
 * `-I` `--inplace` perform replacements or filtering in-place on files
 * `-e` `--explain` print an explanation of the matches
-* `-j` `--json` print matches as JSON objects
 * `-l` `--list-files` print only filenames containing matches
 * `-r` `--replace <replacement>` replace the input pattern with the given replacement
 * `-s` `--skip <skip pattern>` skip over the given pattern when looking for matches
@@ -150,7 +149,6 @@ File                           | Description
 -------------------------------|-----------------------------------------------------
 [bp.c](bp.c)                   | The main program.
 [files.c](files.c)             | Loading files into memory.
-[json.c](json.c)               | JSON output of matches.
 [match.c](match.c)             | Pattern matching code (find occurrences of a bp pattern within an input string).
 [pattern.c](pattern.c)         | Pattern compiling code (compile a bp pattern from an input string).
 [printmatch.c](printmatch.c)   | Printing a visual explanation of a match.

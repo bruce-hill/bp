@@ -24,8 +24,8 @@ O=-O3
 ALL_FLAGS=$(CFLAGS) $(OSFLAGS) -DBP_NAME="\"$(NAME)\"" $(EXTRA) $(CWARN) $(G) $(O)
 
 LIBFILE=lib$(NAME).so
-CFILES=pattern.c utils.c match.c files.c printmatch.c json.c utf8.c
-HFILES=files.h json.h match.h pattern.h printmatch.h utf8.h utils.h
+CFILES=pattern.c utils.c match.c files.c printmatch.c utf8.c
+HFILES=files.h match.h pattern.h printmatch.h utf8.h utils.h
 OBJFILES=$(CFILES:.c=.o)
 
 $(NAME): $(OBJFILES) bp.c

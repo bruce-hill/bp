@@ -22,7 +22,6 @@
 #include <unistd.h>
 
 #include "files.h"
-#include "json.h"
 #include "match.h"
 #include "pattern.h"
 #include "printmatch.h"
@@ -40,7 +39,6 @@ static const char *usage = (
     " -h --help                        print the usage and quit\n"
     " -v --verbose                     print verbose debugging info\n"
     " -e --explain                     explain the matches\n"
-    " -j --json                        print matches as a list of JSON objects\n"
     " -c --case                        use case sensitivity\n"
     " -i --ignore-case                 preform matching case-insensitively\n"
     " -I --inplace                     modify a file in-place\n"
@@ -65,7 +63,7 @@ static const char *usage = (
 static struct {
     int context_before, context_after;
     bool ignorecase, verbose, git_mode, print_filenames;
-    enum { MODE_NORMAL, MODE_LISTFILES, MODE_INPLACE, MODE_JSON, MODE_EXPLAIN } mode;
+    enum { MODE_NORMAL, MODE_LISTFILES, MODE_INPLACE, MODE_EXPLAIN } mode;
     enum { FORMAT_AUTO, FORMAT_FANCY, FORMAT_PLAIN, FORMAT_BARE, FORMAT_FILE_LINE } format;
     bp_pat_t *skip;
 } options = {
@@ -203,22 +201,6 @@ static int is_text_file(const char *filename)
         if (isascii(buf[i]) && !(isprint(buf[i]) || isspace(buf[i])))
             return 0;
     return 1;
-}
-
-//
-// Print matches in JSON format.
-//
-static int print_matches_as_json(file_t *f, bp_pat_t *pattern, bp_pat_t *defs)
-{
-    int nmatches = 0;
-    for (bp_match_t *m = NULL; next_match(&m, f->start, f->end, pattern, defs, options.skip, options.ignorecase); ) {
-        if (++nmatches > 1)
-            printf(",\n");
-        printf("{\"filename\":\"%s\",\"match\":", f->filename);
-        json_match(f->start, m, options.verbose);
-        printf("}");
-    }
-    return nmatches;
 }
 
 //
@@ -418,8 +400,6 @@ static int process_file(const char *filename, bp_pat_t *pattern, bp_pat_t *defs)
             matches += 1;
         }
         stop_matching(&m);
-    } else if (options.mode == MODE_JSON) {
-        matches += print_matches_as_json(f, pattern, defs);
     } else if (options.mode == MODE_INPLACE) {
         bp_match_t *m = NULL;
         bool found = next_match(&m, f->start, f->end, pattern, defs, options.skip, options.ignorecase);
@@ -586,8 +566,6 @@ int main(int argc, char *argv[])
             options.verbose = true;
         } else if (BOOLFLAG("-e") || BOOLFLAG("--explain")) {
             options.mode = MODE_EXPLAIN;
-        } else if (BOOLFLAG("-j") || BOOLFLAG("--json")) {
-            options.mode = MODE_JSON;
         } else if (BOOLFLAG("-I") || BOOLFLAG("--inplace")) {
             options.mode = MODE_INPLACE;
             options.print_filenames = false;
@@ -686,7 +664,6 @@ int main(int argc, char *argv[])
         printf("Matching pattern: %P\n", pattern);
 
     int found = 0;
-    if (options.mode == MODE_JSON) printf("[");
     if (options.git_mode) { // Get the list of files from `git --ls-files ...`
         found = process_git_files(pattern, defs, argc, argv);
     } else if (argv[0]) {
@@ -708,7 +685,6 @@ int main(int argc, char *argv[])
         options.print_filenames = false; // Don't print filename on stdin
         found += process_file("", pattern, defs);
     }
-    if (options.mode == MODE_JSON) printf("]\n");
 
     // This code frees up all residual heap-allocated memory. Since the program
     // is about to exit, this step is unnecessary. However, it is useful for

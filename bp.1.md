@@ -27,9 +27,6 @@ syntax.
 `-e`, `--explain`
 : Print a visual explanation of the matches.
 
-`-j`, `--json`
-: Print a JSON list of the matches. (Pairs with `--verbose` for more detail)
-
 `-l`, `--list-files`
 : Print only the names of files containing matches instead of the matches
 themselves.
