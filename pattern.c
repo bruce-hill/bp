@@ -355,6 +355,7 @@ static bp_pat_t *_bp_simplepattern(const char *str, const char *end, bool inside
             str = next_char(str, end);
         size_t len = (size_t)(str - litstart);
         str = next_char(str, end);
+        if (c == '}') ++start; // Don't include the "}" in the pattern source range
         return Pattern(BP_STRING, start, str, len, (ssize_t)len, .string=strndup(litstart, len));
     }
     // Not <pat>
