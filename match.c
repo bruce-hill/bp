@@ -456,7 +456,7 @@ static bp_match_t *match(match_ctx_t *ctx, const char *str, bp_pat_t *pat)
                     m->end = str;
                     return m;
                 }
-            } else if (str == ctx->end) {
+            } else if (str == ctx->end || *str == '\n') {
                 m->end = str;
                 return m;
             }
