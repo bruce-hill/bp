@@ -528,6 +528,7 @@ public maybe_pat_t bp_stringpattern(const char *str, const char *end)
         bp_pat_t *interp = bp_pattern_nl(str, end, true);
         if (interp)
             pat = chain_together(pat, interp);
+        pat->end = end;
     }
     __END_TRY_PATTERN__
     return (maybe_pat_t){.success = true, .value.pat = pat};
