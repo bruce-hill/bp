@@ -422,6 +422,9 @@ static int process_file(const char *filename, bp_pat_t *pattern, bp_pat_t *defs)
         }
         modifying_file = NULL; backup_file = NULL;
         fclose(out);
+        if (matches > 0)
+            printf(getenv("NO_COLOR") ? "%s: %d replacement%s\n" : "\x1b[33;1m%s:\x1b[m %d replacement%s\n",
+                   filename, matches, matches == 1 ? "" : "s");
     } else {
         matches += print_matches(stdout, f, pattern, defs);
     }
