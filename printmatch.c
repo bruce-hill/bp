@@ -62,6 +62,8 @@ static void _explain_matches(match_node_t *firstmatch, int depth, const char *te
     // input, instead of something the user typed in)
     if (viz_type >= text && viz_type <= &text[textlen])
         printf("\033[%zuG\033[0;2m\"\033[%s;1m", 2*textlen+3, color);
+    else if (viz->pat->type == BP_STRING && (viz->end - viz->start) == (long)viz_typelen)
+        printf("\033[%zuG\033[%s;1m\"", 2*textlen+3, color);
     else
         printf("\033[%zuG\033[%s;1m", 2*textlen+3, color);
 
@@ -75,6 +77,8 @@ static void _explain_matches(match_node_t *firstmatch, int depth, const char *te
 
     if (viz_type >= text && viz_type <= &text[textlen])
         printf("\033[0;2m\"");
+    else if (viz->pat->type == BP_STRING && (viz->end - viz->start) == (long)viz_typelen)
+        printf("\"");
 
     printf("\033[m");
 
