@@ -36,21 +36,22 @@ static const char *usage = (
     "Usage:\n"
     "  "BP_NAME" [flags] <pattern> [<files>...]\n\n"
     "Flags:\n"
-    " -h --help                        print the usage and quit\n"
-    " -v --verbose                     print verbose debugging info\n"
-    " -e --explain                     explain the matches\n"
-    " -c --case                        use case sensitivity\n"
-    " -i --ignore-case                 preform matching case-insensitively\n"
+    " -A --context-after <n>           set number of lines of context to print after the match\n"
+    " -B --context-before <n>          set number of lines of context to print before the match\n"
+    " -C --context <context>           set number of lines of context to print before and after the match\n"
+    " -G --git                         in a git repository, treat filenames as patterns for `git ls-files`\n"
     " -I --inplace                     modify a file in-place\n"
+    " -c --case                        use case sensitivity\n"
+    " -e --explain                     explain the matches\n"
+    " -f --format fancy|plain|bare|file:line    set the output format\n"
+    " -g --grammar <grammar-file>      use the specified file as a grammar\n"
+    " -h --help                        print the usage and quit\n"
+    " -i --ignore-case                 preform matching case-insensitively\n"
     " -l --list-files                  list filenames only\n"
-    " -w --word <string-pat>           find words matching the given string pattern\n"
     " -r --replace <replacement>       replace the input pattern with the given replacement\n"
     " -s --skip <skip-pattern>         skip over the given pattern when looking for matches\n"
-    " -B --context-before <n>          set number of lines of context to print before the match\n"
-    " -A --context-after <n>           set number of lines of context to print after the match\n"
-    " -C --context <context>           set number of lines of context to print before and after the match\n"
-    " -f --format fancy|plain|bare|file:line    set the output format\n"
-    " -g --grammar <grammar-file>      use the specified file as a grammar");
+    " -v --verbose                     print verbose debugging info\n"
+    " -w --word <string-pat>           find words matching the given string pattern\n");
 
 // Used as a heuristic to check if a file is binary or text:
 #define CHECK_FIRST_N_BYTES 256
@@ -563,7 +564,7 @@ int main(int argc, char *argv[])
             ++argv;
             break;
         } else if (BOOLFLAG("-h") || BOOLFLAG("--help")) {
-            printf("%s\n\n%s\n", description, usage);
+            printf("%s\n\n%s", description, usage);
             exit(EXIT_SUCCESS);
         } else if (BOOLFLAG("-v") || BOOLFLAG("--verbose")) {
             options.verbose = true;
@@ -665,6 +666,11 @@ int main(int argc, char *argv[])
 
     if (options.verbose)
         printf("Matching pattern: %P\n", pattern);
+
+    // Default to git mode if there's a .git directory and no files were specified:
+    struct stat gitdir;
+    if (argc == 0 && stat(".git", &gitdir) == 0 && S_ISDIR(gitdir.st_mode))
+        options.git_mode = true;
 
     int found = 0;
     if (options.git_mode) { // Get the list of files from `git --ls-files ...`
