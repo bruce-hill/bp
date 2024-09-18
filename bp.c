@@ -673,10 +673,15 @@ int main(int argc, char *argv[])
         options.git_mode = true;
 
     int found = 0;
-    if (options.git_mode) { // Get the list of files from `git --ls-files ...`
+    if (!isatty(STDIN_FILENO) && !argv[0]) {
+        // Piped in input:
+        options.print_filenames = false; // Don't print filename on stdin
+        found += process_file("", pattern, defs);
+    } else if (options.git_mode) {
+        // Get the list of files from `git --ls-files ...`
         found = process_git_files(pattern, defs, argc, argv);
     } else if (argv[0]) {
-        // Files pass in as command line args:
+        // Files passed in as command line args:
         struct stat statbuf;
         if (!argv[1] && !(stat(argv[0], &statbuf) == 0 && S_ISDIR(statbuf.st_mode))) // Don't print filename for single-file matching
             options.print_filenames = false;
@@ -686,13 +691,9 @@ int main(int argc, char *argv[])
             else
                 found += process_file(argv[0], pattern, defs);
         }
-    } else if (isatty(STDIN_FILENO)) {
+    } else {
         // No files, no piped in input, so use files in current dir, recursively
         found += process_dir(".", pattern, defs);
-    } else {
-        // Piped in input:
-        options.print_filenames = false; // Don't print filename on stdin
-        found += process_file("", pattern, defs);
     }
 
     // This code frees up all residual heap-allocated memory. Since the program
