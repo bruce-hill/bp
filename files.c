@@ -63,7 +63,7 @@ public file_t *load_file(file_t **files, const char *filename)
         // Check for <file>:<line>
         if (strrchr(filename, ':')) {
             char tmp[PATH_MAX] = {0};
-            strcpy(tmp, filename);
+            strlcpy(tmp, filename, sizeof(tmp));
             char *colon = strrchr(tmp, ':');
             *colon = '\0';
             file_t *f = load_file(files, tmp);
