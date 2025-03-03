@@ -3,7 +3,6 @@
 //
 #pragma once
 
-#include <printf.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -158,6 +157,6 @@ maybe_pat_t bp_pattern(const char *str, const char *end);
 void free_all_pats(void);
 __attribute__((nonnull))
 void delete_pat(bp_pat_t **at_pat, bool recursive);
-int set_pattern_printf_specifier(char specifier);
+int fprint_pattern(FILE *stream, bp_pat_t *pat);
 
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1,\:0

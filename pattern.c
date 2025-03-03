@@ -3,7 +3,6 @@
 //
 #include <ctype.h>
 #include <err.h>
-#include <printf.h>
 #include <setjmp.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -673,59 +672,46 @@ public void delete_pat(bp_pat_t **at_pat, bool recursive)
     delete(at_pat);
 }
 
-static int printf_pattern_size(const struct printf_info *info, size_t n, int argtypes[n], int sizes[n])
+int fprint_pattern(FILE *stream, bp_pat_t *pat)
 {
-    if (n < 1) return -1;
-    (void)info;
-    argtypes[0] = PA_POINTER;
-    sizes[0] = sizeof(void*);
-    return 1;
-}
-
-static int printf_pattern(FILE *stream, const struct printf_info *info, const void *const args[])
-{
-    (void)info;
-    bp_pat_t *pat = *(bp_pat_t**)args[0];
     if (!pat) return fputs("(null)", stream);
-
     switch (pat->type) {
-#define P(name, ...) case BP_ ## name: { __auto_type data = pat->__tagged.BP_##name; (void)data; return fprintf(stream, #name __VA_ARGS__); }
-        P(ERROR)
-        P(ANYCHAR)
-        P(ID_START)
-        P(ID_CONTINUE)
-        P(STRING, "(\"%s\")", data.string)
-        P(RANGE, "('%c'-'%c')", data.low, data.high)
-        P(NOT, "(%P)", data.pat)
-        P(UPTO, "(%P, skip=%P)", data.target, data.skip)
-        P(UPTO_STRICT, "(%P, skip=%P)", data.target, data.skip)
-        P(REPEAT, "(%u-%d, %P, sep=%P)", data.min, data.max, data.repeat_pat, data.sep)
-        P(BEFORE, "(%P)", data.pat)
-        P(AFTER, "(%P)", data.pat)
-        P(CAPTURE, "(%P, name=%.*s, backref=%s)", data.pat, data.namelen, data.name, data.backreffable ? "yes" : "no")
-        P(OTHERWISE, "(%P, %P)", data.first, data.second);
-        P(CHAIN, "(%P, %P)", data.first, data.second);
-        P(MATCH, "(%P, matches=%P)", data.pat, data.must_match);
-        P(NOT_MATCH, "(%P, not_matches=%P)", data.pat, data.must_not_match);
-        P(REPLACE, "(%P, \"%.*s\")", data.pat, data.len, data.text);
-        P(REF, "(%.*s)", data.len, data.name);
-        P(NODENT)
-        P(CURDENT)
-        P(START_OF_FILE)
-        P(START_OF_LINE)
-        P(END_OF_FILE)
-        P(END_OF_LINE)
-        P(WORD_BOUNDARY)
-        P(DEFINITIONS, "(%.*s=%P); %P", data.namelen, data.name, data.meaning, data.next_def)
-        P(TAGGED, "(%.*s=%P, backref=%s)", data.namelen, data.name, data.pat, data.backreffable ? "yes" : "no")
+#define CASE(name, ...) case BP_ ## name: { __auto_type data = pat->__tagged.BP_##name; (void)data; int _printed = fputs(#name, stream); __VA_ARGS__; return _printed; }
+#define FMT(...) _printed += fprintf(stream, __VA_ARGS__)
+#define PAT(p) _printed += fprint_pattern(stream, p)
+        CASE(ERROR)
+        CASE(ANYCHAR)
+        CASE(ID_START)
+        CASE(ID_CONTINUE)
+        CASE(STRING, FMT("(\"%s\")", data.string))
+        CASE(RANGE, FMT("('%c'-'%c')", data.low, data.high))
+        CASE(NOT, FMT("("); PAT(data.pat); FMT(")"))
+        CASE(UPTO, FMT("("); PAT(data.target); FMT(", skip="); PAT(data.skip); FMT(")"))
+        CASE(UPTO_STRICT, FMT("("); PAT(data.target); FMT(", skip=)"); PAT(data.skip))
+        CASE(REPEAT, FMT("(%u-%d, ", data.min, data.max); PAT(data.repeat_pat); FMT(", sep="); PAT(data.sep); FMT(")"))
+        CASE(BEFORE, FMT("("); PAT(data.pat); FMT(")"))
+        CASE(AFTER, FMT("("); PAT(data.pat); FMT(")"))
+        CASE(CAPTURE, FMT("("); PAT(data.pat); FMT(", name=%.*s, backref=%s)", data.namelen, data.name, data.backreffable ? "yes" : "no"))
+        CASE(OTHERWISE, FMT("("); PAT(data.first); FMT(", "); PAT(data.second); FMT(")"))
+        CASE(CHAIN, FMT("("); PAT(data.first); FMT(", "); PAT(data.second); FMT(")"))
+        CASE(MATCH, FMT("("); PAT(data.pat); FMT(", matches="); PAT(data.must_match); FMT(")"))
+        CASE(NOT_MATCH, FMT("("); PAT(data.pat); FMT(", must_not_match="); PAT(data.must_not_match); FMT(")"))
+        CASE(REPLACE, FMT("("); PAT(data.pat); FMT(", \"%.*s\")", data.pat, data.len, data.text))
+        CASE(REF, FMT("(%.*s)", data.len, data.name))
+        CASE(NODENT)
+        CASE(CURDENT)
+        CASE(START_OF_FILE)
+        CASE(START_OF_LINE)
+        CASE(END_OF_FILE)
+        CASE(END_OF_LINE)
+        CASE(WORD_BOUNDARY)
+        CASE(DEFINITIONS, FMT("(%.*s=", data.namelen, data.name); PAT(data.meaning); FMT("); "); PAT(data.next_def))
+        CASE(TAGGED, FMT("(%.*s=", data.namelen, data.name); PAT(data.pat); FMT(" backref=%s)", data.backreffable ? "yes" : "no"))
+#undef PAT
+#undef FMT
 #undef P
     default: return fputs("???", stream);
     }
-}
-
-public int set_pattern_printf_specifier(char specifier)
-{
-    return register_printf_specifier(specifier, printf_pattern, printf_pattern_size);
 }
 
 // vim: ts=4 sw=0 et cino=L2,l1,(0,W4,m1,\:0

@@ -10,7 +10,6 @@
 #include <fcntl.h>
 #include <glob.h>
 #include <limits.h>
-#include <printf.h>
 #include <signal.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -543,9 +542,6 @@ int main(int argc, char *argv[])
 {
     char *flag = NULL;
 
-    if (set_pattern_printf_specifier('P'))
-        errx(1, "Couldn't set printf specifier");
-
     bp_pat_t *defs = NULL;
     file_t *loaded_files = NULL;
     bp_pat_t *pattern = NULL;
@@ -664,8 +660,11 @@ int main(int argc, char *argv[])
     // Handle exit() calls gracefully:
     require(atexit(&cleanup), "Failed to set cleanup handler at exit");
 
-    if (options.verbose)
-        printf("Matching pattern: %P\n", pattern);
+    if (options.verbose) {
+        fputs("Matching pattern: ", stderr);
+        fprint_pattern(stderr, pattern);
+        fputc('\n', stderr);
+    }
 
     // Default to git mode if there's a .git directory and no files were specified:
     struct stat gitdir;
