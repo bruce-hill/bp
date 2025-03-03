@@ -2,7 +2,7 @@ NAME=bp
 CC=cc
 PREFIX=/usr/local
 SYSCONFDIR=/etc
-CFLAGS=-std=c11 -Werror -D_XOPEN_SOURCE=700 -D_POSIX_C_SOURCE=200809L -fPIC -flto=auto -fvisibility=hidden \
+CFLAGS=-std=c11 -Werror -D_XOPEN_SOURCE=800 -D_POSIX_C_SOURCE=200809L -fPIC -flto=auto -fvisibility=hidden \
 			 -fsanitize=signed-integer-overflow -fno-sanitize-recover
 CWARN=-Wall -Wextra -Wno-format -Wshadow
   # -Wpedantic -Wsign-conversion -Wtype-limits -Wunused-result -Wnull-dereference \
