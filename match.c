@@ -222,10 +222,9 @@ void cache_destroy(match_ctx_t *ctx)
 //
 // Look up a pattern definition by name from a definition pattern.
 //
-__attribute__((nonnull(2)))
 static bp_pat_t *_lookup_def(match_ctx_t *ctx, bp_pat_t *defs, const char *name, size_t namelen)
 {
-    while (defs) {
+    while (defs != NULL) {
         if (defs->type == BP_CHAIN) {
             auto chain = When(defs, BP_CHAIN);
             bp_pat_t *second = _lookup_def(ctx, chain->second, name, namelen);
@@ -247,7 +246,7 @@ static bp_pat_t *_lookup_def(match_ctx_t *ctx, bp_pat_t *defs, const char *name,
 //
 // Look up a pattern definition by name from a context.
 //
-__attribute__((nonnull))
+__attribute__((nonnull(2)))
 bp_pat_t *lookup_ctx(match_ctx_t *ctx, const char *name, size_t namelen)
 {
     for (; ctx; ctx = ctx->parent_ctx) {
