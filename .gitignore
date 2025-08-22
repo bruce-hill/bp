@@ -1,7 +1,8 @@
 *.o
 *.so
 tags
-bp
+/bp
 .*
 !.gitignore
 /Lua/builtins.h
+config.mk

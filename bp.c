@@ -557,9 +557,9 @@ int main(int argc, char *argv[])
     bp_pat_t *pattern = NULL;
 
     // Load builtins:
-    file_t *builtins_file = load_file(&loaded_files, SYSCONFDIR"/"BP_NAME"/builtins.bp");
+    file_t *builtins_file = load_file(&loaded_files, BP_PREFIX"/"BP_NAME"/builtins.bp");
     if (builtins_file) defs = load_grammar(defs, builtins_file);
-    file_t *local_file = load_filef(&loaded_files, "%s/.config/"BP_NAME"/builtins.bp", getenv("HOME"));
+    file_t *local_file = load_file(&loaded_files, BP_PREFIX"/share/"BP_NAME"/grammars/builtins.bp");
     if (local_file) defs = load_grammar(defs, local_file);
 
     bool explicit_case_sensitivity = false;
@@ -605,7 +605,7 @@ int main(int argc, char *argv[])
             if (f == NULL)
                 f = load_filef(&loaded_files, "%s/.config/"BP_NAME"/%s.bp", getenv("HOME"), flag);
             if (f == NULL)
-                f = load_filef(&loaded_files, SYSCONFDIR"/"BP_NAME"/%s.bp", flag);
+                f = load_filef(&loaded_files, BP_PREFIX"/share/"BP_NAME"/grammars/%s.bp", flag);
             if (f == NULL)
                 errx(EXIT_FAILURE, "Couldn't find grammar: %s", flag);
             defs = load_grammar(defs, f); // Keep in memory for debug output
