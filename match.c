@@ -10,6 +10,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/param.h>
 
 #include "match.h"
 #include "pattern.h"
@@ -306,9 +307,9 @@ __attribute__((nonnull(1, 2, 3))) static bp_match_t *_next_match(match_ctx_t *ct
     // we can just rely on the highly optimized memmem() implementation to skip
     // past areas where we know we won't find a match.
     if (!skip && first->type == BP_STRING && first->min_matchlen > 0) {
-        char *found = ctx->ignorecase
-                          ? strcasestr(str, When(first, BP_STRING)->string)
-                          : memmem(str, (size_t)(ctx->end - str), When(first, BP_STRING)->string, first->min_matchlen);
+        char *found = ctx->ignorecase ? strcasestr(str, When(first, BP_STRING)->string)
+                                      : strnstr(str, When(first, BP_STRING)->string,
+                                                MIN((size_t)(ctx->end - str), first->min_matchlen));
         str = found ? found : ctx->end;
     } else if (!skip && str > ctx->start && (first->type == BP_START_OF_LINE || first->type == BP_END_OF_LINE)) {
         char *found = memchr(str, '\n', (size_t)(ctx->end - str));

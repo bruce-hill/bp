@@ -1,9 +1,23 @@
+ifeq ($(wildcard config.mk),)
+all: config.mk
+	$(MAKE) all
+install: config.mk
+	$(MAKE) install
+install-files: config.mk
+	$(MAKE) install-files
+install-lib: config.mk
+	$(MAKE) install-lib
+test: config.mk
+	$(MAKE) test
+config.mk: configure.sh
+	bash ./configure.sh
+else
+
+include config.mk
 NAME=bp
 CC=cc
-PREFIX=/usr/local
-SYSCONFDIR=/etc
-CFLAGS=-std=c11 -Werror -D_XOPEN_SOURCE=800 -D_POSIX_C_SOURCE=200809L -fPIC -flto=auto -fvisibility=hidden \
-			 -fsanitize=signed-integer-overflow -fno-sanitize-recover
+CFLAGS=-std=c2x -Werror -D_GNU_SOURCE -fPIC -flto=auto -fvisibility=hidden \
+			 -fsanitize=signed-integer-overflow -fno-sanitize-recover -DBP_PREFIX='"$(PREFIX)"'
 CWARN=-Wall -Wextra -Wno-format -Wshadow
   # -Wpedantic -Wsign-conversion -Wtype-limits -Wunused-result -Wnull-dereference \
 	# -Waggregate-return -Walloc-zero -Walloca -Warith-conversion -Wcast-align -Wcast-align=strict \
@@ -34,7 +48,7 @@ $(NAME): $(OBJFILES) bp.c
 $(LIBFILE): pattern.o utils.o match.o utf8.o
 	$(CC) $^ $(ALL_FLAGS) -Wl,-soname,$(LIBFILE) -shared -o $@
 
-all: $(NAME) $(LIBFILE) bp.1 lua
+all: $(NAME) bp.1
 
 %.o: %.c %.h utf8.h
 	$(CC) -c $(ALL_FLAGS) -o $@ $<
@@ -80,8 +94,8 @@ splint:
 #		$(CFILES) bp.c
 
 install: $(NAME) bp.1
-	mkdir -p -m 755 "$(PREFIX)/man/man1" "$(PREFIX)/bin" "$(SYSCONFDIR)/$(NAME)"
-	cp -r grammars/* "$(SYSCONFDIR)/$(NAME)/"
+	mkdir -p -m 755 "$(PREFIX)/man/man1" "$(PREFIX)/bin" "$(PREFIX)/share/$(NAME)"
+	cp -r grammars "$(PREFIX)/share/$(NAME)/"
 	cp bp.1 "$(PREFIX)/man/man1/$(NAME).1"
 	rm -f "$(PREFIX)/bin/$(NAME)"
 	cp $(NAME) "$(PREFIX)/bin/"
@@ -92,17 +106,14 @@ install-lib: $(LIBFILE) bp.1
 	cp pattern.h match.h "$(PREFIX)/include/$(NAME)"
 
 uninstall:
-	rm -rf "$(PREFIX)/bin/$(NAME)" "$(PREFIX)/man/man1/$(NAME).1" "$(SYSCONFDIR)/$(NAME)"
-	@if [ -d ~/.config/$(NAME) ]; then \
-	  printf 'Config files exist in ~/.config/$(NAME) Do you want to delete them? [Y/n] '; \
-	  read confirm; \
-	  [ "$$confirm" != n ] && rm -rf ~/.config/$(NAME); \
-	fi
+	rm -rf "$(PREFIX)/bin/$(NAME)" "$(PREFIX)/man/man1/$(NAME).1" "$(PREFIX)/share/$(NAME)"
 
 profile_grammar: bp
 	perf stat -r 100 -e L1-dcache-loads,L1-dcache-load-misses,L1-dcache-stores -e cycles ./bp -f plain -g bp -p Grammar grammars/bp.bp >/dev/null
 
 profile_pattern: bp
 	perf stat -r 1 -e L1-dcache-loads,L1-dcache-load-misses,L1-dcache-stores -e cycles ./bp -f plain -p 'id parens' /usr/include/*.h >/dev/null
+
+endif
 
 .PHONY: all clean install install-lib uninstall leaktest splint test tutorial lua profile luatest
