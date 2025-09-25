@@ -2,7 +2,6 @@
 // match.c - Code for the BP virtual machine that performs the matching.
 //
 
-#include <ctype.h>
 #include <err.h>
 #include <limits.h>
 #include <setjmp.h>
@@ -308,8 +307,8 @@ __attribute__((nonnull(1, 2, 3))) static bp_match_t *_next_match(match_ctx_t *ct
     // past areas where we know we won't find a match.
     if (!skip && first->type == BP_STRING && first->min_matchlen > 0) {
         char *found = ctx->ignorecase ? strcasestr(str, When(first, BP_STRING)->string)
-                                      : strnstr(str, When(first, BP_STRING)->string,
-                                                MIN((size_t)(ctx->end - str), first->min_matchlen));
+                                      : memmem(str, (size_t)(ctx->end - str), When(first, BP_STRING)->string,
+                                               strlen(When(first, BP_STRING)->string));
         str = found ? found : ctx->end;
     } else if (!skip && str > ctx->start && (first->type == BP_START_OF_LINE || first->type == BP_END_OF_LINE)) {
         char *found = memchr(str, '\n', (size_t)(ctx->end - str));
