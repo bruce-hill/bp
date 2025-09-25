@@ -79,7 +79,7 @@ file_t *load_file(file_t **files, const char *filename) {
     struct stat sb;
     if (fstat(fd, &sb) == -1) goto read_file;
 
-    f->mmapped = mmap(NULL, (size_t)sb.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+    f->mmapped = mmap(NULL, (size_t)sb.st_size + 1, PROT_READ, MAP_PRIVATE, fd, 0);
     if (f->mmapped == MAP_FAILED) {
         f->mmapped = NULL;
         goto read_file;
