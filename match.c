@@ -2,6 +2,7 @@
 // match.c - Code for the BP virtual machine that performs the matching.
 //
 
+#include <ctype.h>
 #include <err.h>
 #include <limits.h>
 #include <setjmp.h>
@@ -288,6 +289,22 @@ static bp_pat_t *get_prerequisite(match_ctx_t *ctx, bp_pat_t *pat) {
     return pat;
 }
 
+static const char *memcasemem(const char *haystack, size_t haystack_len, const char *needle, size_t needle_len) {
+    if (needle_len == 0) return haystack;
+    if (haystack_len == 0) return NULL;
+
+    char first_char = tolower(needle[0]);
+    for (const char *end = haystack + haystack_len - needle_len; haystack < end; haystack += 1) {
+        while (haystack < end && tolower(*haystack) != first_char) {
+            haystack += 1;
+        }
+        if (haystack < end && strncasecmp(haystack, needle, needle_len) == 0) {
+            return haystack;
+        }
+    }
+    return NULL;
+}
+
 //
 // Find the next match after prev (or the first match if prev is NULL)
 //
@@ -306,12 +323,13 @@ __attribute__((nonnull(1, 2, 3))) static bp_match_t *_next_match(match_ctx_t *ct
     // we can just rely on the highly optimized memmem() implementation to skip
     // past areas where we know we won't find a match.
     if (!skip && first->type == BP_STRING && first->min_matchlen > 0) {
-        char *found = ctx->ignorecase ? strcasestr(str, When(first, BP_STRING)->string)
-                                      : memmem(str, (size_t)(ctx->end - str), When(first, BP_STRING)->string,
-                                               strlen(When(first, BP_STRING)->string));
+        const char *found = ctx->ignorecase ? memcasemem(str, (size_t)(ctx->end - str), When(first, BP_STRING)->string,
+                                                         strlen(When(first, BP_STRING)->string))
+                                            : memmem(str, (size_t)(ctx->end - str), When(first, BP_STRING)->string,
+                                                     strlen(When(first, BP_STRING)->string));
         str = found ? found : ctx->end;
     } else if (!skip && str > ctx->start && (first->type == BP_START_OF_LINE || first->type == BP_END_OF_LINE)) {
-        char *found = memchr(str, '\n', (size_t)(ctx->end - str));
+        const char *found = memchr(str, '\n', (size_t)(ctx->end - str));
         str = found ? (first->type == BP_START_OF_LINE ? found + 1 : found) : ctx->end;
     }
 
