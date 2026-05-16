@@ -93,7 +93,7 @@ static file_t *backup_file;
 //
 static inline void fprint_filename(FILE *out, const char *filename) {
     if (!filename[0]) return;
-    if (options.format == FORMAT_FANCY) fprintf(out, "\033[0;1;4;33m%s\033[m\n", filename);
+    if (options.format == FORMAT_FANCY) fprintf(out, "\033[0;1;4;93m%s\033[m\n", filename);
     else fprintf(out, "%s:\n", filename);
 }
 
@@ -120,10 +120,10 @@ static inline bp_pat_t *assert_pat(const char *start, const char *end, maybe_pat
         const char *eol = nl ? nl : end;
         if (eol < err_end) err_end = eol;
 
-        fprintf(stderr, "\033[31;1m%s\033[0m\n", err_msg);
+        fprintf(stderr, "\033[91;1m%s\033[0m\n", err_msg);
         fprintf(stderr, "%.*s\033[41;30m%.*s\033[m%.*s\n", (int)(err_start - sol), sol, (int)(err_end - err_start),
                 err_start, (int)(eol - err_end), err_end);
-        fprintf(stderr, "\033[34;1m");
+        fprintf(stderr, "\033[94;1m");
         const char *p = sol;
         for (; p < err_start; ++p)
             (void)fputc(*p == '\t' ? '\t' : ' ', stderr);
@@ -337,8 +337,8 @@ static int print_matches(FILE *out, file_t *f, bp_pat_t *pattern, bp_pat_t *defs
 
     print_options_t print_opts = {.fprint_between = _fprint_between, .on_nl = on_nl};
     if (options.format == FORMAT_FANCY) {
-        print_opts.match_color = "\033[0;31;1m";
-        print_opts.replace_color = "\033[0;34;1m";
+        print_opts.match_color = "\033[0;91;1m";
+        print_opts.replace_color = "\033[0;94;1m";
         print_opts.normal_color = "\033[m";
     }
     for (bp_match_t *m = NULL; next_match(&m, f->start, f->end, pattern, defs, options.skip, options.ignorecase);) {
@@ -412,7 +412,7 @@ __attribute__((nonnull)) static int process_file(const char *filename, bp_pat_t 
         backup_file = NULL;
         fclose(out);
         if (matches > 0)
-            printf(getenv("NO_COLOR") ? "%s: %d replacement%s\n" : "\x1b[33;1m%s:\x1b[m %d replacement%s\n", filename,
+            printf(getenv("NO_COLOR") ? "%s: %d replacement%s\n" : "\x1b[93;1m%s:\x1b[m %d replacement%s\n", filename,
                    matches, matches == 1 ? "" : "s");
     } else {
         matches += print_matches(stdout, f, pattern, defs);
@@ -420,7 +420,7 @@ __attribute__((nonnull)) static int process_file(const char *filename, bp_pat_t 
     fflush(stdout);
 
     if (recycle_all_matches() != 0)
-        fprintf(stderr, "\033[33;1mMemory leak: there should no longer be any matches in use at this point.\033[m\n");
+        fprintf(stderr, "\033[93;1mMemory leak: there should no longer be any matches in use at this point.\033[m\n");
     destroy_file(&f);
     (void)fflush(stdout);
     return matches;
